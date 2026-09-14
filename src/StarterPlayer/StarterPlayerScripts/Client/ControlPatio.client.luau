@@ -4,7 +4,8 @@
 	Input del patio en el cliente. Solo envia INTENCION; el servidor valida.
 
 	  Clic / toque sobre un objeto del patio  -> ReclamarObjetoEvent(id)
-	  F / ButtonY / boton tactil "Lanzar"     -> LanzarObjetoEvent(punto)
+	  MANTENER F / ButtonY / boton tactil    -> carga la fuerza; al soltar,
+	                                            LanzarObjetoEvent(punto, fuerza)
 	  Resaltado del objeto bajo el cursor si esta al Alcance
 
 	Excavar, reciclar, refresco y hablar NO estan aqui: son ProximityPrompts y
@@ -29,6 +30,7 @@ local Config = Shared:WaitForChild("Config")
 local Paleta = require(Config:WaitForChild("Paleta"))
 local Textos = require(Config:WaitForChild("Textos"))
 local DefinicionesMejoras = require(Config:WaitForChild("DefinicionesMejoras"))
+local GameConfig = require(Config:WaitForChild("GameConfig"))
 local Utilidades = Shared:WaitForChild("Utilidades")
 local Red = require(Utilidades:WaitForChild("Red"))
 local Entrada = require(Utilidades:WaitForChild("Entrada"))
@@ -94,7 +96,8 @@ end
 
 local function posicionCursor(): Vector2?
 	local plataforma = Entrada.plataforma()
-	if plataforma == "gamepad" then
+	-- Gamepad y primera persona (raton bloqueado en el centro): rayo central
+	if plataforma == "gamepad" or UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter then
 		return nil
 	end
 	local pos = UserInputService:GetMouseLocation()
@@ -163,7 +166,7 @@ UserInputService.InputBegan:Connect(function(input, procesado)
 	end
 end)
 
--- === Lanzar ===
+-- === Lanzar la bolsa: mantener para cargar, soltar para lanzar ===
 local function puntoObjetivo(): Vector3
 	local resultado = rayoDesdePantalla(posicionCursor())
 	if resultado then
@@ -176,13 +179,36 @@ local function puntoObjetivo(): Vector3
 	return Vector3.zero
 end
 
+local cargando: number? = nil -- os.clock() del inicio de la carga
+
 local function lanzar(_nombre: string, estado: Enum.UserInputState)
-	if estado ~= Enum.UserInputState.Begin or Menu.hayAbierto() then
+	if Menu.hayAbierto() then
 		return Enum.ContextActionResult.Pass
 	end
-	LanzarObjetoEvent:FireServer(puntoObjetivo())
-	return Enum.ContextActionResult.Sink
+	if estado == Enum.UserInputState.Begin then
+		if #EstadoCliente.bolsa.items == 0 then
+			return Enum.ContextActionResult.Pass
+		end
+		cargando = os.clock()
+		return Enum.ContextActionResult.Sink
+	elseif estado == Enum.UserInputState.End or estado == Enum.UserInputState.Cancel then
+		local inicio = cargando
+		cargando = nil
+		local fuerza = EstadoCliente.cargaLanzamiento
+		EstadoCliente.fijarCarga(0)
+		if inicio and estado == Enum.UserInputState.End and os.clock() - inicio >= GameConfig.FUERZA_LANZAMIENTO.minimo then
+			LanzarObjetoEvent:FireServer(puntoObjetivo(), math.max(fuerza, 0.15))
+		end
+		return Enum.ContextActionResult.Sink
+	end
+	return Enum.ContextActionResult.Pass
 end
+
+RunService.RenderStepped:Connect(function()
+	if cargando then
+		EstadoCliente.fijarCarga((os.clock() - cargando) / GameConfig.FUERZA_LANZAMIENTO.segundosCarga)
+	end
+end)
 
 ContextActionService:BindAction("Lanzar", lanzar, true, Enum.KeyCode.F, Enum.KeyCode.ButtonY)
 ContextActionService:SetTitle("Lanzar", Textos.HUD.lanzar)

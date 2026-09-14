@@ -5,7 +5,7 @@
 	  - ProximityPrompts del patio y la caseta (excavar, reciclar, refresco,
 	    hablar con Dona Chatarra),
 	  - ReclamarObjetoEvent (clic dentro del Alcance),
-	  - LanzarObjetoEvent (punteria).
+	  - LanzarObjetoEvent(punto, fuerza): lanzar la bolsa entera (punteria).
 
 	Un solo listener de ProximityPromptService.PromptTriggered para todo: se
 	decide por el MODELO al que pertenece el prompt (atributo MontonId, tags
@@ -164,11 +164,11 @@ ReclamarObjetoEvent.OnServerEvent:Connect(function(jugador, objetoId)
 	Botin.reclamar(jugador, objetoId, "clic")
 end)
 
-LanzarObjetoEvent.OnServerEvent:Connect(function(jugador, punto)
-	if typeof(punto) ~= "Vector3" or enCooldown(jugador, "lanzar", 0.4) then
+LanzarObjetoEvent.OnServerEvent:Connect(function(jugador, punto, fuerza)
+	if typeof(punto) ~= "Vector3" or typeof(fuerza) ~= "number" or enCooldown(jugador, "lanzar", 0.4) then
 		return
 	end
-	local ok, motivo = Botin.lanzar(jugador, punto)
+	local ok, motivo = Botin.lanzarBolsa(jugador, punto, fuerza)
 	if not ok then
 		if motivo == "demasiadoCerca" then
 			notificar(jugador, Textos.PATIO.demasiadoCerca, "aviso")

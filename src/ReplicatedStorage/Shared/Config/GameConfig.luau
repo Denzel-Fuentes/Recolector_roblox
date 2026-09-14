@@ -52,15 +52,21 @@ GameConfig.FACTOR_COSTE_MEJORA = 1.6
 
 -- === Montones ===
 GameConfig.DURACION_EXCAVAR = 1.5
-GameConfig.VIDA_OBJETO = 45
-GameConfig.UMBRAL_REPOBLACION = 8
+-- Los objetos liberados NO caducan: se quedan hasta que alguien los recoja.
+GameConfig.UMBRAL_REPOBLACION = 4
+-- Un monton activo cuenta como disponible mientras le quede esta fraccion de
+-- sus objetos sin recoger (asi la repoblacion no espera al ultimo papel).
+GameConfig.FRACCION_MONTON_DISPONIBLE = 0.25
 GameConfig.RETRASO_REPOBLACION = 20
+-- min/max = PIEZAS de la montana = objetos que se liberan (la cantidad visible
+-- es la cantidad real). cantidad = montones de ese tamano en el patio (12).
 GameConfig.TAMANOS_MONTON = {
-	chico = { min = 5, max = 7, cantidad = 10 },
-	mediano = { min = 8, max = 11, cantidad = 9 },
-	grande = { min = 12, max = 16, cantidad = 5 },
+	chico = { min = 14, max = 18, cantidad = 4, radio = 7 },
+	mediano = { min = 22, max = 28, cantidad = 5, radio = 10 },
+	grande = { min = 34, max = 44, cantidad = 3, radio = 14 },
 }
-GameConfig.RADIO_DISPERSION_OBJETOS = 6
+GameConfig.RADIO_DISPERSION_OBJETOS = 10
+GameConfig.PATIO_LADO = 200
 
 -- === Pity (correccion deliberada del RNG "duro" del original) ===
 GameConfig.PITY_BASE = 0.08
@@ -69,12 +75,13 @@ GameConfig.PITY_PASO_PASE = 0.03
 GameConfig.PITY_TOPE = 0.60
 GameConfig.PROB_EPICA_ENTRE_RARAS = 0.25
 
--- === Punteria: lanzar objetos de la bolsa al Contenedor de la caseta ===
+-- === Punteria: lanzar la BOLSA entera al Contenedor de la caseta ===
 GameConfig.DISTANCIA_MIN_LANZAR = 6
 GameConfig.DISTANCIA_MAX_LANZAR = 70
-GameConfig.TIEMPO_VUELO = 1.2
 GameConfig.BONUS_ACIERTO = 0.5
 GameConfig.VIDA_PROYECTIL = 4
+-- Mantener pulsado carga la fuerza: a fuerza 1 la bolsa llega a alcanceMax.
+GameConfig.FUERZA_LANZAMIENTO = { segundosCarga = 1.2, alcanceMax = 70, minimo = 0.15 }
 
 -- === Reparacion ===
 GameConfig.FRAGMENTOS_POR_MASCOTA = 5
@@ -99,7 +106,7 @@ GameConfig.PRECIO_CONTENEDOR_DORADO_GEMAS = 150
 GameConfig.MASCOTAS_CONTENEDOR_DORADO = 3
 
 -- === Parcelas ===
-GameConfig.NUM_PARCELAS = 16
+GameConfig.NUM_PARCELAS = 6
 GameConfig.PEDESTALES = 6
 GameConfig.SLOTS_ESTANTERIA = 12
 

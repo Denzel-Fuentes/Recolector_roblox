@@ -1,6 +1,6 @@
 # Guía de pruebas cerradas — Recíclatas
 
-Para 3–5 probadores en el mismo servidor. **Esto no mide si el juego funciona,
+Para 3–5 probadores en el mismo servidor (máximo 6 por partida: 6 bases). **Esto no mide si el juego funciona,
 mide si se siente bien.** Lo técnico ya está cubierto con pruebas automáticas;
 aquí interesa la sensación, y para eso hace falta gente que no lo haya hecho.
 
@@ -12,12 +12,13 @@ sesión existe para responder a eso antes de comprometer arte.
 
 | Control | Acción |
 |---|---|
-| Acercarse a un montón y mantener **E** | Excavar (cuesta energía; los objetos saltan) |
+| Entrar al patio | La cámara pasa sola a **primera persona** y ves tus manos con la bolsa |
+| Acercarse a una montaña de basura y mantener **E** | Activarla (cuesta energía): las piezas ruedan al suelo y se quedan ahí hasta que alguien las recoja |
 | Caminar sobre un objeto / **clic** cerca | Recogerlo a la bolsa |
-| **E** en el Contenedor de la caseta | Reciclar la bolsa (bonus si iba llena) |
+| **Mantener F** (o botón táctil) apuntando al Contenedor, soltar | Lanzar la **bolsa entera**; cuanto más tiempo, más lejos. Si falla, queda en el suelo y cualquiera puede recogerla |
+| **E** en el Contenedor de la caseta | Reciclar la bolsa de cerca (bonus si iba llena) |
 | **E** en la máquina | Refresco ($50): recupera energía |
-| **F** (o botón Lanzar) apuntando a la caseta | Lanzar basura al Contenedor desde lejos |
-| **Q** / **T** / **L** / **B** | Álbum / Tienda / Logros / Base |
+| **Q** / **J** / **L** / **B** | Teléfono (tienda) / Álbum / Logros / Base |
 | Botones "Ir a casa" / "Ir al patio" | Teletransporte |
 | Gamepad | X recoger, Y lanzar, B cerrar, Select álbum |
 

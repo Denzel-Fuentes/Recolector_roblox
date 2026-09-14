@@ -13,7 +13,9 @@
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Senal = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Utilidades"):WaitForChild("Senal"))
+local Utilidades = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Utilidades")
+local Senal = require(Utilidades:WaitForChild("Senal"))
+local Entrada = require(Utilidades:WaitForChild("Entrada"))
 
 export type Panel = {
 	abrir: (argumento: any?) -> (),
@@ -68,8 +70,10 @@ function Menu.abrir(nombre: string, argumento: any?)
 	end
 	abierto = nombre
 	panel.abrir(argumento)
+	-- Solo con gamepad: en PC fijar SelectedObject fuerza la navegacion por
+	-- teclado y el raton deja de sentirse natural.
 	task.defer(function()
-		if abierto == nombre and panel.primerSeleccionable then
+		if abierto == nombre and panel.primerSeleccionable and Entrada.esGamepad() then
 			local sel = panel.primerSeleccionable()
 			if sel then
 				GuiService.SelectedObject = sel

@@ -28,6 +28,15 @@ EstadoCliente.energia = { actual = 0, max = 100 }
 EstadoCliente.alCambiarPerfil = Senal.nueva() :: Senal.Senal<any>
 EstadoCliente.alCambiarBolsa = Senal.nueva() :: Senal.Senal<any>
 EstadoCliente.alCambiarEnergia = Senal.nueva() :: Senal.Senal<number, number>
+-- Carga del lanzamiento (0..1) mientras se mantiene pulsado; la fija
+-- ControlPatio y la pintan el HUD (barra derecha) y las manos.
+EstadoCliente.cargaLanzamiento = 0
+EstadoCliente.alCambiarCarga = Senal.nueva() :: Senal.Senal<number>
+
+function EstadoCliente.fijarCarga(fraccion: number)
+	EstadoCliente.cargaLanzamiento = math.clamp(fraccion, 0, 1)
+	EstadoCliente.alCambiarCarga:Fire(EstadoCliente.cargaLanzamiento)
+end
 
 Red.evento("PerfilEvent").OnClientEvent:Connect(function(perfil, cargado, extras)
 	EstadoCliente.perfil = perfil

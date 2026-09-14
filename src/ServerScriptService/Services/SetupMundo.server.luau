@@ -11,6 +11,7 @@
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Servicios = ServerScriptService:WaitForChild("Services")
+local GameConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("GameConfig"))
 local Mundo = require(Servicios:WaitForChild("Mundo"))
 
 Mundo.asegurar()
@@ -32,6 +33,10 @@ print(string.format(
 	tostring(maquina)
 ))
 
-if ranuras ~= 24 or parcelas ~= 16 or figurinas ~= 6 or not contenedor or not zona or not maquina then
-	warn("SetupMundo: el mundo no coincide con lo esperado (24/16/6 + contenedor + zona + maquina). Rehornea con herramientas/construir-mundo.luau")
+local ranurasEsperadas = 0
+for _, def in GameConfig.TAMANOS_MONTON do
+	ranurasEsperadas += def.cantidad
+end
+if ranuras ~= ranurasEsperadas or parcelas ~= GameConfig.NUM_PARCELAS or figurinas ~= 6 or not contenedor or not zona or not maquina then
+	warn(string.format("SetupMundo: el mundo no coincide con lo esperado (%d ranuras / %d parcelas / 6 figurinas + contenedor + zona + maquina). Rehornea con herramientas/construir-mundo.luau", ranurasEsperadas, GameConfig.NUM_PARCELAS))
 end

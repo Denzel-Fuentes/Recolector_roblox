@@ -4,22 +4,25 @@ Réplica mecánica de KOTAMON para Roblox, en whitebox low-poly sin texturas.
 El diseño completo está en `docs/GDD.md`; este documento es lo que NO se deduce
 del código: qué hay, cómo se trabaja y por qué se decidió lo no obvio.
 
-Última pasada: 14 sep 2026. Estado: **todas las mecánicas del GDD implementadas
+Última pasada: 14 sep 2026 (lote 2: 6 bases, bolsa lanzable, primera persona,
+montones reales). Estado: **todas las mecánicas del GDD implementadas
 y verificadas en Play Solo**; pendiente la prueba con 2+ jugadores y publicar.
 
 ## 1. Qué hay
 
 | Sistema | Dónde | Estado |
 |---|---|---|
-| Patio compartido: 24 montones, activación con prompt, objetos físicos, reclamo atómico, imán, despawn, repoblación | `Services/Botin.luau` + `BotinHandler` | verificado |
-| Puntería: lanzar objetos de la bolsa al Contenedor de la caseta | `Botin.lanzar` | verificado (acierto desde 20 studs) |
+| Patio compartido: 12 montañas de basura hechas de sus piezas (lo visible = lo que sale), activación con prompt, reclamo atómico, imán, **sin caducidad**, repoblación | `Services/Botin.luau` + `BotinHandler` | verificado (`montonPiezas`) |
+| Puntería: **mantener F carga y lanza la bolsa entera**; si falla queda en el suelo y cualquiera la recoge | `Botin.lanzarBolsa` | verificado (`lanzarBolsa`, `lanzarBolsaFallo`) |
+| Primera persona automática en el patio, manos+bolsa en 2D (Frames), brazos extendidos para los demás, bolsa soldada al torso | `Services/Patio.luau`, `Client/Camara.client`, `Client/UI/Manos.client`, `Escena.client` | verificado (`enPatio`, capturas) |
+| HUD estilo KOTAMON: píldoras, barras verticales de energía y fuerza, dock Q/J/L/B, "MANTÉN F PARA LANZAR" | `Client/UI/HUD.client.luau` | verificado (captura) |
 | Bolsa, depósito con bonus +25% por bolsa llena, Auto-Reciclaje | `Services/Bolsa.luau` | verificado |
 | Energía, refrescos (máquina), regen lenta | `Services/Energia.luau` | verificado |
 | 41 mascotas, 5 estados, fusión 3→1, venta, exhibición, pasivas, Rey Reciclón | `Config/DefinicionesMascotas`, `Services/Mascotas.luau` | verificado |
 | Reparación: limpieza (frotar manchas) y ensamblaje (girar 5 piezas), Auto-Ensamblaje | `Services/Reparacion.luau`, `Client/UI/Reparacion.luau` | verificado por UI simulada |
 | 7 mejoras × 10 niveles, coste ×1.6 | `Config/DefinicionesMejoras`, `Services/Mejoras.luau` | verificado (232.430 $ para maxear) |
 | Tienda: Sobre Premium, Contenedor Dorado, trajes, skins, gemas, pases; modal de probabilidades | `Services/Tienda.luau`, `Client/UI/Tienda.luau`, `UI/Probabilidades.luau` | verificado |
-| 16 parcelas: estantería, radio, exhibidor, mesa, teléfono, almacén, me gusta, skins | `Services/Parcelas.luau`, `Client/UI/Base.luau` | verificado |
+| 6 parcelas (6 jugadores por servidor): estantería, radio, exhibidor, mesa, teléfono, almacén, me gusta, skins | `Services/Parcelas.luau`, `Client/UI/Base.luau` | verificado |
 | 12 figurinas (6 fijas en escondites), 7 cintas, 3 trajes gratis + 2 premium | `Config/DefinicionesColeccionables`, `Services/Coleccionables.luau` | verificado |
 | 40 logros en 11 categorías, progreso compartido servidor/cliente | `Config/DefinicionesLogros`, `Utilidades/ProgresoLogros`, `Services/Logros.luau` | verificado |
 | Persistencia DataStore (pcall, `cargado`, UpdateAsync, autosave, BindToClose) | `Services/DataService.server.luau` | sin probar: exige publicar |
@@ -49,7 +52,7 @@ cambió; cuando el plugin de Rojo se conecte no verá diferencias.
 `ServerStorage/Herramientas/ConstructorMundo`). **Tras construir hay que guardar
 el place.** `SetupMundo` sólo lo adopta; si falta, lo construye en runtime como
 fallback y avisa. Todo se localiza por tags/atributos, nunca por nombre:
-`RanuraMonton`, `Parcela`, `FigurinaFija`, `Contenedor`, `MaquinaRefrescos`,
+`RanuraMonton` (12), `Parcela` (6), `FigurinaFija`, `Contenedor`, `MaquinaRefrescos`,
 `Limite`, `SoloDecorado`; atributos `Mueble`, `Pintable`, `NPC`, `IndiceParcela`.
 
 ### Probar
@@ -137,6 +140,51 @@ solo neón: el anillo del montón recién activado (la señal social). Todo en
 Cualquier script de cliente que busque muebles debe escuchar `DescendantAdded`
 (ver `Escena.client.luau`); una pasada única al arrancar se queda corta.
 
+### ⚠️ `Model.WorldPivot` se ignora si hay `PrimaryPart`
+
+Medido en Studio: asignar `WorldPivot` a un modelo con `PrimaryPart` no hace
+nada; el pivote sigue siendo la parte principal. Durante el lote 1 todos los
+modelos "en el suelo" (montones, objetos, mascotas) se colocaban con `PivotTo`
+y quedaban HUNDIDOS la altura de su parte principal: por eso los montones se
+veían como bloques pequeños (solo asomaba la cima). Lo correcto es
+`PrimaryPart.PivotOffset = PrimaryPart.CFrame:Inverse()`
+(`ModelosMascota.pivoteEnSuelo`). Cualquier modelo nuevo debe pasar por ahí.
+
+### La montaña ES la basura, y no caduca
+
+Cada montón se construye con `numPiezas` piezas (14–44 según tamaño). Al
+activarlo se generan exactamente `numPiezas` objetos para el activador (su
+pity, sus fragmentos a medias, sus coleccionables faltantes) y cada pieza
+rueda al suelo y se convierte en su objeto: lo que se ve es lo que hay. Los
+objetos no desaparecen nunca (decisión del usuario, como en KOTAMON). Para que
+la repoblación no espere al último papel, un montón activo deja de contar como
+"disponible" cuando le queda menos del 25 % de sus objetos.
+
+### La bolsa se lanza entera, y si falla es de todos
+
+Mantener F carga la fuerza (1,2 s = 70 studs); al soltar, la bolsa sale con
+TODO lo que llevaba hacia donde apuntas. Si entra en el Contenedor se recicla
+con +50 % (y +25 % más si iba llena) y cuenta para Puntería. Si falla cae como
+objeto `bolsa` que **cualquiera** puede recoger (decisión del usuario: es la
+tensión social ligera del patio). Reciclar por el prompt de cerca sigue
+existiendo, pero no cuenta para Puntería.
+
+### Primera persona en el patio y el bug de los modales
+
+Entrar al patio (servidor: atributo `EnPatio`) pone `LockFirstPerson`. Con un
+panel abierto el script de cámara de Roblox re-bloquea el ratón CADA frame, y
+cambiar a `Classic` tampoco lo libera mientras el zoom está a distancia de
+primera persona. La solución que funciona: `BindToRenderStep` con prioridad
+`Camera + 1` que deja `MouseBehavior = Default` mientras hay panel
+(`Camara.client`). Además `Menu` solo fija `GuiService.SelectedObject` con
+gamepad: en PC forzaba la navegación por teclado.
+
+La pose de brazos no se hace en el servidor: los rigs nuevos usan
+`AnimationConstraint` (sin `C0`) y el Animator del cliente pisa cualquier
+cambio. Cada cliente escribe `Transform` de los hombros en `RunService.Stepped`
+(después del Animator) para todos los personajes con `EnPatio`
+(`Escena.client`); el servidor solo suelda la bolsa al torso.
+
 ### Modelos por código
 
 `Utilidades/ModelosMascota` construye las 41 mascotas (forma por set y `forma`,
@@ -147,16 +195,21 @@ ViewportFrames del álbum: un solo vocabulario visual.
 
 ## 4. Números de calibración (punto de partida)
 
-- Maxear las 7 mejoras: 232.430 $. Un montón chico deja ~5 objetos; basura
+- Maxear las 7 mejoras: 232.430 $. Un montón chico deja 14–18 objetos, uno
+  mediano 22–28 y uno grande 34–44 (= sus piezas); basura
   5–12 $, billetes 20–80 $, tesoros 150–600 $. Objetivo KOTAMON: ~5 h gratis.
 - Energía 100 (+15/nivel), excavar cuesta 10, refresco 50 $ restaura 30 (+8/nivel),
   regen 1 punto / 2 s.
 - Bolsa 8 (+3/nivel), almacén 30 (+10/nivel), imán 1,5 studs/nivel, alcance 6 (+1/nivel).
 - Sobre Premium 149 gemas; Contenedor Dorado 25.000 $ o 150 gemas, 3 mascotas.
-- Repoblación: con ≤ 8 montones no agotados, 20 s después se rellenan todos.
+- Repoblación: con ≤ 4 montones disponibles (lleno, o activo con ≥ 25 % de
+  sus objetos), 20 s después se rellenan los agotados. Nada caduca.
+- Lanzamiento: 1,2 s de carga = alcance máximo 70 studs; +50 % al entrar.
 
 ## 5. Pendiente
 
+- Fijar **Max players = 6** en Game Settings / Creator Dashboard
+  (`Players.MaxPlayers` es de solo lectura por script).
 - Publicar el place y activar *Studio Access to API Services* para probar el
   DataStore; crear pases, productos y badges y rellenar sus ids.
 - Ids de audio de las 7 cintas (`sonidoId = 0`).

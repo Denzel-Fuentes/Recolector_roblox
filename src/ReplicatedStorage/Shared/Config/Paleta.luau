@@ -68,6 +68,10 @@ Paleta.DORADO = Color3.fromRGB(230, 190, 60)
 Paleta.FIGURINA = gris(215)
 Paleta.CINTA = gris(50)
 Paleta.FRAGMENTO_BORDE = gris(240)
+-- La bolsa de basura (azul oscuro, como en KOTAMON): proyectil, objeto caido,
+-- bolsa en manos y la "imagen" de manos del cliente
+Paleta.BOLSA = Color3.fromRGB(52, 74, 128)
+Paleta.PIEL = Color3.fromRGB(232, 196, 160)
 
 -- UI
 Paleta.UI_FONDO = Color3.fromRGB(30, 31, 36)

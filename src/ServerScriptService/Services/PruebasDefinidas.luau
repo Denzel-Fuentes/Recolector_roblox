@@ -90,10 +90,12 @@ function Pruebas.excavar(indice)
 	local j = jugador()
 	local m = Botin.montones()[tonumber(indice) or 1]
 	assert(m, "no existe el monton")
-	teletransportar(j, m.ranura.Position + Vector3.new(6, 0, 0))
+	teletransportar(j, m.ranura.Position + Vector3.new(GameConfig.TAMANOS_MONTON[m.tamano].radio + 6, 0, 0))
 	task.wait(0.2)
 	local energiaAntes = Energia.actual(j)
+	local piezas = m.modelo and #m.modelo:GetChildren() or 0
 	local ok, motivo = Botin.excavar(j, m)
+	task.wait(3.5) -- las piezas ruedan hasta el suelo y se convierten en objetos
 	local conteo = {}
 	for _, obj in Botin.objetos() do
 		if obj.monton == m then
@@ -105,14 +107,18 @@ function Pruebas.excavar(indice)
 		table.insert(partes, tipo .. "=" .. n)
 	end
 	table.sort(partes)
-	return string.format("excavar monton %d (%s): ok=%s motivo=%s energia %d->%d | %s", m.id, m.tamano, tostring(ok), motivo, energiaAntes, Energia.actual(j), table.concat(partes, " "))
+	local total = 0
+	for _, n in conteo do
+		total += n
+	end
+	return string.format("excavar monton %d (%s): ok=%s motivo=%s energia %d->%d | piezas=%d objetos=%d (%s) | %s", m.id, m.tamano, tostring(ok), motivo, energiaAntes, Energia.actual(j), piezas, total, if piezas == total then "IGUAL OK" else "DIFERENTE", table.concat(partes, " "))
 end
 
 -- Reclama todos los objetos libres para el jugador
 function Pruebas.reclamarTodo()
 	local j = jugador()
 	local ok, fallos = 0, {}
-	task.wait(0.8) -- que aterricen
+	task.wait(3.5) -- que aterricen
 	for id, obj in Botin.objetos() do
 		local exito, motivo = Botin.reclamar(j, id, "toque")
 		if exito then
@@ -139,11 +145,11 @@ function Pruebas.reclamoAtomico()
 		end
 	end
 	assert(m, "no queda monton lleno")
-	teletransportar(j, m.ranura.Position + Vector3.new(6, 0, 0))
+	teletransportar(j, m.ranura.Position + Vector3.new(GameConfig.TAMANOS_MONTON[m.tamano].radio + 6, 0, 0))
 	task.wait(0.2)
 	Energia.fijar(j, Energia.maxima(j))
 	assert(Botin.excavar(j, m))
-	task.wait(0.8)
+	task.wait(3.5)
 	local basuras = {}
 	for id, obj in Botin.objetos() do
 		if obj.monton == m and obj.item.tipo == "basura" then
@@ -277,20 +283,6 @@ function Pruebas.recibo()
 end
 
 -- Lanzar directo a la zona de acierto desde 20 studs
-function Pruebas.lanzar()
-	local j = jugador()
-	local zona = Mundo.zonaAcierto()
-	teletransportar(j, zona.Position + Vector3.new(0, 0, 20))
-	task.wait(0.3)
-	Monetizacion.fijarModoDev(false)
-	Bolsa.meter(j, { tipo = "basura", nombre = "Chatarra", material = "Metal", valor = 12 })
-	Monetizacion.fijarModoDev(true)
-	local aciertosAntes = Perfiles.leerEstadistica(j, "aciertos")
-	local ok, motivo = Botin.lanzar(j, zona.Position)
-	task.wait(2)
-	local aciertos = Perfiles.leerEstadistica(j, "aciertos")
-	return string.format("lanzar ok=%s (%s) aciertos %d->%d mejorDistancia=%d => %s", tostring(ok), motivo, aciertosAntes, aciertos, Perfiles.leerEstadistica(j, "mejorDistanciaAcierto"), (ok and aciertos > aciertosAntes) and "OK" or "FALLO")
-end
 
 function Pruebas.repoblar()
 	Botin.repoblarAhora()
@@ -424,6 +416,117 @@ function Pruebas.bolsaAlSalir()
 	Bolsa.meter(j, { tipo = "mascota", nombre = "Latita", id = "latita", estado = 2, sucia = false })
 	Monetizacion.fijarModoDev(true)
 	return "bolsa " .. Bolsa.cuenta(j) .. "/" .. Bolsa.capacidad(j) .. " (al desconectar: papel -> $6, latita -> almacen)"
+end
+
+-- Lanzar la bolsa entera a la zona de acierto desde 20 studs
+function Pruebas.lanzarBolsa()
+	local j = jugador()
+	local zona = Mundo.zonaAcierto()
+	teletransportar(j, zona.Position + Vector3.new(0, 0, 20))
+	task.wait(0.3)
+	Monetizacion.fijarModoDev(false)
+	for _ = 1, 3 do
+		Bolsa.meter(j, { tipo = "basura", nombre = "Chatarra", material = "Metal", valor = 12 })
+	end
+	Monetizacion.fijarModoDev(true)
+	local dineroAntes = Economia.dinero(j)
+	local aciertosAntes = Perfiles.leerEstadistica(j, "aciertos")
+	local ok, motivo = Botin.lanzarBolsa(j, zona.Position, 1)
+	local vacia = Bolsa.cuenta(j) == 0
+	task.wait(2.5)
+	local aciertos = Perfiles.leerEstadistica(j, "aciertos")
+	return string.format("lanzarBolsa ok=%s (%s) bolsa vacia al lanzar=%s aciertos %d->%d dinero %d->%d (3 chatarras x12 x1.5 = 54, mas logros) => %s",
+		tostring(ok), motivo, tostring(vacia), aciertosAntes, aciertos, dineroAntes, Economia.dinero(j),
+		(ok and vacia and aciertos > aciertosAntes and Economia.dinero(j) - dineroAntes >= 54) and "OK" or "FALLO")
+end
+
+-- Lanzar al suelo: la bolsa cae como objeto y otro (un falso) la recoge
+function Pruebas.lanzarBolsaFallo()
+	local j = jugador()
+	local zona = Mundo.zonaAcierto()
+	teletransportar(j, zona.Position + Vector3.new(0, 0, 30))
+	task.wait(0.3)
+	Monetizacion.fijarModoDev(false)
+	Bolsa.meter(j, { tipo = "basura", nombre = "Papel", material = "Papel", valor = 6 })
+	Bolsa.meter(j, { tipo = "fragmento", nombre = "Fragmento de Latita", id = "latita" })
+	-- apuntar lejos del contenedor, hacia el patio
+	local ok, motivo = Botin.lanzarBolsa(j, zona.Position + Vector3.new(25, 0, 60), 0.5)
+	task.wait(3)
+	local bolsaId = nil
+	for id, obj in Botin.objetos() do
+		if obj.item.tipo == "bolsa" then
+			bolsaId = id
+		end
+	end
+	local recogida, motivoRec = false, "sinBolsa"
+	if bolsaId then
+		recogida, motivoRec = Botin.reclamar(j, bolsaId, "toque")
+	end
+	Monetizacion.fijarModoDev(true)
+	return string.format("lanzar ok=%s (%s) | bolsa en el suelo=%s | recogida=%s (%s) | bolsa ahora %d/%d => %s",
+		tostring(ok), motivo, tostring(bolsaId ~= nil), tostring(recogida), motivoRec, Bolsa.cuenta(j), Bolsa.capacidad(j),
+		(ok and bolsaId and recogida and Bolsa.cuenta(j) == 2) and "OK" or "FALLO")
+end
+
+-- La montana tiene tantas piezas como objetos libera, y nada caduca
+function Pruebas.montonPiezas()
+	local j = jugador()
+	local m = nil
+	for _, monton in Botin.montones() do
+		if monton.estado == "lleno" then
+			m = monton
+			break
+		end
+	end
+	assert(m, "no queda monton lleno")
+	local piezas = 0
+	for _, hijo in m.modelo:GetChildren() do
+		if hijo.Name:match("^Pieza_") then
+			piezas += 1
+		end
+	end
+	teletransportar(j, m.ranura.Position + Vector3.new(GameConfig.TAMANOS_MONTON[m.tamano].radio + 6, 0, 0))
+	task.wait(0.2)
+	Energia.fijar(j, Energia.maxima(j))
+	-- alejar al jugador para que el iman no recoja nada
+	local ok = Botin.excavar(j, m)
+	teletransportar(j, Vector3.new(0, 0, -130))
+	task.wait(4)
+	local objetos = 0
+	for _, obj in Botin.objetos() do
+		if obj.monton == m then
+			objetos += 1
+		end
+	end
+	local antesEspera = objetos
+	task.wait(3)
+	local despues = 0
+	for _, obj in Botin.objetos() do
+		if obj.monton == m then
+			despues += 1
+		end
+	end
+	return string.format("monton %d (%s): numPiezas=%d piezas en modelo=%d objetos liberados=%d, tras 3 s siguen %d => %s",
+		m.id, m.tamano, m.numPiezas, piezas, objetos, despues,
+		(ok and piezas == m.numPiezas and objetos == piezas and despues == antesEspera) and "OK" or "FALLO")
+end
+
+-- Entrar y salir del patio: atributo EnPatio y bolsa en manos (la pose de
+-- brazos es del cliente: ver Escena.client)
+function Pruebas.enPatio()
+	local j = jugador()
+	teletransportar(j, Vector3.new(0, 0, 0))
+	task.wait(0.6)
+	local dentro = j:GetAttribute("EnPatio")
+	local ch = j.Character
+	local bolsa = ch and ch:FindFirstChild("BolsaEnManos") ~= nil
+	teletransportar(j, Vector3.new(0, 0, -130))
+	task.wait(0.6)
+	local fuera = j:GetAttribute("EnPatio")
+	local bolsaFuera = ch and ch:FindFirstChild("BolsaEnManos") ~= nil
+	return string.format("dentro: EnPatio=%s bolsa=%s | fuera: EnPatio=%s bolsa=%s => %s",
+		tostring(dentro), tostring(bolsa), tostring(fuera), tostring(bolsaFuera),
+		(dentro == true and bolsa and fuera == false and not bolsaFuera) and "OK" or "FALLO")
 end
 
 return Pruebas

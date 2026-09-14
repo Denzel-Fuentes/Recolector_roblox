@@ -3,7 +3,7 @@
 	Paneles
 	Carga todos los paneles (cada modulo se registra en Menu al cargarse) y
 	pone los atajos globales: Esc / ButtonB cierran el panel abierto, y las
-	teclas de acceso rapido abren Album (Q), Tienda (T), Logros (L) y Base (B).
+	teclas de acceso rapido abren Tienda/telefono (Q), Album (J), Logros (L) y Base (B).
 
 	Los paneles se buscan por nombre y se ignoran los que no existan, para que
 	el juego arranque aunque una fase aun no este escrita.
@@ -38,7 +38,8 @@ end
 ContextActionService:BindAction("CerrarPanel", cerrar, false, Enum.KeyCode.ButtonB, Enum.KeyCode.Escape)
 
 local ATAJOS = {
-	[Enum.KeyCode.Q] = "Album",
+	[Enum.KeyCode.Q] = "Tienda", -- telefono, como en KOTAMON
+	[Enum.KeyCode.J] = "Album",
 	[Enum.KeyCode.T] = "Tienda",
 	[Enum.KeyCode.L] = "Logros",
 	[Enum.KeyCode.B] = "Base",

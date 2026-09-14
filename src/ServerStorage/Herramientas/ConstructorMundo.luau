@@ -28,16 +28,15 @@
 	Las partes de una parcela que cambian con una skin llevan attr Pintable
 	("losa" | "mueble" | "borde").
 
-	Plano (N = z negativa):
+	Plano (N = z negativa). 6 parcelas = 6 jugadores por servidor:
 
-	       [P1] [P2]   PLAZA / CASETA   [P3] [P4]      z = -165
-	                        spawn
-	   [P16]  +---------------------------+  [P5]
-	   [P15]  |     PATIO 200 x 200       |  [P6]      x = +-165
-	   [P14]  |   24 ranuras de monton    |  [P7]
-	   [P13]  |   decorado y escondites   |  [P8]
-	          +---------------------------+
-	       [P12] [P11]               [P10] [P9]      z = +165
+	                 PLAZA / CASETA                    z = -120
+	                      spawn
+	    [P1]  +---------------------------+  [P4]     z = -70
+	          |     PATIO 200 x 200       |
+	    [P2]  |   12 ranuras de monton    |  [P5]     z = 0    (x = +-165)
+	          |   decorado y escondites   |
+	    [P3]  +---------------------------+  [P6]     z = +70
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -58,17 +57,21 @@ ConstructorMundo.VERSION = 1
 -- ===========================================================================
 
 local LAYOUT = {
-	PATIO_LADO = 200,
+	PATIO_LADO = GameConfig.PATIO_LADO,
 	MURO_ALTURA = 4,
 	MURO_GRUESO = 2,
 	MURO_HUECO = 24,
-	RANURA_PASO = 40, -- rejilla 5x5 sin el centro = 24 ranuras
-	RANURA_JITTER = 6,
+	-- Rejilla 4x3 = 12 ranuras. Los montones son montanas de hasta 14 studs de
+	-- radio: 50 studs entre columnas y 60 entre filas dejan pasillos.
+	RANURA_X = { -75, -25, 25, 75 },
+	RANURA_Z = { -60, 0, 60 },
+	RANURA_JITTER = 5,
 	CASETA_Z = -120,
 	SPAWN_Z = -134,
 	PARCELA_LADO = 36,
 	PARCELA_RADIO = 165,
-	PARCELA_OFFSETS = { -120, -40, 40, 120 },
+	-- 6 parcelas: 3 en la columna oeste y 3 en la este
+	PARCELA_OFFSETS = { -70, 0, 70 },
 	LIMITE = 240,
 	LIMITE_ALTURA = 60,
 }
@@ -283,19 +286,16 @@ local function construirMuros(patio)
 	end
 end
 
--- 24 ranuras: rejilla 5x5 a paso 40 sin el centro, con jitter determinista.
--- Los tamanos se reparten con la misma semilla para que hornear dos veces de
--- el mismo patio.
+-- 12 ranuras: rejilla 4x3 con jitter determinista. Los tamanos se reparten
+-- con la misma semilla para que hornear dos veces de el mismo patio.
 local function posicionesRanuras()
 	local rng = Random.new(GameConfig.NUM_PARCELAS * 7 + 3)
 	local posiciones = {}
-	for ix = -2, 2 do
-		for iz = -2, 2 do
-			if not (ix == 0 and iz == 0) then
-				local x = ix * LAYOUT.RANURA_PASO + rng:NextNumber(-LAYOUT.RANURA_JITTER, LAYOUT.RANURA_JITTER)
-				local z = iz * LAYOUT.RANURA_PASO + rng:NextNumber(-LAYOUT.RANURA_JITTER, LAYOUT.RANURA_JITTER)
-				table.insert(posiciones, Vector3.new(x, 1, z))
-			end
+	for _, x0 in LAYOUT.RANURA_X do
+		for _, z0 in LAYOUT.RANURA_Z do
+			local x = x0 + rng:NextNumber(-LAYOUT.RANURA_JITTER, LAYOUT.RANURA_JITTER)
+			local z = z0 + rng:NextNumber(-LAYOUT.RANURA_JITTER, LAYOUT.RANURA_JITTER)
+			table.insert(posiciones, Vector3.new(x, 1, z))
 		end
 	end
 	local tamanos = {}
@@ -530,32 +530,17 @@ end
 local function cframesParcelas()
 	local lista = {}
 	local r = LAYOUT.PARCELA_RADIO
-	local offs = LAYOUT.PARCELA_OFFSETS
-	-- Norte 1-4 (de oeste a este), Este 5-8 (de norte a sur), Sur 9-12 (de
-	-- este a oeste), Oeste 13-16 (de sur a norte): sentido horario.
-	for _, x in offs do
-		table.insert(lista, Vector3.new(x, 0, -r))
+	-- Oeste 1-3 (de norte a sur), Este 4-6 (de norte a sur). Todas miran al
+	-- patio en paralelo (mas legible que un abanico).
+	for _, z in LAYOUT.PARCELA_OFFSETS do
+		table.insert(lista, Vector3.new(-r, 0, z))
 	end
-	for _, z in offs do
+	for _, z in LAYOUT.PARCELA_OFFSETS do
 		table.insert(lista, Vector3.new(r, 0, z))
-	end
-	for i = #offs, 1, -1 do
-		table.insert(lista, Vector3.new(offs[i], 0, r))
-	end
-	for i = #offs, 1, -1 do
-		table.insert(lista, Vector3.new(-r, 0, offs[i]))
 	end
 	local cframes = {}
 	for i, pos in lista do
-		local objetivo = Vector3.new(0, 0, 0)
-		-- Solo la componente que mira al centro del lado: las parcelas de un
-		-- mismo lado quedan paralelas (mas legible que un abanico).
-		if math.abs(pos.X) > math.abs(pos.Z) then
-			objetivo = Vector3.new(0, 0, pos.Z)
-		else
-			objetivo = Vector3.new(pos.X, 0, 0)
-		end
-		cframes[i] = CFrame.lookAt(pos, objetivo)
+		cframes[i] = CFrame.lookAt(pos, Vector3.new(0, 0, pos.Z))
 	end
 	return cframes
 end

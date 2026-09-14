@@ -157,7 +157,7 @@ function Parcelas.renderizar(jugador: Player)
 		local slot = slots[i]
 		if slot and perfil.figurinas[def.id] then
 			local modelo = ModelosMascota.figurina(def)
-			modelo:PivotTo(slot.CFrame * CFrame.new(0, -0.5, 0))
+			modelo:PivotTo(slot.CFrame * CFrame.new(0, -0.9, 0))
 			modelo.Parent = contenido
 		end
 	end

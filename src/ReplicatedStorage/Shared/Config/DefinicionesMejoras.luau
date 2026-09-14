@@ -27,7 +27,7 @@ export type Mejora = {
 local DefinicionesMejoras = {}
 
 DefinicionesMejoras.LISTA = {
-	{ id = "Mochila", nombre = "Mochila", descripcion = "Cuánto cargas por viaje", costeBase = 150, unidad = "objetos", original = "Bag" },
+	{ id = "Mochila", nombre = "Bolsa", descripcion = "Cuánta basura cabe en la bolsa antes de lanzarla", costeBase = 150, unidad = "objetos", original = "Bag" },
 	{ id = "Energia", nombre = "Energía", descripcion = "Cuánto puedes excavar antes de necesitar un refresco", costeBase = 200, unidad = "energía", original = "Energy" },
 	{ id = "Chispa", nombre = "Chispa", descripcion = "Cuánta energía restaura cada refresco", costeBase = 120, unidad = "energía", original = "Buzz" },
 	{ id = "Almacen", nombre = "Almacén", descripcion = "Cuántas mascotas caben en tu base", costeBase = 180, unidad = "mascotas", original = "Capacity" },

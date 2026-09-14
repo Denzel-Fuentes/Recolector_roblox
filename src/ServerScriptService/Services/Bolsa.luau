@@ -4,7 +4,9 @@
 	Unica responsabilidad: lo que cada jugador lleva encima entre el patio y la
 	caseta. Estado de SESION: no persiste.
 
-	Capacidad = mejora Mochila. Cada objeto ocupa un hueco, sea basura o mascota.
+	Capacidad = mejora "Bolsa" (id Mochila en el perfil). Cada objeto ocupa un
+	hueco, sea basura o mascota. La bolsa entera se LANZA al Contenedor (Botin)
+	o se vacia con el prompt de cerca: las dos vias pasan por depositarItems.
 	Los billetes NO pasan por aqui: son dinero directo al recogerlos.
 
 	Depositar (prompt del Contenedor):
@@ -43,7 +45,10 @@ local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
 local BolsaEvent = Red.evento("BolsaEvent")
 
 export type Item = {
-	tipo: string, -- basura | tesoro | fragmento | mascota | figurina | cinta | traje
+	tipo: string, -- basura | tesoro | fragmento | mascota | figurina | cinta | traje | bolsa (solo en el mundo)
+	contenido: { any }?, -- bolsa caida: lo que llevaba
+	estabaLlena: boolean?,
+	dueno: string?,
 	nombre: string,
 	material: string?,
 	valor: number?,
@@ -127,26 +132,33 @@ function Bolsa.meter(jugador: Player, item: Item): boolean
 	return true
 end
 
--- Saca el primer objeto lanzable (basura o tesoro) o nil
-function Bolsa.sacarLanzable(jugador: Player): Item?
+-- Vacia la bolsa y devuelve (items, estabaLlena). Lo usa el lanzamiento: la
+-- bolsa sale volando con todo lo que llevaba.
+function Bolsa.vaciar(jugador: Player): ({ Item }, boolean)
 	local items = itemsDe(jugador)
-	for i, item in items do
-		if item.tipo == "basura" or item.tipo == "tesoro" then
-			table.remove(items, i)
-			Bolsa.publicar(jugador)
-			return item
-		end
-	end
-	return nil
+	local estabaLlena = Bolsa.estaLlena(jugador)
+	bolsas[jugador] = {}
+	Bolsa.publicar(jugador)
+	return items, estabaLlena
 end
 
-function Bolsa.tieneLanzable(jugador: Player): boolean
-	for _, item in itemsDe(jugador) do
-		if item.tipo == "basura" or item.tipo == "tesoro" then
-			return true
+-- Mete varios items de golpe (una bolsa caida que se recoge). Solo si caben
+-- TODOS: si no, no se toca nada y devuelve false.
+function Bolsa.meterVarios(jugador: Player, items: { Item }): boolean
+	local propios = itemsDe(jugador)
+	local sinBasura = 0
+	for _, item in items do
+		if not (item.tipo == "basura" and Monetizacion.tienePase(jugador, "AutoReciclaje")) then
+			sinBasura += 1
 		end
 	end
-	return false
+	if #propios + sinBasura > Bolsa.capacidad(jugador) then
+		return false
+	end
+	for _, item in items do
+		Bolsa.meter(jugador, item)
+	end
+	return true
 end
 
 -- Pasa al perfil todo lo que no es dinero. Devuelve los items que NO cupieron.
@@ -178,12 +190,12 @@ local function guardarEnPerfil(jugador: Player, items: { Item }, resumen: Resume
 	return quedaron
 end
 
-function Bolsa.depositar(jugador: Player): ResumenDeposito?
-	local items = itemsDe(jugador)
-	if #items == 0 then
-		return nil
-	end
-	local estabaLlena = Bolsa.estaLlena(jugador)
+
+-- Recicla una lista de items para un jugador (los de su bolsa, o los de una
+-- bolsa lanzada). multiplicador extra: +50% si entro lanzada (punteria).
+-- Devuelve el resumen; los items que no quepan en el almacen vuelven a la
+-- bolsa del jugador.
+function Bolsa.depositarItems(jugador: Player, items: { Item }, estabaLlena: boolean, multiplicadorExtra: number?): ResumenDeposito
 	local resumen: ResumenDeposito = { objetos = 0, dinero = 0, bonus = false, quedaron = 0, mascotasNuevas = {}, fragmentosCompletos = {} }
 	local paraPerfil = {}
 	for _, item in items do
@@ -203,15 +215,30 @@ function Bolsa.depositar(jugador: Player): ResumenDeposito?
 		resumen.dinero = math.floor(resumen.dinero * (1 + GameConfig.BONUS_BOLSA_LLENA) + 0.5)
 		resumen.bonus = true
 	end
+	if multiplicadorExtra and multiplicadorExtra > 1 then
+		resumen.dinero = math.floor(resumen.dinero * multiplicadorExtra + 0.5)
+	end
 	local quedaron = guardarEnPerfil(jugador, paraPerfil, resumen)
 	resumen.quedaron = #quedaron
-	bolsas[jugador] = quedaron
+	local propios = itemsDe(jugador)
+	for _, item in quedaron do
+		table.insert(propios, item)
+	end
 	if resumen.dinero > 0 then
 		Economia.ganar(jugador, resumen.dinero)
 	end
 	Perfiles.estadistica(jugador, "depositos", 1)
 	Bolsa.publicar(jugador)
 	return resumen
+end
+
+-- Deposito por el prompt del Contenedor: vaciar y reciclar lo propio.
+function Bolsa.depositar(jugador: Player): ResumenDeposito?
+	if Bolsa.cuenta(jugador) == 0 then
+		return nil
+	end
+	local items, estabaLlena = Bolsa.vaciar(jugador)
+	return Bolsa.depositarItems(jugador, items, estabaLlena)
 end
 
 -- Al desconectar: reciclar sin bonus y guardar lo que quepa.
