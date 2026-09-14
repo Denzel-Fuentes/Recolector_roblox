@@ -1,0 +1,115 @@
+--!strict
+--[[
+	GameConfig
+	Todas las constantes compartidas entre servidor y cliente.
+
+	Distancias en studs, tiempos en segundos, dinero en $ (billetes) o Gemas.
+	Los numeros de balance (costes, valores, probabilidades base) son un punto de
+	partida para las pruebas cerradas, no cifras finales: KOTAMON se termina en
+	~5 h jugando gratis y ese es el objetivo de calibracion.
+]]
+
+local GameConfig = {}
+
+GameConfig.NOMBRE_JUEGO = "Recíclatas"
+
+-- === Persistencia ===
+GameConfig.NOMBRE_DATASTORE = "ReciclatasPerfiles_v1"
+GameConfig.VERSION_PERFIL = 1
+GameConfig.INTERVALO_AUTOGUARDADO = 120
+GameConfig.REINTENTOS_DATASTORE = 3
+
+-- === Energia (mejoras Energia y Chispa) ===
+GameConfig.ENERGIA_BASE = 100
+GameConfig.ENERGIA_POR_NIVEL = 15
+GameConfig.COSTE_EXCAVAR = 10
+GameConfig.REFRESCO_BASE = 30
+GameConfig.REFRESCO_POR_NIVEL = 8
+GameConfig.PRECIO_REFRESCO = 50
+-- Regeneracion pasiva: un punto cada tantos segundos. Existe para que quien no
+-- compre refrescos nunca quede bloqueado del todo (queja evitable del original).
+GameConfig.REGEN_ENERGIA_CADA = 2
+
+-- === Bolsa y Almacen (mejoras Mochila y Almacen) ===
+GameConfig.BOLSA_BASE = 8
+GameConfig.BOLSA_POR_NIVEL = 3
+GameConfig.ALMACEN_BASE = 30
+GameConfig.ALMACEN_POR_NIVEL = 10
+GameConfig.BONUS_BOLSA_LLENA = 0.25
+
+-- === Movimiento, alcance e iman ===
+GameConfig.VELOCIDAD_BASE = 16
+GameConfig.VELOCIDAD_POR_NIVEL = 1.2
+GameConfig.ALCANCE_BASE = 6
+GameConfig.ALCANCE_POR_NIVEL = 1
+GameConfig.IMAN_POR_NIVEL = 1.5
+GameConfig.INTERVALO_IMAN = 0.2
+GameConfig.DISTANCIA_RECLAMO_IMAN = 2.5
+
+-- === Mejoras ===
+GameConfig.NIVEL_MAX_MEJORA = 10
+GameConfig.FACTOR_COSTE_MEJORA = 1.6
+
+-- === Montones ===
+GameConfig.DURACION_EXCAVAR = 1.5
+GameConfig.VIDA_OBJETO = 45
+GameConfig.UMBRAL_REPOBLACION = 8
+GameConfig.RETRASO_REPOBLACION = 20
+GameConfig.TAMANOS_MONTON = {
+	chico = { min = 5, max = 7, cantidad = 10 },
+	mediano = { min = 8, max = 11, cantidad = 9 },
+	grande = { min = 12, max = 16, cantidad = 5 },
+}
+GameConfig.RADIO_DISPERSION_OBJETOS = 6
+
+-- === Pity (correccion deliberada del RNG "duro" del original) ===
+GameConfig.PITY_BASE = 0.08
+GameConfig.PITY_PASO = 0.02
+GameConfig.PITY_PASO_PASE = 0.03
+GameConfig.PITY_TOPE = 0.60
+GameConfig.PROB_EPICA_ENTRE_RARAS = 0.25
+
+-- === Punteria: lanzar objetos de la bolsa al Contenedor de la caseta ===
+GameConfig.DISTANCIA_MIN_LANZAR = 6
+GameConfig.DISTANCIA_MAX_LANZAR = 70
+GameConfig.TIEMPO_VUELO = 1.2
+GameConfig.BONUS_ACIERTO = 0.5
+GameConfig.VIDA_PROYECTIL = 4
+
+-- === Reparacion ===
+GameConfig.FRAGMENTOS_POR_MASCOTA = 5
+GameConfig.MIN_SEGUNDOS_LIMPIEZA = 3
+GameConfig.MIN_SEGUNDOS_ENSAMBLAJE = 2
+GameConfig.MANCHAS_LIMPIEZA = { min = 8, max = 12 }
+
+-- === Valores en $ ===
+GameConfig.VALOR_BASURA = { Metal = 12, Plastico = 8, Papel = 6, Organico = 5 }
+GameConfig.VALOR_BILLETE = { min = 20, max = 80 }
+GameConfig.VALOR_TESORO = { min = 150, max = 600 }
+GameConfig.VALOR_BASE_RAREZA = { Comun = 40, Rara = 200, Epica = 900, Mitica = 5000 }
+-- Indice = estado (1 Danada .. 5 Perfecta)
+GameConfig.MULT_ESTADO = { 0.5, 1, 1.6, 2.5, 4 }
+GameConfig.MULT_SUCIA = 0.5
+GameConfig.RECOMPENSA_LOGRO = 100
+
+-- === Tienda de Dona Chatarra ===
+GameConfig.PRECIO_SOBRE_GEMAS = 149
+GameConfig.PRECIO_CONTENEDOR_DORADO = 25000
+GameConfig.PRECIO_CONTENEDOR_DORADO_GEMAS = 150
+GameConfig.MASCOTAS_CONTENEDOR_DORADO = 3
+
+-- === Parcelas ===
+GameConfig.NUM_PARCELAS = 16
+GameConfig.PEDESTALES = 6
+GameConfig.SLOTS_ESTANTERIA = 12
+
+-- === Red ===
+GameConfig.COOLDOWN_REMOTE = 0.15
+GameConfig.DISTANCIA_INTERACCION = 12
+
+-- === Monetizacion ===
+-- En Studio, con esta bandera, todos los pases cuentan como comprados para
+-- poder probar sus efectos sin ids reales. /pases off la desactiva en sesion.
+GameConfig.PASES_DEV_EN_STUDIO = true
+
+return GameConfig

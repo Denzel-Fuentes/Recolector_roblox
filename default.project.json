@@ -1,0 +1,89 @@
+{
+  "name": "CleanRecycle",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$className": "Folder",
+        "Config": {
+          "$path": "src/ReplicatedStorage/Shared/Config"
+        },
+        "Events": {
+          "$path": "src/ReplicatedStorage/Shared/Events"
+        },
+        "Utilidades": {
+          "$path": "src/ReplicatedStorage/Shared/Utilidades"
+        }
+      }
+    },
+
+    "ServerScriptService": {
+      "Services": {
+        "$path": "src/ServerScriptService/Services"
+      }
+    },
+
+    "ServerStorage": {
+      "Herramientas": {
+        "$path": "src/ServerStorage/Herramientas"
+      }
+    },
+
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "$properties": {
+        "CharacterWalkSpeed": 16
+      },
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "Client": {
+          "$path": "src/StarterPlayer/StarterPlayerScripts/Client"
+        }
+      }
+    },
+
+    "Workspace": {
+      "$ignoreUnknownInstances": true,
+      "$properties": {
+        "FilteringEnabled": true
+      },
+      "Baseplate": {
+        "$className": "Part",
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Anchored": true,
+          "Color": [0.647, 0.647, 0.647],
+          "Locked": true,
+          "Material": "SmoothPlastic",
+          "Position": [0, -10, 0],
+          "Size": [512, 20, 512]
+        }
+      }
+    },
+
+    "Lighting": {
+      "$ignoreUnknownInstances": true,
+      "$properties": {
+        "Ambient": [0.32, 0.32, 0.32],
+        "OutdoorAmbient": [0.38, 0.38, 0.38],
+        "ColorShift_Top": [0, 0, 0],
+        "ColorShift_Bottom": [0, 0, 0],
+        "Brightness": 1.3,
+        "ExposureCompensation": -0.35,
+        "EnvironmentDiffuseScale": 0.25,
+        "EnvironmentSpecularScale": 0,
+        "ClockTime": 13,
+        "GlobalShadows": true,
+        "Outlines": false,
+        "Technology": "Voxel"
+      }
+    },
+
+    "SoundService": {
+      "$properties": {
+        "RespectFilteringEnabled": true
+      }
+    }
+  }
+}

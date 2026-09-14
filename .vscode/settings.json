@@ -1,0 +1,9 @@
+{
+  "files.eol": "\n",
+  "luau-lsp.sourcemap.rojoProjectFile": "default.project.json",
+  "rojo.projectFile": "default.project.json",
+  "[luau]": {
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4
+  }
+}

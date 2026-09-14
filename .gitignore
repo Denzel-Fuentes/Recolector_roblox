@@ -1,0 +1,10 @@
+# Place files: la fuente del mundo es herramientas/construir-mundo.luau
+/*.rbxlx
+/*.rbxl
+/build/
+
+# Roblox Studio lock files
+/*.rbxlx.lock
+/*.rbxl.lock
+
+sourcemap.json
