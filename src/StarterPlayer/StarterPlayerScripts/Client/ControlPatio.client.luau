@@ -3,7 +3,8 @@
 	ControlPatio
 	Input del patio en el cliente. Solo envia INTENCION; el servidor valida.
 
-	  Clic / toque sobre un objeto del patio  -> ReclamarObjetoEvent(id)
+	  MANTENER clic / dedo / ButtonX          -> ReclamarObjetoEvent(id) de lo que
+	                                            pase por la mira, cada INTERVALO_RECOGIDA
 	  MANTENER F / ButtonY / boton tactil    -> carga la fuerza; al soltar,
 	                                            LanzarObjetoEvent(punto, fuerza)
 	  Resaltado del objeto bajo el cursor si esta al Alcance
@@ -34,6 +35,7 @@ local GameConfig = require(Config:WaitForChild("GameConfig"))
 local Utilidades = Shared:WaitForChild("Utilidades")
 local Red = require(Utilidades:WaitForChild("Red"))
 local Entrada = require(Utilidades:WaitForChild("Entrada"))
+local Geometria = require(Utilidades:WaitForChild("Geometria"))
 
 local EstadoCliente = require(script.Parent:WaitForChild("EstadoCliente"))
 local Menu = require(script.Parent:WaitForChild("UI"):WaitForChild("Menu"))
@@ -69,10 +71,13 @@ local function alcanceActual(): number
 	return DefinicionesMejoras.valor("Alcance", EstadoCliente.nivelMejora("Alcance")) + 2
 end
 
-local function objetoDesde(inst: Instance?): Model?
+-- Un objeto es una pieza de montana (BasePart con ObjetoId) o un modelo con
+-- ObjetoId (mascota metida en la montana, bolsa caida): lo primero que tenga
+-- el atributo subiendo desde lo que toco el rayo.
+local function objetoDesde(inst: Instance?): PVInstance?
 	local actual = inst
 	while actual and actual ~= workspace do
-		if actual:IsA("Model") and actual:GetAttribute("ObjetoId") then
+		if actual:IsA("PVInstance") and actual:GetAttribute("ObjetoId") then
 			return actual
 		end
 		actual = actual.Parent
@@ -104,13 +109,15 @@ local function posicionCursor(): Vector2?
 	return Vector2.new(pos.X, pos.Y - GuiService:GetGuiInset().Y)
 end
 
-local function distanciaAlPersonaje(pos: Vector3): number
+-- Distancia del personaje a la superficie del objeto: la misma medida que
+-- usa el servidor para aceptar el reclamo (Utilidades/Geometria)
+local function distanciaAlPersonaje(objeto: PVInstance): number
 	local personaje = jugador.Character
 	local root = personaje and personaje:FindFirstChild("HumanoidRootPart")
-	if root and root:IsA("BasePart") then
-		return (root.Position - pos).Magnitude
+	if not root or not root:IsA("BasePart") then
+		return math.huge
 	end
-	return math.huge
+	return Geometria.distanciaASuperficie(objeto, root.Position)
 end
 
 -- === Resaltado del objeto bajo el cursor ===
@@ -127,7 +134,7 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 	local resultado = rayoDesdePantalla(posicionCursor())
 	local objeto = resultado and objetoDesde(resultado.Instance)
-	if objeto and distanciaAlPersonaje(objeto:GetPivot().Position) <= alcanceActual() then
+	if objeto and distanciaAlPersonaje(objeto) <= alcanceActual() then
 		resaltado.Adornee = objeto
 		resaltado.Enabled = true
 	else
@@ -135,20 +142,42 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
--- === Clic / toque para reclamar ===
+-- === Mantener el clic para recoger ===
+-- Mientras se mantiene el clic izquierdo (el dedo en tactil, X en gamepad) se
+-- recoge lo que vaya pasando por la mira, una pieza cada INTERVALO_RECOGIDA:
+-- el servidor tiene su propio cooldown por remote (COOLDOWN_REMOTE), asi que
+-- enviar mas rapido no recoge mas. Un mismo objeto no se reenvia hasta que el
+-- servidor lo retira (o pasa medio segundo): al reclamarlo vuela a la bolsa y
+-- el rayo ya pasa a la siguiente pieza.
+local recogiendo = false
+local posicionTactil: Vector2? = nil
+local ultimoIntento = 0
+local ultimoId: string? = nil
+local ultimoIdEn = 0
+
 local function intentarReclamar(posPantalla: Vector2?)
 	local resultado = rayoDesdePantalla(posPantalla)
 	local objeto = resultado and objetoDesde(resultado.Instance)
 	if not objeto then
 		return
 	end
-	if distanciaAlPersonaje(objeto:GetPivot().Position) > alcanceActual() then
+	if distanciaAlPersonaje(objeto) > alcanceActual() then
 		return
 	end
 	local id = objeto:GetAttribute("ObjetoId")
 	if id then
-		ReclamarObjetoEvent:FireServer(tostring(id))
+		id = tostring(id)
+		if id == ultimoId and os.clock() - ultimoIdEn < 0.5 then
+			return
+		end
+		ultimoId, ultimoIdEn = id, os.clock()
+		ReclamarObjetoEvent:FireServer(id)
 	end
+end
+
+local function recogerAhora()
+	ultimoIntento = os.clock()
+	intentarReclamar(if posicionTactil then posicionTactil else posicionCursor())
 end
 
 UserInputService.InputBegan:Connect(function(input, procesado)
@@ -156,13 +185,37 @@ UserInputService.InputBegan:Connect(function(input, procesado)
 		return
 	end
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		intentarReclamar(posicionCursor())
+		recogiendo = true
+		recogerAhora()
 	elseif input.UserInputType == Enum.UserInputType.Touch then
-		local pos = input.Position
-		intentarReclamar(Vector2.new(pos.X, pos.Y))
+		posicionTactil = Vector2.new(input.Position.X, input.Position.Y)
+		recogiendo = true
+		recogerAhora()
 	elseif input.KeyCode == Enum.KeyCode.ButtonX then
-		-- Gamepad: reclamar lo que hay en el centro de la pantalla
-		intentarReclamar(nil)
+		-- Gamepad: lo que hay en el centro de la pantalla
+		recogiendo = true
+		recogerAhora()
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch and posicionTactil then
+		posicionTactil = Vector2.new(input.Position.X, input.Position.Y)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.KeyCode == Enum.KeyCode.ButtonX then
+		recogiendo = false
+	elseif input.UserInputType == Enum.UserInputType.Touch then
+		recogiendo = false
+		posicionTactil = nil
+	end
+end)
+
+RunService.RenderStepped:Connect(function()
+	if recogiendo and not Menu.hayAbierto() and os.clock() - ultimoIntento >= GameConfig.INTERVALO_RECOGIDA then
+		recogerAhora()
 	end
 end)
 

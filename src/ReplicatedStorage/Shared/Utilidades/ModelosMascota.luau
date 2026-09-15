@@ -1,9 +1,10 @@
 --!strict
 --[[
 	ModelosMascota
-	Construye por codigo TODOS los modelos whitebox del juego: mascotas,
-	fragmentos, basura, billetes, tesoros, figurinas, cintas, trajes y montones.
-	Solo primitivas (Part Block/Ball/Cylinder, WedgePart), sin texturas.
+	Construye por codigo las 41 mascotas (en sus 5 estados, sucias o no) y sus
+	fragmentos. Solo primitivas (Primitivas.luau), sin texturas. La basura,
+	tesoros, coleccionables y bolsas estan en ModelosObjetos; la colina de los
+	montones en ModelosMonton.
 
 	Lo usa el servidor para lo que hay en el mundo y el cliente para las
 	previsualizaciones del album (ViewportFrame): un solo vocabulario visual.
@@ -17,8 +18,7 @@
 	  - sucia = manchas oscuras pegadas al cuerpo.
 
 	Todas las partes van ANCLADAS: el modelo se mueve con PivotTo (arrastre del
-	iman, salto al aparecer, pedestal). El origen del modelo esta en el suelo,
-	bajo el centro, para poder colocarlo con PivotTo(CFrame.new(posSuelo)).
+	iman, pedestal). El origen del modelo esta en el suelo, bajo el centro.
 
 	La forma de cada mascota es determinista (Random con semilla de su id): dos
 	copias de Latita son identicas y dos mascotas del mismo set no lo son.
@@ -26,11 +26,14 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Config = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = Shared:WaitForChild("Config")
 local Paleta = require(Config:WaitForChild("Paleta"))
-local GameConfig = require(Config:WaitForChild("GameConfig"))
 local DefinicionesMascotas = require(Config:WaitForChild("DefinicionesMascotas"))
-local DefinicionesColeccionables = require(Config:WaitForChild("DefinicionesColeccionables"))
+local Primitivas = require(Shared:WaitForChild("Utilidades"):WaitForChild("Primitivas"))
+
+local cuna, cilindroVertical, cilindroHorizontal, esfera, bloque, semilla, nuevoModelo, pivoteEnSuelo, aclarar =
+	Primitivas.cuna, Primitivas.cilindroVertical, Primitivas.cilindroHorizontal, Primitivas.esfera, Primitivas.bloque, Primitivas.semilla, Primitivas.nuevoModelo, Primitivas.pivoteEnSuelo, Primitivas.aclarar
 
 type Mascota = DefinicionesMascotas.Mascota
 
@@ -38,167 +41,6 @@ local ModelosMascota = {}
 
 local ESCALA_RAREZA = { Comun = 1, Rara = 1.25, Epica = 1.5, Mitica = 2.2 }
 local GRIS_OJOS = Paleta.gris(40)
-
--- ===========================================================================
--- Primitivas
--- ===========================================================================
-
-type Props = {
-	Nombre: string?,
-	Size: Vector3,
-	CFrame: CFrame,
-	Color: Color3?,
-	Shape: Enum.PartType?,
-	Transparency: number?,
-	Reflectance: number?,
-	Material: Enum.Material?,
-	Parent: Instance,
-}
-
-local function parte(p: Props): Part
-	local x = Instance.new("Part")
-	x.Name = p.Nombre or "Parte"
-	x.Anchored = true
-	x.CanCollide = false
-	x.CanTouch = false
-	x.CanQuery = true
-	x.CastShadow = true
-	x.Material = p.Material or Enum.Material.SmoothPlastic
-	x.TopSurface = Enum.SurfaceType.Smooth
-	x.BottomSurface = Enum.SurfaceType.Smooth
-	x.Size = p.Size
-	x.CFrame = p.CFrame
-	x.Color = p.Color or Paleta.MUEBLE
-	if p.Shape then
-		x.Shape = p.Shape
-	end
-	if p.Transparency then
-		x.Transparency = p.Transparency
-	end
-	if p.Reflectance then
-		x.Reflectance = p.Reflectance
-	end
-	x.Parent = p.Parent
-	return x
-end
-
-local function cuna(p: Props): WedgePart
-	local w = Instance.new("WedgePart")
-	w.Name = p.Nombre or "Cuna"
-	w.Anchored = true
-	w.CanCollide = false
-	w.CanTouch = false
-	w.Material = p.Material or Enum.Material.SmoothPlastic
-	w.TopSurface = Enum.SurfaceType.Smooth
-	w.BottomSurface = Enum.SurfaceType.Smooth
-	w.Size = p.Size
-	w.CFrame = p.CFrame
-	w.Color = p.Color or Paleta.MUEBLE
-	if p.Transparency then
-		w.Transparency = p.Transparency
-	end
-	w.Parent = p.Parent
-	return w
-end
-
--- Cilindro con el eje VERTICAL (Roblox lo crea con el eje en X)
-local function cilindroVertical(nombre: string, diametro: number, alto: number, cf: CFrame, color: Color3, padre: Instance): Part
-	return parte({
-		Nombre = nombre,
-		Size = Vector3.new(alto, diametro, diametro),
-		CFrame = cf * CFrame.Angles(0, 0, math.rad(90)),
-		Color = color,
-		Shape = Enum.PartType.Cylinder,
-		Parent = padre,
-	})
-end
-
--- Cilindro con el eje en Z (tumbado hacia el frente)
-local function cilindroHorizontal(nombre: string, diametro: number, largo: number, cf: CFrame, color: Color3, padre: Instance): Part
-	return parte({
-		Nombre = nombre,
-		Size = Vector3.new(largo, diametro, diametro),
-		CFrame = cf * CFrame.Angles(0, math.rad(90), 0),
-		Color = color,
-		Shape = Enum.PartType.Cylinder,
-		Parent = padre,
-	})
-end
-
-local function esfera(nombre: string, diametro: number, cf: CFrame, color: Color3, padre: Instance): Part
-	return parte({ Nombre = nombre, Size = Vector3.new(diametro, diametro, diametro), CFrame = cf, Color = color, Shape = Enum.PartType.Ball, Parent = padre })
-end
-
-local function bloque(nombre: string, size: Vector3, cf: CFrame, color: Color3, padre: Instance): Part
-	return parte({ Nombre = nombre, Size = size, CFrame = cf, Color = color, Parent = padre })
-end
-
-local function semilla(texto: string): Random
-	local h = 7
-	for i = 1, #texto do
-		h = (h * 31 + string.byte(texto, i)) % 2147483647
-	end
-	return Random.new(h)
-end
-
-local function nuevoModelo(nombre: string): Model
-	local m = Instance.new("Model")
-	m.Name = nombre
-	return m
-end
-
--- Deja el pivote del modelo en el origen local (el suelo bajo el centro).
--- OJO: asignar Model.WorldPivot se IGNORA cuando hay PrimaryPart (medido en
--- Studio); lo que manda es PrimaryPart.PivotOffset, asi que se calcula desde
--- la posicion de la parte principal. Sin esto, PivotTo pone la parte
--- principal en el destino y el resto del modelo queda hundido.
-local function pivoteEnSuelo(m: Model)
-	local principal = m.PrimaryPart
-	if principal then
-		principal.PivotOffset = principal.CFrame:Inverse()
-	else
-		m.WorldPivot = CFrame.new(0, 0, 0)
-	end
-end
-
-local function aclarar(color: Color3, f: number): Color3
-	return Color3.new(
-		math.clamp(color.R + (1 - color.R) * f, 0, 1),
-		math.clamp(color.G + (1 - color.G) * f, 0, 1),
-		math.clamp(color.B + (1 - color.B) * f, 0, 1)
-	)
-end
-
--- ===========================================================================
--- Etiqueta flotante
--- ===========================================================================
-
-function ModelosMascota.etiqueta(modelo: Model, texto: string, color: Color3?, altura: number?): BillboardGui?
-	local base = modelo.PrimaryPart
-	if not base then
-		return nil
-	end
-	local bb = Instance.new("BillboardGui")
-	bb.Name = "Etiqueta"
-	bb.Size = UDim2.fromOffset(140, 26)
-	bb.StudsOffsetWorldSpace = Vector3.new(0, altura or 2.6, 0)
-	bb.MaxDistance = 45
-	bb.AlwaysOnTop = false
-	bb.Parent = base
-	local tl = Instance.new("TextLabel")
-	tl.Size = UDim2.fromScale(1, 1)
-	tl.BackgroundColor3 = Paleta.UI_FONDO
-	tl.BackgroundTransparency = 0.35
-	tl.TextColor3 = color or Paleta.UI_TEXTO
-	tl.Text = texto
-	tl.TextScaled = true
-	tl.Font = Enum.Font.GothamMedium
-	tl.Parent = bb
-	local esquinas = Instance.new("UICorner")
-	esquinas.CornerRadius = UDim.new(0, 6)
-	esquinas.Parent = tl
-	return bb
-end
 
 -- ===========================================================================
 -- Mascotas
@@ -411,7 +253,7 @@ function ModelosMascota.alturaMascota(def: Mascota): number
 end
 
 -- ===========================================================================
--- Objetos sueltos
+-- Fragmentos
 -- ===========================================================================
 
 function ModelosMascota.fragmento(def: Mascota, indice: number): Model
@@ -430,193 +272,6 @@ function ModelosMascota.fragmento(def: Mascota, indice: number): Model
 	m.PrimaryPart = c
 	pivoteEnSuelo(m)
 	return m
-end
-
-function ModelosMascota.basura(material: string): Model
-	local m = nuevoModelo("Basura")
-	local color = Paleta.MATERIAL[material] or Paleta.MUEBLE
-	local c: BasePart
-	if material == "Metal" then
-		c = cilindroHorizontal("Cuerpo", 0.7, 1.0, CFrame.new(0, 0.35, 0) * CFrame.Angles(0, math.rad(30), 0), color, m)
-	elseif material == "Plastico" then
-		c = cilindroVertical("Cuerpo", 0.6, 1.2, CFrame.new(0, 0.55, 0) * CFrame.Angles(math.rad(70), 0, math.rad(20)), color, m)
-	elseif material == "Papel" then
-		c = bloque("Cuerpo", Vector3.new(1.1, 0.15, 1.3), CFrame.new(0, 0.08, 0) * CFrame.Angles(0, math.rad(15), 0), color, m)
-	else
-		c = esfera("Cuerpo", 0.8, CFrame.new(0, 0.4, 0), color, m)
-		cuna({ Nombre = "Hoja", Size = Vector3.new(0.5, 0.25, 0.5), CFrame = CFrame.new(0.2, 0.85, 0), Color = Paleta.escalar(color, 1.2), Parent = m })
-	end
-	m.PrimaryPart = c
-	pivoteEnSuelo(m)
-	return m
-end
-
-function ModelosMascota.billete(): Model
-	local m = nuevoModelo("Billete")
-	local c = bloque("Cuerpo", Vector3.new(1.3, 0.06, 0.65), CFrame.new(0, 0.05, 0) * CFrame.Angles(0, math.rad(20), 0), Paleta.BILLETE, m)
-	bloque("Sello", Vector3.new(0.4, 0.07, 0.4), c.CFrame * CFrame.new(0, 0.01, 0), Paleta.escalar(Paleta.BILLETE, 0.75), m)
-	m.PrimaryPart = c
-	pivoteEnSuelo(m)
-	return m
-end
-
-function ModelosMascota.tesoro(): Model
-	local m = nuevoModelo("Tesoro")
-	local c = bloque("Cuerpo", Vector3.new(1.1, 0.8, 0.8), CFrame.new(0, 0.4, 0), Paleta.TESORO, m)
-	bloque("Tapa", Vector3.new(1.15, 0.2, 0.85), CFrame.new(0, 0.9, 0), Paleta.escalar(Paleta.TESORO, 0.8), m)
-	bloque("Cierre", Vector3.new(0.2, 0.3, 0.1), CFrame.new(0, 0.75, -0.42), Paleta.gris(60), m)
-	m.PrimaryPart = c
-	pivoteEnSuelo(m)
-	return m
-end
-
-function ModelosMascota.figurina(def: DefinicionesColeccionables.Figurina): Model
-	local m = nuevoModelo(def.nombre)
-	m:SetAttribute("FigurinaId", def.id)
-	local rng = semilla(def.id)
-	local color = Paleta.FIGURINA
-	local base = cilindroVertical("Base", 0.9, 0.2, CFrame.new(0, 0.1, 0), Paleta.gris(120), m)
-	bloque("Cuerpo", Vector3.new(0.5, 0.9, 0.4), CFrame.new(0, 0.65, 0), color, m)
-	esfera("Cabeza", 0.5, CFrame.new(0, 1.3, 0), color, m)
-	if rng:NextNumber() > 0.5 then
-		bloque("Sombrero", Vector3.new(0.6, 0.15, 0.6), CFrame.new(0, 1.6, 0), Paleta.gris(120), m)
-	else
-		cuna({ Nombre = "Sombrero", Size = Vector3.new(0.4, 0.4, 0.4), CFrame = CFrame.new(0, 1.7, 0), Color = Paleta.gris(120), Parent = m })
-	end
-	m.PrimaryPart = base
-	pivoteEnSuelo(m)
-	return m
-end
-
-function ModelosMascota.cinta(def: DefinicionesColeccionables.Cinta): Model
-	local m = nuevoModelo(def.nombre)
-	m:SetAttribute("CintaId", def.id)
-	local c = bloque("Cuerpo", Vector3.new(1.1, 0.2, 0.7), CFrame.new(0, 0.1, 0), Paleta.CINTA, m)
-	for _, dx in { -0.28, 0.28 } do
-		cilindroVertical("Carrete", 0.3, 0.22, CFrame.new(dx, 0.11, 0), Paleta.gris(200), m)
-	end
-	m.PrimaryPart = c
-	pivoteEnSuelo(m)
-	return m
-end
-
-function ModelosMascota.traje(def: DefinicionesColeccionables.Traje): Model
-	local m = nuevoModelo(def.nombre)
-	m:SetAttribute("TrajeId", def.id)
-	local c = bloque("Cuerpo", Vector3.new(1.3, 0.25, 1.2), CFrame.new(0, 0.125, 0), def.colorCuerpo, m)
-	bloque("Pliegue", Vector3.new(1.3, 0.2, 0.5), CFrame.new(0, 0.35, -0.2), def.colorBrazos, m)
-	bloque("Pliegue2", Vector3.new(0.6, 0.15, 1.2), CFrame.new(0.3, 0.32, 0.1), def.colorPiernas, m)
-	m.PrimaryPart = c
-	pivoteEnSuelo(m)
-	return m
-end
-
--- ===========================================================================
--- Montones
--- ===========================================================================
-
-
-function ModelosMascota.radioMonton(tamano: string): number
-	local def = GameConfig.TAMANOS_MONTON[tamano]
-	return if def then def.radio else 7
-end
-
--- Numero de capas del cono para n piezas (cada capa tiene ~el doble de piezas
--- que la de arriba). Se usa para altura y para repartir las piezas.
-local function repartirCapas(n: number): { number }
-	local capas = {}
-	local restantes = n
-	local porCapa = 1
-	while restantes > 0 do
-		local en = math.min(restantes, porCapa)
-		table.insert(capas, 1, en) -- la capa mas pequena (cima) va al final
-		restantes -= en
-		porCapa = math.max(2, math.floor(porCapa * 1.9))
-	end
-	return capas -- capas[1] = base (mas piezas), capas[#capas] = cima
-end
-
--- Una MONTANA hecha de exactamente numPiezas piezas apiladas en capas
--- concentricas: al activarla, cada pieza se convierte en un objeto real, asi
--- que lo que se ve es lo que hay. Las piezas se llaman Pieza_i (atributo
--- Indice) para que Botin pueda animarlas una a una.
-function ModelosMascota.monton(tamano: string, agotado: boolean, indice: number?, numPiezas: number?): Model
-	local m = nuevoModelo("Monton")
-	local rng = semilla("monton" .. tamano .. tostring(indice or 0))
-	local radio = ModelosMascota.radioMonton(tamano)
-	if agotado then
-		local c = bloque("Resto", Vector3.new(radio * 1.6, 0.4, radio * 1.4), CFrame.new(0, 0.2, 0) * CFrame.Angles(0, rng:NextNumber(0, math.pi), 0), Paleta.MONTON_AGOTADO, m)
-		bloque("Resto2", Vector3.new(radio * 1.0, 0.3, radio * 0.9), CFrame.new(radio * 0.3, 0.15, -radio * 0.2) * CFrame.Angles(0, rng:NextNumber(0, math.pi), 0), Paleta.MONTON_AGOTADO, m)
-		m.PrimaryPart = c
-		pivoteEnSuelo(m)
-		return m
-	end
-	local n = numPiezas or GameConfig.TAMANOS_MONTON[tamano].min
-	local capas = repartirCapas(n)
-	local alturaCapa = 2.4
-	local i = 0
-	local masAlta: BasePart? = nil
-	for k, enCapa in capas do
-		local radioCapa = radio * (1 - (k - 1) / #capas) * 0.85
-		local y = (k - 1) * alturaCapa + 1.2
-		for j = 1, enCapa do
-			i += 1
-			local ang = (j / enCapa) * math.pi * 2 + rng:NextNumber(-0.25, 0.25)
-			local dist = if enCapa == 1 then 0 else radioCapa * rng:NextNumber(0.55, 1)
-			local sx = rng:NextNumber(2.2, 4.2)
-			local sy = rng:NextNumber(1.8, 3.2)
-			local sz = rng:NextNumber(2.2, 4.2)
-			local cf = CFrame.new(math.cos(ang) * dist, y + rng:NextNumber(-0.3, 0.3), math.sin(ang) * dist)
-				* CFrame.Angles(rng:NextNumber(-0.25, 0.25), rng:NextNumber(0, math.pi * 2), rng:NextNumber(-0.25, 0.25))
-			local color = Paleta.gris(rng:NextInteger(126, 152))
-			local pieza: BasePart
-			if i % 3 == 0 then
-				pieza = cuna({ Nombre = "Pieza_" .. i, Size = Vector3.new(sx, sy, sz), CFrame = cf, Color = color, Parent = m })
-			else
-				pieza = bloque("Pieza_" .. i, Vector3.new(sx, sy, sz), cf, color, m)
-			end
-			pieza:SetAttribute("Indice", i)
-			pieza.CanCollide = true
-			pieza.CanQuery = true
-			masAlta = pieza
-		end
-	end
-	m.PrimaryPart = masAlta
-	pivoteEnSuelo(m)
-	return m
-end
-
--- Altura aproximada de la montana (para colocar prompts y etiquetas)
-function ModelosMascota.alturaMonton(numPiezas: number): number
-	return #repartirCapas(numPiezas) * 2.4 + 2
-end
-
--- La bolsa de basura: proyectil, objeto caido y bolsa en manos. fraccion 0..1
--- de llenado escala el tamano.
-function ModelosMascota.bolsaLlena(fraccion: number): Model
-	local m = nuevoModelo("Bolsa")
-	local d = 1.4 * (0.8 + 0.6 * math.clamp(fraccion, 0, 1))
-	local c = esfera("Cuerpo", d, CFrame.new(0, d / 2, 0), Paleta.BOLSA, m)
-	cilindroVertical("Nudo", d * 0.35, d * 0.3, CFrame.new(0, d + d * 0.1, 0), Paleta.escalar(Paleta.BOLSA, 1.25), m)
-	bloque("Asa", Vector3.new(d * 0.5, d * 0.12, d * 0.12), CFrame.new(0, d + d * 0.3, 0), Paleta.escalar(Paleta.BOLSA, 1.25), m)
-	m.PrimaryPart = c
-	pivoteEnSuelo(m)
-	return m
-end
-
-function ModelosMascota.anilloActivado(radio: number): Part
-	local anillo = Instance.new("Part")
-	anillo.Name = "AnilloActivado"
-	anillo.Anchored = true
-	anillo.CanCollide = false
-	anillo.CanQuery = false
-	anillo.CanTouch = false
-	anillo.Material = Enum.Material.Neon
-	anillo.Color = Paleta.NEON_ACTIVADO
-	anillo.Shape = Enum.PartType.Cylinder
-	anillo.Size = Vector3.new(0.2, radio * 2.8 + 2, radio * 2.8 + 2)
-	anillo.CFrame = CFrame.new(0, 1.1, 0) * CFrame.Angles(0, 0, math.rad(90))
-	return anillo
 end
 
 return ModelosMascota

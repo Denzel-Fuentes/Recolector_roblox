@@ -19,7 +19,8 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Textos = require(Shared:WaitForChild("Config"):WaitForChild("Textos"))
 local DefinicionesColeccionables = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesColeccionables"))
-local ModelosMascota = require(Shared:WaitForChild("Utilidades"):WaitForChild("ModelosMascota"))
+local ModelosObjetos = require(Shared:WaitForChild("Utilidades"):WaitForChild("ModelosObjetos"))
+local Primitivas = require(Shared:WaitForChild("Utilidades"):WaitForChild("Primitivas"))
 local Red = require(Shared:WaitForChild("Utilidades"):WaitForChild("Red"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
@@ -40,10 +41,10 @@ for _, marcador in Mundo.figurinasFijas() do
 	local id = marcador:GetAttribute("FigurinaId")
 	local def = if typeof(id) == "string" then DefinicionesColeccionables.FIGURINA_POR_ID[id] else nil
 	if def then
-		local modelo = ModelosMascota.figurina(def)
+		local modelo = ModelosObjetos.figurina(def)
 		modelo:PivotTo(CFrame.new(marcador.Position - Vector3.new(0, 0.5, 0)))
 		modelo:SetAttribute("FigurinaId", def.id)
-		ModelosMascota.etiqueta(modelo, def.nombre, nil, 2.4)
+		Primitivas.etiqueta(modelo, def.nombre, nil, 2.4)
 		modelo.Parent = carpeta
 		table.insert(figurinas, { id = def.id, modelo = modelo, posicion = marcador.Position })
 	end

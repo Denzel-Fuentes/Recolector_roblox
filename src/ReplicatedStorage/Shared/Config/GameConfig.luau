@@ -44,6 +44,8 @@ GameConfig.ALCANCE_BASE = 6
 GameConfig.ALCANCE_POR_NIVEL = 1
 GameConfig.IMAN_POR_NIVEL = 1.5
 GameConfig.INTERVALO_IMAN = 0.2
+-- Nada se recoge por pasar encima (decision del usuario): solo con clic (Alcance)
+-- o arrastrado por el Iman. A esta distancia un objeto ARRASTRADO entra en la bolsa.
 GameConfig.DISTANCIA_RECLAMO_IMAN = 2.5
 
 -- === Mejoras ===
@@ -58,14 +60,19 @@ GameConfig.UMBRAL_REPOBLACION = 4
 -- sus objetos sin recoger (asi la repoblacion no espera al ultimo papel).
 GameConfig.FRACCION_MONTON_DISPONIBLE = 0.25
 GameConfig.RETRASO_REPOBLACION = 20
--- min/max = PIEZAS de la montana = objetos que se liberan (la cantidad visible
--- es la cantidad real). cantidad = montones de ese tamano en el patio (12).
+-- min/max = OBJETOS que aparecen al activar: al desbloquear, la colina se
+-- sustituye entera por una montana de basura del mismo tamano (decision del
+-- usuario: "mucha basura, equivalente al tamano del monton"), y cada pieza es
+-- un objeto que se recoge. lotes = cuantas tiradas de TIPO_OBJETO se hacen
+-- (mascotas, fragmentos, tesoros, billetes, coleccionables): el resto hasta
+-- min/max es basura de relleno, asi los premios por monton no se disparan con
+-- la cantidad de basura. cantidad = montones de ese tamano (12). radio = de
+-- la colina (la altura sale de min/max).
 GameConfig.TAMANOS_MONTON = {
-	chico = { min = 14, max = 18, cantidad = 4, radio = 7 },
-	mediano = { min = 22, max = 28, cantidad = 5, radio = 10 },
-	grande = { min = 34, max = 44, cantidad = 3, radio = 14 },
+	chico = { min = 30, max = 40, lotes = { 14, 18 }, cantidad = 4, radio = 7 },
+	mediano = { min = 80, max = 110, lotes = { 22, 28 }, cantidad = 5, radio = 10 },
+	grande = { min = 200, max = 280, lotes = { 34, 44 }, cantidad = 3, radio = 14 },
 }
-GameConfig.RADIO_DISPERSION_OBJETOS = 10
 GameConfig.PATIO_LADO = 200
 
 -- === Pity (correccion deliberada del RNG "duro" del original) ===
@@ -90,6 +97,8 @@ GameConfig.MIN_SEGUNDOS_ENSAMBLAJE = 2
 GameConfig.MANCHAS_LIMPIEZA = { min = 8, max = 12 }
 
 -- === Valores en $ ===
+-- Todo se cobra al depositar en el contenedor (nunca al recoger): basura,
+-- billetes y tesoros ocupan un hueco de la bolsa hasta entonces.
 GameConfig.VALOR_BASURA = { Metal = 12, Plastico = 8, Papel = 6, Organico = 5 }
 GameConfig.VALOR_BILLETE = { min = 20, max = 80 }
 GameConfig.VALOR_TESORO = { min = 150, max = 600 }
@@ -112,6 +121,9 @@ GameConfig.SLOTS_ESTANTERIA = 12
 
 -- === Red ===
 GameConfig.COOLDOWN_REMOTE = 0.15
+-- Mantener el clic recoge una pieza cada tanto (cliente); >= COOLDOWN_REMOTE,
+-- que es lo que el servidor acepta por jugador.
+GameConfig.INTERVALO_RECOGIDA = 0.16
 GameConfig.DISTANCIA_INTERACCION = 12
 
 -- === Monetizacion ===

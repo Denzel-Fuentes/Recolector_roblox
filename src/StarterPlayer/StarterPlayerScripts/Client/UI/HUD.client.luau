@@ -3,9 +3,12 @@
 	HUD
 	Distribucion calcada de KOTAMON (referencia del usuario):
 
-	  arriba-izq     $ dinero  |  cartas (mascotas distintas)  |  bolsa n/cap  |  gemas
+	  arriba-izq     $ dinero  |  cartas (mascotas distintas)  |  gemas
 	  izquierda      barra vertical de ENERGIA (se llena de abajo arriba)
-	  derecha        barra vertical de FUERZA de lanzamiento (mantener F)
+	  derecha        barra vertical de FUERZA de lanzamiento (mantener F) y, a
+	                 su lado, la de BOLSA: cuanto llevas, sin numeros (decision
+	                 del usuario: se ve llenarse, y "LLENA" en rojo avisa de que
+	                 toca volver al contenedor)
 	  abajo-izq      avatar + iconos con tecla: telefono Q, album J, logros L, base B
 	  abajo-dcha     "MANTEN F PARA LANZAR" cuando la bolsa no esta vacia
 	  arriba-dcha    Ir a casa / Ir al patio (pequenos)
@@ -18,6 +21,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
@@ -58,11 +62,8 @@ end
 
 local _, textoDinero = pildora("Dinero", 150, Paleta.UI_DINERO, 1)
 local pildoraCartas, textoCartas = pildora("Cartas", 120, Paleta.UI_GEMAS, 2)
-local pildoraBolsa, textoBolsa = pildora("Bolsa", 130, Paleta.BOLSA, 3)
-local _, textoGemas = pildora("Gemas", 130, Paleta.UI_GEMAS, 4)
--- El icono de la bolsa es redondo, el de las cartas es una "carta"
-local iconoBolsa = pildoraBolsa:FindFirstChild("Icono") :: Frame
-Componentes.esquinas(iconoBolsa, 11)
+local _, textoGemas = pildora("Gemas", 130, Paleta.UI_GEMAS, 3)
+-- El icono de las cartas es una "carta"
 local iconoCartas = pildoraCartas:FindFirstChild("Icono") :: Frame
 iconoCartas.Size = UDim2.fromOffset(16, 22)
 iconoCartas.Position = UDim2.fromOffset(13, 11)
@@ -71,11 +72,17 @@ iconoCartas.Position = UDim2.fromOffset(13, 11)
 -- Barras verticales
 -- ===========================================================================
 
-local function barraVertical(nombre: string, lado: number, color: Color3): (Frame, Frame, TextLabel)
+local ANCHO_BARRA = 26
+local SEPARACION_BARRAS = 22 -- que "¡LLENA!" y "Fuerza" no se peguen
+
+-- lado -1 = borde izquierdo, 1 = derecho; columna 0 = pegada al borde, 1 = la
+-- siguiente hacia dentro
+local function barraVertical(nombre: string, lado: number, columna: number, color: Color3): (Frame, Frame, TextLabel)
+	local desplazamiento = 22 + columna * (ANCHO_BARRA + SEPARACION_BARRAS)
 	local marco = Componentes.marco({
 		Parent = pantalla,
-		Size = UDim2.fromOffset(26, 190),
-		Position = UDim2.new(if lado < 0 then 0 else 1, -lado * 22, 0.5, 40),
+		Size = UDim2.fromOffset(ANCHO_BARRA, 190),
+		Position = UDim2.new(if lado < 0 then 0 else 1, -lado * desplazamiento, 0.5, 40),
 		Anchor = Vector2.new(if lado < 0 then 0 else 1, 0.5),
 		Color = Paleta.UI_FONDO,
 		Transparencia = 0.15,
@@ -97,9 +104,15 @@ local function barraVertical(nombre: string, lado: number, color: Color3): (Fram
 	return marco, relleno, etiqueta
 end
 
-local _, rellenoEnergia, etiquetaEnergia = barraVertical("Energia", -1, Paleta.UI_ENERGIA)
-local _, rellenoFuerza, etiquetaFuerza = barraVertical("Fuerza", 1, Paleta.UI_ACENTO)
+local _, rellenoEnergia, etiquetaEnergia = barraVertical("Energia", -1, 0, Paleta.UI_ENERGIA)
+local _, rellenoFuerza, etiquetaFuerza = barraVertical("Fuerza", 1, 0, Paleta.UI_ACENTO)
 etiquetaFuerza.Text = Textos.HUD.fuerza
+-- La bolsa, al lado de la fuerza: se llena con cada objeto recogido
+local COLOR_BOLSA_HUD = Paleta.escalar(Paleta.BOLSA, 1.6)
+local marcoBolsa, rellenoBolsa, etiquetaBolsa = barraVertical("Bolsa", 1, 1, COLOR_BOLSA_HUD)
+local bordeBolsa = marcoBolsa:FindFirstChildOfClass("UIStroke") :: UIStroke
+etiquetaBolsa.Text = Textos.HUD.bolsa
+local pulsoBolsaLlena = TweenService:Create(rellenoBolsa, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { BackgroundTransparency = 0.45 })
 
 -- ===========================================================================
 -- Abajo-izq: avatar e iconos con tecla
@@ -165,6 +178,29 @@ local pistaLanzar = Componentes.texto({
 })
 pistaLanzar.Visible = false
 
+-- Encima de la de lanzar: como se recoge (mantener el clic). Solo en el patio.
+local pistaRecoger = Componentes.texto({
+	Parent = pantalla,
+	Size = UDim2.fromOffset(360, 30),
+	Position = UDim2.new(1, -16, 1, -46),
+	Anchor = Vector2.new(1, 1),
+	Tamano = 14,
+	Negrita = true,
+	Alinear = Enum.TextXAlignment.Right,
+	Color = Paleta.UI_TEXTO_SUAVE,
+})
+pistaRecoger.Visible = false
+
+local function refrescarPistaRecoger()
+	local plataforma = Entrada.plataforma()
+	if plataforma == "tactil" then
+		pistaRecoger.Text = Textos.HUD.tocarRecoger
+	else
+		pistaRecoger.Text = Textos.formatear(Textos.HUD.mantenerRecoger, { tecla = if plataforma == "gamepad" then "X" else "CLIC" })
+	end
+	pistaRecoger.Visible = jugador:GetAttribute("EnPatio") == true and not Menu.hayAbierto()
+end
+
 -- ===========================================================================
 -- Refrescos
 -- ===========================================================================
@@ -172,10 +208,23 @@ pistaLanzar.Visible = false
 local function refrescarBolsa()
 	local b = EstadoCliente.bolsa
 	local n = #b.items
-	textoBolsa.Text = string.format("%d/%d", n, b.capacidad)
 	local llena = n >= b.capacidad
-	textoBolsa.TextColor3 = if llena then Paleta.UI_ENERGIA else Paleta.UI_TEXTO
-	iconoBolsa.BackgroundColor3 = if llena then Paleta.UI_ENERGIA else Paleta.BOLSA
+	local fraccion = if b.capacidad > 0 then math.clamp(n / b.capacidad, 0, 1) else 0
+	TweenService:Create(rellenoBolsa, TweenInfo.new(0.2), { Size = UDim2.new(1, -6, fraccion, -6) }):Play()
+	if llena then
+		etiquetaBolsa.Text = Textos.HUD.bolsaLlenaBarra
+		etiquetaBolsa.TextColor3 = Paleta.UI_PELIGRO
+		rellenoBolsa.BackgroundColor3 = Paleta.UI_PELIGRO
+		bordeBolsa.Color = Paleta.UI_PELIGRO
+		pulsoBolsaLlena:Play()
+	else
+		etiquetaBolsa.Text = Textos.HUD.bolsa
+		etiquetaBolsa.TextColor3 = Paleta.UI_TEXTO_SUAVE
+		rellenoBolsa.BackgroundColor3 = COLOR_BOLSA_HUD
+		bordeBolsa.Color = Paleta.UI_PANEL_CLARO
+		pulsoBolsaLlena:Cancel()
+		rellenoBolsa.BackgroundTransparency = 0
+	end
 	if n > 0 then
 		local plataforma = Entrada.plataforma()
 		if plataforma == "tactil" then
@@ -238,4 +287,8 @@ Menu.alCambiar:Connect(function(nombre)
 	dock.Visible = nombre == nil
 	esquina.Visible = nombre == nil
 	refrescarBolsa()
+	refrescarPistaRecoger()
 end)
+jugador:GetAttributeChangedSignal("EnPatio"):Connect(refrescarPistaRecoger)
+UserInputService.LastInputTypeChanged:Connect(refrescarPistaRecoger)
+refrescarPistaRecoger()

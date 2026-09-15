@@ -36,6 +36,8 @@ local Textos = require(Config:WaitForChild("Textos"))
 local DefinicionesMascotas = require(Config:WaitForChild("DefinicionesMascotas"))
 local DefinicionesColeccionables = require(Config:WaitForChild("DefinicionesColeccionables"))
 local ModelosMascota = require(Shared:WaitForChild("Utilidades"):WaitForChild("ModelosMascota"))
+local ModelosObjetos = require(Shared:WaitForChild("Utilidades"):WaitForChild("ModelosObjetos"))
+local Primitivas = require(Shared:WaitForChild("Utilidades"):WaitForChild("Primitivas"))
 local Senal = require(Shared:WaitForChild("Utilidades"):WaitForChild("Senal"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
@@ -156,7 +158,7 @@ function Parcelas.renderizar(jugador: Player)
 	for i, def in DefinicionesColeccionables.FIGURINAS do
 		local slot = slots[i]
 		if slot and perfil.figurinas[def.id] then
-			local modelo = ModelosMascota.figurina(def)
+			local modelo = ModelosObjetos.figurina(def)
 			modelo:PivotTo(slot.CFrame * CFrame.new(0, -0.9, 0))
 			modelo.Parent = contenido
 		end
@@ -172,7 +174,7 @@ function Parcelas.renderizar(jugador: Player)
 			local modelo = ModelosMascota.mascota(def, copia.estado, copia.sucia)
 			modelo:PivotTo(ped.CFrame * CFrame.new(0, -0.5, 0))
 			modelo:SetAttribute("Uid", uid)
-			ModelosMascota.etiqueta(modelo, def.nombre .. " · " .. DefinicionesMascotas.nombreEstado(copia.estado), Paleta.RAREZA[def.rareza], ModelosMascota.alturaMascota(def))
+			Primitivas.etiqueta(modelo, def.nombre .. " · " .. DefinicionesMascotas.nombreEstado(copia.estado), Paleta.RAREZA[def.rareza], ModelosMascota.alturaMascota(def))
 			modelo.Parent = contenido
 		end
 	end

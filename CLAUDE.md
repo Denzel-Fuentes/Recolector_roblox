@@ -14,7 +14,7 @@ tocar balance o estructura.
   `loadstring(game:GetService("HttpService"):GetAsync("http://localhost:8123/herramientas/instalar-desde-http.luau", true))()`.
   Crea el mismo árbol que Rojo; idempotente.
 - Pruebas dentro de la VM del juego (Play): `game.ServerStorage.EjecutarPrueba:Invoke("estado")`
-  (ver `Services/PruebasDefinidas.luau`) y `ReplicatedStorage.EjecutarPruebaCliente:Invoke("abrir","Album")`.
+  (ver `Services/PruebasDefinidas/`) y `ReplicatedStorage.EjecutarPruebaCliente:Invoke("abrir","Album")`.
   La barra de comandos corre en la VM del plugin: `require` allí da copias vacías.
 - El mundo NO se genera en runtime: se hornea en el place con
   `herramientas/construir-mundo.luau` (pegar en la barra de comandos o mandar
@@ -34,7 +34,31 @@ herramientas/                           NO mapeado en Rojo: scripts de diseño p
 ```
 
 Rojo 7: `.luau` → ModuleScript, `.server.luau` → Script, `.client.luau` →
-LocalScript, `X.model.json` → instancia (los RemoteEvents van así).
+LocalScript, `X.model.json` → instancia (los RemoteEvents van así), carpeta
+con `init.luau` → ModuleScript con hijos (`PruebasDefinidas/`).
+
+Capas (la dependencia va siempre hacia abajo, nunca al revés):
+
+```
+Config            datos puros: números, textos, tablas de probabilidad, definiciones
+Utilidades        sin estado de juego, servidor y cliente por igual:
+                  Primitivas → ModelosMascota / ModelosObjetos / ModelosMonton,
+                  Geometria, PoseBrazos, Red, Senal, Formato, Entrada, ProgresoLogros
+Services          reglas y estado (Perfiles, Bolsa, Mascotas, Economia…). El patio
+                  es una fachada (Botin) sobre seis módulos de una responsabilidad:
+                  GeneradorBotin (qué sale) · ObjetosPatio (registro y reclamo) ·
+                  FisicaBasura (cae y se ancla) · Montones (ciclo de vida) ·
+                  Iman · Lanzamiento; tipos comunes en TiposPatio, grupos de
+                  colisión en Colisiones
+*Handler.server   cableado: prompts, remotes, cooldowns → llaman a los módulos
+Client            solo intención + presentación; toma Config y Utilidades, nunca Services
+```
+
+Reglas al añadir código: un módulo = una responsabilidad nombrada en su
+cabecera; nada de lógica de juego en los Handlers ni en la UI; si dos módulos
+se necesitan mutuamente, el de abajo publica una `Senal` y el de arriba se
+suscribe (así ObjetosPatio no conoce a Montones); los tipos compartidos van a
+un módulo de solo tipos.
 
 ## Convenciones de código
 
@@ -56,9 +80,15 @@ LocalScript, `X.model.json` → instancia (los RemoteEvents van así).
 ## Verificar
 
 1. Consola de Studio sin errores tras sincronizar (`get_console_output`).
-2. Hornear mundo → capturas → contar tags (24 `RanuraMonton`, 16 `Parcela`).
+2. Hornear mundo → capturas → contar tags (12 `RanuraMonton`, 6 `Parcela`).
 3. Play: asserts de servidor en `execute_luau` (reclamo atómico, pity, fusión,
-   odds suman 100, 41/40/12/7/3 definiciones).
+   odds suman 100, 41/40/12/7/3 definiciones); `montonPiezas`, `reacomodo`,
+   `sinRecogidaAutomatica`, `variedadBasura`, `enPatio` para el patio;
+   `billeteEnBolsa`, `sinDineroAlRecoger`, `bonusBolsaLlena` para la regla
+   "el dinero sólo sale del contenedor" (si el MCP no puede invocar el
+   BindableFunction, por atributo `Prueba`, ver CONTEXTO);
+   en el cliente `EjecutarPruebaCliente:Invoke("reticula")` y `("verme", 8)`
+   para capturar el propio personaje desde fuera.
 4. Multijugador: Studio → Test → Clients and Servers (2 jugadores), ver
    `README-pruebas.md`.
 

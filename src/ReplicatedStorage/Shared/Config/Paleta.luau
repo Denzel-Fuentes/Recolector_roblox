@@ -18,8 +18,9 @@
 	Los OBJETOS y MASCOTAS llevan color plano por MATERIAL y un disco de RAREZA:
 	set y rareza son informacion de juego y necesitan leerse a distancia.
 
-	Un unico NEON: el anillo de un monton recien activado. Es la senal social
-	"aqui acaba de aparecer algo" y por eso es lo unico que canta en el mapa.
+	Sin NEON en el mapa (el usuario quito el anillo amarillo del monton activado):
+	la senal de "aqui hay basura" es la propia montana, que pasa de gris a los
+	colores de material al activarla.
 ]]
 
 local Paleta = {}
@@ -42,11 +43,10 @@ Paleta.CONTENEDOR = gris(195)
 Paleta.MUEBLE = gris(215)
 Paleta.NPC = gris(215)
 Paleta.CASETA = gris(240)
-Paleta.NEON_ACTIVADO = Color3.fromRGB(190, 255, 60)
 
 -- Materiales (sets de mascotas y basura)
 Paleta.MATERIAL = {
-	Metal = Color3.fromRGB(110, 127, 153),
+	Metal = Color3.fromRGB(150, 165, 185),
 	Plastico = Color3.fromRGB(70, 190, 200),
 	Papel = Color3.fromRGB(214, 196, 150),
 	Organico = Color3.fromRGB(120, 150, 80),

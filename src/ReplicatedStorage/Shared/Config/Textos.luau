@@ -25,8 +25,11 @@ Textos.HUD = {
 	lanzar = "Lanzar",
 	mantenerLanzar = "MANTÉN {tecla} PARA LANZAR",
 	tocarLanzar = "MANTÉN EL BOTÓN PARA LANZAR",
+	mantenerRecoger = "MANTÉN {tecla} PARA RECOGER",
+	tocarRecoger = "MANTÉN EL DEDO SOBRE LA BASURA PARA RECOGER",
 	cartas = "Cartas",
 	fuerza = "Fuerza",
+	bolsaLlenaBarra = "¡LLENA!",
 	restaurarEnergia = "RESTAURAR ENERGÍA",
 	telefono = "Teléfono",
 	cerrar = "Cerrar",
@@ -57,7 +60,7 @@ Textos.PATIO = {
 	sinGemas = "No te alcanzan las Gemas",
 	figurinaEncontrada = "¡Figurita encontrada: {nombre}!",
 	figurinaYaTienes = "Ya tienes esta figurita",
-	billete = "+${cantidad}",
+	billete = "Billete de ${cantidad}: cóbralo en el contenedor",
 }
 
 Textos.FEED = {

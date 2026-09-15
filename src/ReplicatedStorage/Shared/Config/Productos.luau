@@ -44,8 +44,8 @@ Productos.PASES = {
 	{ id = "PaseVelocidad", nombre = "Pase de Velocidad", descripcion = "+25% velocidad de movimiento permanente", precioRobux = 149, gamePassId = 0, categoria = "boost" },
 	{ id = "PaseIman", nombre = "Pase de Imán", descripcion = "+50% radio de imán", precioRobux = 149, gamePassId = 0, categoria = "boost" },
 	{ id = "AutoEnsamblaje", nombre = "Auto-Ensamblaje", descripcion = "Los fragmentos se ensamblan solos al tener los 5", precioRobux = 199, gamePassId = 0, categoria = "conveniencia" },
-	-- B) Auto-farm y cosmeticos
-	{ id = "AutoReciclaje", nombre = "Pase Auto-Reciclaje", descripcion = "La basura común se convierte en $ al recogerla, sin ocupar la bolsa", precioRobux = 299, gamePassId = 0, categoria = "conveniencia" },
+	-- B) Cosmeticos. (El "Pase Auto-Reciclaje" del GDD se retiro: el dinero
+	-- solo sale del contenedor, y ese pase pagaba al recoger.)
 	{ id = "TrajeDorado", nombre = "Traje Dorado", descripcion = "Traje de reciclador premium", precioRobux = 199, gamePassId = 0, categoria = "cosmetico", trajeId = "TP1" },
 	{ id = "TrajeFantasma", nombre = "Fantasma del Vertedero", descripcion = "Traje de reciclador premium", precioRobux = 79, gamePassId = 0, categoria = "cosmetico", trajeId = "TP2" },
 	{ id = "SkinNeon", nombre = "Base Neón", descripcion = "Tema decorativo para tu parcela", precioRobux = 249, gamePassId = 0, categoria = "cosmetico", skinId = "S1" },

@@ -3,9 +3,10 @@
 	Economia (ModuleScript)
 	Unica responsabilidad: las dos monedas y sus reglas.
 
-	  $ (dinero)   gratuita. Billetes literales: se encuentran en la basura, los
-	               paga Dona Chatarra por reciclar/tesoros/duplicados. Compra
-	               mejoras, refrescos y el Contenedor Dorado.
+	  $ (dinero)   gratuita. Los paga Dona Chatarra al DEPOSITAR en el
+	               contenedor (basura, billetes, tesoros), por duplicados y por
+	               logros; recoger nunca paga. Compra mejoras, refrescos y el
+	               Contenedor Dorado.
 	  Gemas        premium. Solo entran por Developer Products (Monetizacion) o
 	               comandos de admin. Compran el Sobre Premium y aceleran el
 	               Contenedor Dorado.

@@ -167,7 +167,7 @@ Se combinan los tres enfoques, cada uno cubriendo una necesidad distinta para qu
 ### B) Auto-farm + cosméticos
 | Producto | Precio (Robux) | Qué hace |
 |---|---|---|
-| Pase Auto-Reciclaje | 299 | Recicla automáticamente objetos comunes sin acción manual (conveniencia, no exclusividad) |
+| ~~Pase Auto-Reciclaje~~ | ~~299~~ | **Retirado en producción**: el dinero sólo se obtiene depositando en el contenedor (ver `CONTEXTO.md`); un pase que paga al recoger rompía ese bucle |
 | Trajes de Reciclador extra | 79–199 c/u | Cosméticos de avatar más allá de los 3 gratuitos |
 | Skins de base (temas decorativos) | 99–249 | Personalización visual de la parcela |
 

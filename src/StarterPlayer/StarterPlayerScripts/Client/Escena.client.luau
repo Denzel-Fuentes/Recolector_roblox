@@ -10,7 +10,7 @@
 	                   mientras el id sea placeholder).
 	  Exhibidas        las mascotas Perfectas de los pedestales giran despacio.
 	  Brazos           quien esta en el patio (EnPatio) lleva los brazos al frente
-	                   sujetando la bolsa (Transform de los hombros en Stepped).
+	                   sujetando la bolsa (Utilidades/PoseBrazos en Stepped).
 
 	Nada de esto toca el estado del juego; es puro RenderStepped.
 ]]
@@ -24,6 +24,7 @@ local Textos = require(Shared:WaitForChild("Config"):WaitForChild("Textos"))
 local Paleta = require(Shared:WaitForChild("Config"):WaitForChild("Paleta"))
 local DefinicionesColeccionables = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesColeccionables"))
 local DefinicionesMascotas = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesMascotas"))
+local PoseBrazos = require(Shared:WaitForChild("Utilidades"):WaitForChild("PoseBrazos"))
 
 local EstadoCliente = require(script.Parent:WaitForChild("EstadoCliente"))
 
@@ -168,29 +169,15 @@ RunService.RenderStepped:Connect(function(dt)
 end)
 
 -- === Brazos extendidos de quien esta en el patio ===
--- Se escribe Transform de los hombros en Stepped, DESPUES de que el Animator
--- del personaje haya puesto el suyo: es la forma documentada de posar
--- articulaciones por codigo. Vale para Motor6D y para AnimationConstraint
--- (los rigs nuevos), que comparten esa propiedad. Se hace para todos los
+-- Se escribe Transform en Stepped, DESPUES de que el Animator haya puesto el
+-- suyo (Utilidades/PoseBrazos explica el porque). Se hace para todos los
 -- personajes con EnPatio, asi cada cliente ve a los demas sujetando la bolsa.
-local POSE_BRAZO = CFrame.Angles(math.rad(65), 0, 0)
-local NOMBRES_HOMBRO = { RightShoulder = true, LeftShoulder = true, ["Right Shoulder"] = true, ["Left Shoulder"] = true }
-
 RunService.Stepped:Connect(function()
 	for _, otro in Players:GetPlayers() do
 		if otro:GetAttribute("EnPatio") == true then
 			local ch = otro.Character
 			if ch then
-				for _, nombre in { "RightUpperArm", "LeftUpperArm", "Torso" } do
-					local brazo = ch:FindFirstChild(nombre)
-					if brazo then
-						for _, hijo in brazo:GetChildren() do
-							if NOMBRES_HOMBRO[hijo.Name] and (hijo:IsA("Motor6D") or hijo:IsA("AnimationConstraint")) then
-								(hijo :: any).Transform = POSE_BRAZO
-							end
-						end
-					end
-				end
+				PoseBrazos.aplicar(ch)
 			end
 		end
 	end
