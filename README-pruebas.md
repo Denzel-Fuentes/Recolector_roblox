@@ -13,7 +13,7 @@ sesión existe para responder a eso antes de comprometer arte.
 | Control | Acción |
 |---|---|
 | Entrar al patio | La cámara pasa sola a **primera persona** y ves tus manos con la bolsa |
-| Acercarse a una colina de basura y mantener **E** | Activarla (cuesta energía): la colina se convierte en una montaña de basura de verdad (latas, llantas, cajas, botellas, cáscaras…; 30–280 piezas según el tamaño) que se queda ahí hasta que alguien se la lleve |
+| Acercarse a una colina de basura y mantener **E** | Activarla (cuesta energía): la colina se convierte en una montaña de basura de verdad (latas, llantas, cajas, botellas, cáscaras…; 30–200 piezas según el tamaño) que se queda ahí hasta que alguien se la lleve |
 | **Mantener el clic** apuntando a la basura (el punto del centro es la mira) | Se recoge todo lo que pase por la mira, ~6 piezas por segundo; cada una vuela a la bolsa y lo que tenía encima cae (física). La montaña asentada es sólida: se sube por ella (salta) para lo de arriba; solo la basura que está cayendo te atraviesa. **Nada se recoge por pasar por encima**; solo la mejora Imán atrae sola |
 | **Mantener F** (o botón táctil) apuntando al Contenedor, soltar | Lanzar la **bolsa entera**; cuanto más tiempo, más lejos. Si falla, queda en el suelo y cualquiera puede recogerla |
 | **E** en el Contenedor de la caseta | Reciclar la bolsa de cerca (bonus si iba llena). **Es la única forma de ganar $**: todo lo que recoges (basura, billetes, tesoros) ocupa un hueco de la bolsa hasta que lo depositas. La barra junto a la de fuerza es la bolsa: cuando dice "¡LLENA!" toca volver |

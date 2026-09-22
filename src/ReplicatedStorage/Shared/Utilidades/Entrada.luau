@@ -16,9 +16,26 @@ local Entrada = {}
 
 export type Plataforma = "teclado" | "tactil" | "gamepad"
 
+-- Solo en Studio: fuerza la plataforma para capturar la disposicion tactil o
+-- de gamepad sin el dispositivo (PruebasCliente "plataforma"). nil = real.
+local forzada: Plataforma? = nil
+
+function Entrada.forzar(plataforma: Plataforma?)
+	if RunService:IsStudio() then
+		forzada = plataforma
+	end
+end
+
+function Entrada.forzada(): Plataforma?
+	return forzada
+end
+
 function Entrada.plataforma(): Plataforma
 	if RunService:IsServer() then
 		return "teclado"
+	end
+	if forzada then
+		return forzada
 	end
 	local ultimo = UserInputService:GetLastInputType()
 	if ultimo == Enum.UserInputType.Gamepad1

@@ -8,7 +8,13 @@
 	ServerStorage.Herramientas.ConstructorMundo.
 
 	DESPUES DE CONSTRUIR HAY QUE GUARDAR EL PLACE (Ctrl+S). La geometria vive en
-	el place; este script y ConstructorMundo son su codigo fuente.
+	el place; este script, ConstructorMundo y ArteMundo son su codigo fuente.
+	El arte usa por nombre las variantes de material de MaterialService
+	(CespedCartoon, MontanaBasura, MaderaVieja) y las mallas de
+	ServerStorage.Arte (Arbol, Camion), generadas con la IA del MCP y guardadas
+	en el place: si faltan, el mundo se construye igual con materiales base y
+	props de partes. Desde el hilo del MCP (que no puede hacer require) se usa
+	hornear-desde-mcp.luau.
 
 	    MODO = "previsualizar"  imprime el plan sin tocar nada
 	    MODO = "construir"      borra workspace.Mundo y lo rehace (deshacible)

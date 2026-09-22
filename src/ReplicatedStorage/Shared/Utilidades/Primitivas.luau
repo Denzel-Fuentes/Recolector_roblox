@@ -32,8 +32,18 @@ export type Props = {
 	Transparency: number?,
 	Reflectance: number?,
 	Material: Enum.Material?,
+	Variante: string?, -- MaterialVariant por nombre (Paleta.VARIANTES); si no existe en el place, se ignora
 	Parent: Instance,
 }
+
+-- Material base + variante generada (MaterialService) si la hay. Asignar un
+-- nombre de variante que no existe no da error: la parte usa el material base.
+function Primitivas.materializar(x: BasePart, material: Enum.Material?, variante: string?)
+	x.Material = material or Enum.Material.SmoothPlastic
+	if variante then
+		x.MaterialVariant = variante
+	end
+end
 
 function Primitivas.parte(p: Props): Part
 	local x = Instance.new("Part")
@@ -43,7 +53,7 @@ function Primitivas.parte(p: Props): Part
 	x.CanTouch = false
 	x.CanQuery = true
 	x.CastShadow = true
-	x.Material = p.Material or Enum.Material.SmoothPlastic
+	Primitivas.materializar(x, p.Material, p.Variante)
 	x.TopSurface = Enum.SurfaceType.Smooth
 	x.BottomSurface = Enum.SurfaceType.Smooth
 	x.Size = p.Size
@@ -68,7 +78,7 @@ function Primitivas.cuna(p: Props): WedgePart
 	w.Anchored = true
 	w.CanCollide = false
 	w.CanTouch = false
-	w.Material = p.Material or Enum.Material.SmoothPlastic
+	Primitivas.materializar(w, p.Material, p.Variante)
 	w.TopSurface = Enum.SurfaceType.Smooth
 	w.BottomSurface = Enum.SurfaceType.Smooth
 	w.Size = p.Size

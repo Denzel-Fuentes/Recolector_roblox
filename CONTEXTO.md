@@ -1,21 +1,30 @@
 # Recíclatas (CleanRecycle) — estado del proyecto
 
-Réplica mecánica de KOTAMON para Roblox, en whitebox low-poly sin texturas.
-El diseño completo está en `docs/GDD.md`; este documento es lo que NO se deduce
-del código: qué hay, cómo se trabaja y por qué se decidió lo no obvio.
+Réplica mecánica de KOTAMON para Roblox, low-poly de partes con arte por
+capas sobre un esqueleto whitebox (ver §3 "Arte del mundo"). El diseño
+completo está en `docs/GDD.md`; este documento es lo que NO se deduce del
+código: qué hay, cómo se trabaja y por qué se decidió lo no obvio.
 
-Última pasada: 15 sep 2026 (lote 7: refactor a módulos de una responsabilidad;
-antes lotes 3–6: colina, basura real, física, clic mantenido). Estado: **todas las mecánicas del GDD implementadas
-y verificadas en Play Solo**; pendiente la prueba con 2+ jugadores y publicar.
+Última pasada: 16 sep 2026 (rendimiento móvil: sin árboles, valla ligera,
+sombras y física de la basura recortadas; plano v3 del mapa: parcelas en columna al oeste,
+recicladora al sur, valla alrededor de todo; antes, el mismo día, arte del
+mundo por MCP: cabaña, máquinas, vallas,
+árboles, camión, materiales IA; antes, 15 sep: interfaz v2 papel y tinta,
+lotes 9–11). Estado: **todas las mecánicas del GDD implementadas y
+verificadas en Play Solo**, HUD/manos/carteles/diálogo con el estilo nuevo,
+mundo vestido; pendientes los paneles (lotes 12–13 de la UI), la prueba con
+2+ jugadores y publicar.
 
 ## 1. Qué hay
 
 | Sistema | Dónde | Estado |
 |---|---|---|
-| Patio compartido: 12 **colinas** de basura; al activar, la colina se sustituye por una **montaña de basura real con física** (30–280 objetos: latas, llantas, cajas, botellas…, sin etiquetas; caen, se asientan y se anclan; nada flota); **solo se recoge con clic** (o Imán), reclamo atómico, **sin caducidad**, repoblación | `Services/Botin.luau` (fachada) → `GeneradorBotin`, `ObjetosPatio`, `FisicaBasura`, `Montones`, `Iman`, `Lanzamiento` + `BotinHandler` | verificado (`montonPiezas`, `reacomodo`, `sinRecogidaAutomatica`, `variedadBasura`) |
+| Patio compartido: 12 **colinas** de basura; al activar, la colina se sustituye por una **montaña de basura real con física** (30–200 objetos: latas, llantas, cajas, botellas…, sin etiquetas; caen, se asientan y se anclan; nada flota); **solo se recoge con clic** (o Imán), reclamo atómico, **sin caducidad**, repoblación | `Services/Botin.luau` (fachada) → `GeneradorBotin`, `ObjetosPatio`, `FisicaBasura`, `Montones`, `Iman`, `Lanzamiento` + `BotinHandler` | verificado (`montonPiezas`, `reacomodo`, `sinRecogidaAutomatica`, `variedadBasura`) |
 | Puntería: **mantener F carga y lanza la bolsa entera**; si falla queda en el suelo y cualquiera la recoge | `Services/Lanzamiento.luau` | verificado (`lanzarBolsa`, `lanzarBolsaFallo`) |
 | Primera persona automática en el patio con retícula (punto), manos+bolsa en 2D (Frames), brazos extendidos (cliente y servidor) sujetando una bolsa abierta soldada entre las manos | `Services/Patio.luau`, `Utilidades/PoseBrazos`, `Client/Camara.client`, `Client/UI/Manos.client`, `Escena.client` | verificado (`enPatio`, capturas) |
-| HUD estilo KOTAMON: píldoras ($, cartas, gemas), barras verticales de energía, fuerza y **bolsa** (sin números; "¡LLENA!" en rojo), dock Q/J/L/B, "MANTÉN F PARA LANZAR" | `Client/UI/HUD.client.luau` | verificado (captura) |
+| HUD estilo KOTAMON en **papel y tinta**: píldoras con icono ($, cartas, gemas), barras verticales con icono en la base (energía, fuerza, **bolsa** sin números; "¡LLENA!" en rojo), retrato (headshot), dock con insignia de tecla (Q/J/L/B), "[F] MANTÉN PARA LANZAR"; disposición táctil (dock arriba-centro, botón de lanzar sobre el salto) | `Client/UI/HUD.client.luau`, `UI/Componentes.luau` | verificado (capturas PC y táctil forzada) |
+| Sistema de diseño: pegatinas con sombra, iconos por registro (`Config/Iconos`, id 0 = glifo dibujado en `Utilidades/Glifos`), insignias de tecla/mando, modales que se encogen al viewport, pestañas de libreta; diálogo de Doña Chatarra con retrato; carteles del mundo y prompts personalizados desde el cliente | `Client/UI/Componentes.luau`, `UI/Dialogo.luau`, `Escena.client`, `Prompts.client` | verificado (capturas) |
+| **Arte del mundo**: cabaña de dos plantas, máquina azul, trituradora + contenedor verde, vallas, postes con cables, camión (malla IA), parcelas de madera, Doña Chatarra vestida, césped/tierra/basura con materiales, iluminación cartoon | `ServerStorage/Herramientas/ArteMundo.luau` + `ConstructorMundo` v3 | verificado (capturas, pruebas de servidor intactas) |
 | Bolsa: todo lo recogido ocupa hueco (billetes incluidos) y **sólo el contenedor paga**, bonus +25% por bolsa llena | `Services/Bolsa.luau` | verificado (`billeteEnBolsa`, `sinDineroAlRecoger`, `bonusBolsaLlena`) |
 | Energía, refrescos (máquina), regen lenta | `Services/Energia.luau` | verificado |
 | 41 mascotas, 5 estados, fusión 3→1, venta, exhibición, pasivas, Rey Reciclón | `Config/DefinicionesMascotas`, `Services/Mascotas.luau` | verificado |
@@ -49,11 +58,47 @@ cambió; cuando el plugin de Rojo se conecte no verá diferencias.
 
 `workspace.Mundo` es geometría REAL del place, construida por
 `herramientas/construir-mundo.luau` (que llama a
-`ServerStorage/Herramientas/ConstructorMundo`). **Tras construir hay que guardar
-el place.** `SetupMundo` sólo lo adopta; si falta, lo construye en runtime como
-fallback y avisa. Todo se localiza por tags/atributos, nunca por nombre:
-`RanuraMonton` (12), `Parcela` (6), `FigurinaFija`, `Contenedor`, `MaquinaRefrescos`,
-`Limite`, `SoloDecorado`; atributos `Mueble`, `Pintable`, `NPC`, `IndiceParcela`.
+`ServerStorage/Herramientas/ConstructorMundo`, y este viste el esqueleto con
+`ArteMundo`). **Tras construir hay que guardar el place.** `SetupMundo` sólo
+lo adopta; si falta, lo construye en runtime como fallback y avisa. Todo se
+localiza por tags/atributos, nunca por nombre: `RanuraMonton` (12), `Parcela`
+(6), `FigurinaFija`, `Contenedor`, `MaquinaRefrescos`, `Limite`,
+`SoloDecorado`; atributos `Mueble`, `Pintable`, `NPC`, `IndiceParcela`.
+Con arte, `workspace.Mundo` son ~1.600 instancias (504 el whitebox).
+
+Lo generado por IA vive **en el place**, no en git: las variantes de
+material de `MaterialService` (`MontanaBasura` es la única en uso; `CespedCartoon` y
+`MaderaVieja` quedaron huérfanas al pasar suelo y parcelas a color liso; hijas directas; el generador las deja en carpetas
+`Material: X` con 4 candidatas) y las mallas de `ServerStorage.Arte`
+(`Camion`, `Bolsa` —saco facetado atado con banda amarilla, referencia del
+usuario—; `Arbol` ya no se usa: se quitaron todos los árboles por
+rendimiento). El código las usa por nombre (`Paleta.VARIANTES`,
+`ArteMundo.clonarMalla`) y sin ellas construye igual con materiales base y
+props de partes. Para regenerarlas: `generate_material` / `generate_mesh`
+del MCP y renombrar.
+
+### Trabajar por el MCP de Studio
+
+El hilo de `execute_luau` (Edit) **puede** crear partes, escribir `Source` y
+propiedades, y leer `Source`; **no puede** hacer `require` de módulos del
+juego, usar HttpService, crear/reparentar scripts ni invocar
+BindableFunctions/RemoteEvents (le faltan capacidades: "LoadUnownedAsset",
+"Network", "RobloxScript"). De ahí:
+
+- Hornear desde el MCP: `herramientas/hornear-desde-mcp.luau`, un `require`
+  que carga cada módulo con `loadstring(modulo.Source)` y `setfenv`.
+- Sincronizar código sin el plugin de Rojo: `multi_edit` crea y edita
+  scripts y `Source = [==[...]==]` por `execute_luau` reescribe los
+  existentes; se comprueba con una huella (largo, suma de bytes y suma
+  ponderada por posición) igual en local y en Studio. **Con Rojo conectado no
+  usar `multi_edit`**: aplica el mismo cambio dos veces (pasó con `Paleta`).
+- Pruebas: por atributos (`Prueba` / `PruebaCliente`, ver arriba).
+- `screen_capture` acepta `camera_position` / `look_at_position` en Edit;
+  en Play, mover `workspace.CurrentCamera` (Scriptable) desde el cliente.
+- Los eventos de `user_keyboard_input` / `user_mouse_input` llegan al juego
+  ~6–8 s después de que la herramienta responda; para pulsar algo que
+  aparece por un tiempo (el diálogo) hay que esperar a verlo (poll desde
+  `execute_luau`) y usar `instance_path` en el clic.
 
 ### Probar
 
@@ -203,14 +248,167 @@ en `pasesCache`, para no envenenar perfiles). `/pases off` lo apaga para probar
 sin ellos. Los ids reales (0 = placeholder) se rellenan en `Config/Productos` y
 `Config/DefinicionesLogros` (badges) al publicar.
 
-### Whitebox: grises por función + color por material
+### Arte del mundo por capas (16 sep)
 
-Escenario: 110 suelo del patio, 140 montones/decorado, 165 caminos/muros, 195
-losas/contenedor, 215 muebles/NPC, 240 caseta. Objetos y mascotas llevan color
-plano por material y disco de rareza: set y rareza son información de juego.
-Sin neón en el mapa: el anillo amarillo del montón activado se quitó a petición
-del usuario; la señal es la propia montaña, que pasa de gris a colores de
-material. Todo en `Config/Paleta.luau`.
+Decisión del usuario: "modela todo el juego, dale color como en KOTAMON,
+usando solo el MCP de Roblox" → low-poly de partes + IA del MCP para
+materiales y dos props. La regla que lo hace barato y seguro: **el whitebox
+sigue siendo el esqueleto funcional** (tags, atributos, prompts,
+`ZonaAcierto`, colisiones, tamaños intactos) y el arte es una capa
+`SoloDecorado` sin colisión ni query alrededor (`ArteMundo`), más pintura de
+materiales sobre las cajas que se ven. Ninguna prueba ni servicio distingue
+el mundo vestido del desnudo (verificado: `estado`, `excavar`, `reclamarTodo`,
+`lanzarBolsa`, `depositar`, `parcela`, `irCasa` en Play sobre el mundo v2).
+
+- Los grises del whitebox (110 suelo, 140 montones, 165 muros, 195 losas,
+  215 muebles, 240 caseta) siguen en `Paleta` como respaldo; `Paleta.MUNDO`
+  es la paleta de arte y `Paleta.LOSA_PARCELA/MUEBLE/MUROS` pasan a madera
+  porque `Parcelas.pintar` repinta con ellos las partes `Pintable` sin skin.
+  Objetos y mascotas siguen con color por material y disco de rareza (set y
+  rareza son información de juego); sin neón en el mapa.
+- Montones intactos: **montañas de escombros** (petición del usuario, 16 sep,
+  con foto de referencia: ni bolas lisas ni pirámides puntiagudas). Cada
+  montón es un pico principal + 2–3 secundarios; cada pico, una bola grande
+  hundida que da el bulto, bolas medianas apiñadas en la cima y bolas de
+  tamaños varios medio enterradas por la falda, con `Rock` + variante
+  `MontanaBasura` y tono por bola (~40–55 partes por montón, sin sombra).
+  Perfil para colocar la basura: cono redondeado `h·(1−d/r)^1.6`. Radios
+  9/12/17 (antes 7/10/14). Se probaron capas de cilindro (parecían una
+  tarta), pirámides de `CornerWedgePart` y una malla IA (`generate_mesh`
+  dio cajas apiladas sobre un disco, no escombros; `ModelosMonton` la
+  usaría si existiera `ServerStorage.Arte.Monton`). Las partes siguen
+  llamándose `Loma_…` porque `Montones` y las pruebas las reconocen por ese
+  prefijo. La basura se reparte en el 60 % de la altura y en el 65 % del
+  radio: cayendo desde más de ~8 studs se clavaba en el suelo, y apretada se
+  asienta antes que suelta por el suelo. `Patio.Suelo` pasa a 4 studs de
+  grosor por lo mismo; agotado = parches `Ground`. La basura real coge colores
+  vivos de `Paleta.BASURA` y material de Roblox por tipo (latas `Metal`,
+  cartón `Cardboard`, neumáticos `Rubber` negros).
+- Caminos: `Ground` base sin variante a propósito (las cuatro tandas de IA
+  salían agrietadas y naranjas). Suelo, baseplate y parcelas: `SmoothPlastic` liso, sin variante (el usuario no quiso textura de césped ni de madera en las bases: look minimalista).
+- La caseta mira a +Z (el patio): la cara visible de sus letreros es la
+  `Back` de Roblox (`CARA_PATIO` en ArteMundo); un letrero por cara
+  (`LetreroFront`/`LetreroBack`) para que las tablas se lean por los dos
+  lados.
+- Las cuñas (`WedgePart`): la cara vertical es la trasera (+Z local) y la
+  rampa baja hacia -Z; el tejado a dos aguas son dos cuñas, la del frente
+  girada 180°.
+- Los cables de los postes son `Beam` entre Attachments con `CurveSize`
+  negativo (comba).
+- Iluminación cartoon en `ConstructorMundo.iluminar()` (idempotente) y
+  reflejada en `default.project.json`; `Technology` es de plugin y desde el
+  MCP ni se lee, por eso va en pcall.
+- Fuera de alcance de esta pasada: las 41 mascotas (siguen siendo primitivas
+  por set/rareza, y el álbum depende de ese vocabulario), el avatar, sonidos.
+
+### Plano v3 del mapa (16 sep)
+
+El usuario pidió el plano de su boceto: las 6 bases en columna a la
+izquierda, el patio de basura grande a la derecha, la recicladora de Doña
+Chatarra debajo del patio, y **la valla que rodeaba el patio pasa a rodear
+todo el mapa**. `ConstructorMundo` v3 (`LAYOUT`):
+
+- El patio (200×200) **no se mueve del origen**: `Patio.posicionEnPatio`
+  comprueba `|x|, |z| < PATIO_LADO/2`, así que se recoloca todo lo demás a
+  su alrededor. Sin muros: es la explanada de césped claro un stud más alta.
+- Recicladora al SUR (z 140–186, lote de tierra del ancho del patio) con la
+  caseta mirando al norte. Como `ArteMundo` espera el frente en +Z local
+  (`CARA_PATIO = Back`), `construirCaseta` construye todo sobre un pivote
+  girado 180° (`en(x, y, z)`); las paredes del contenedor pasan a llamarse
+  `ParedFrente/Fondo/Izq/Der`. La cara de Doña Chatarra está en +Z local de
+  la cabeza, por eso el retrato del diálogo pone la cámara relativa a
+  `Cabeza.CFrame` y no en +Z del mundo.
+- Plaza del spawn (40×38, pegada al borde sur del patio, z 100–138); se
+  aparece mirando a la caseta. `Mundo.posicionPlaza()` sigue siendo la
+  fuente para "Ir al patio" y para las pruebas (`Comunes.fueraDelPatio()`
+  en vez de un `(0,0,-130)` a mano).
+- Parcelas en x = −150, z = {−87, −37, 13, 63, 113, 163}, mirando al este;
+  calle de tierra en x = −116 con un ramal a cada entrada.
+- Límite rectangular (`LAYOUT.LIMITE`, x −196..124, z −124..202): muro
+  invisible de 60 studs (tag `Limite`, 4) y la valla de madera de 10 studs
+  (no se salta: el salto llega a ~7,5)
+  por dentro (sin árboles: se quitaron todos a petición del usuario y por
+  rendimiento). El Baseplate mide justo el rectángulo del límite (320×326,
+  centrado en −36, 39): fuera de la valla no hay terreno. Igual en el
+  constructor, `default.project.json` e `instalar-desde-http`.
+- El contenedor grande (escondite F3) pasa al fondo norte del patio para no
+  tapar la entrada desde la plaza; F1 queda detrás de la caseta.
+
+### `Mundo.Manual`: lo editado a mano sobrevive al horneado (16 sep)
+
+El usuario editó el place a mano y un horneado posterior lo borró:
+`construir()` destruye `workspace.Mundo` entero. Desde entonces
+`limpiarPlace` aparta la carpeta `Mundo.Manual` antes de borrar y
+`construir()` la vuelve a colgar del Mundo nuevo (si no existe, la crea
+vacía). Regla: lo que se toque a mano en Studio va a `Manual`; si se mueve
+una pieza funcional, avisar para que el constructor no la duplique. Y antes
+de hornear, preguntar siempre.
+
+### Rendimiento en móvil (16 sep)
+
+Medido en Play con 3 montones grandes + 2 medianos activos (el caso malo
+realista). Antes: 2.470 partes de mundo (todas con sombra) + 902 objetos de
+basura ≈ 5.300 partes en `workspace`, ~3 partes por pieza con colisión y
+masa cada una. Después: 1.336 partes de mundo (601 con sombra) + 733
+objetos ≈ 3.640 partes, y solo el `Cuerpo` de cada pieza colisiona. Los
+FPS de Studio no sirven de métrica (el cliente de Play va capado a ~15 fps
+sin foco, con GPU a 0): la medida buena es en dispositivo con el menú de
+Stats de Roblox. Qué se hizo y por qué:
+
+- **Sin árboles** (petición del usuario): eran ~200 modelos y el anillo
+  exterior no aportaba nada al juego. `ArteMundo.arbol/arbusto` y
+  `construirArboleda` se borraron; la malla `Arbol` queda huérfana en el
+  place.
+- **Valla**: postes cada 6 studs y una tabla ancha por vano (el material de
+  tablas dibuja las juntas) en vez de una tabla cada 1,25 studs: de ~1.350
+  a ~440 partes para rodear el mapa.
+- **Sombras**: `ArteMundo.parte` no proyecta sombra salvo `Sombra = true`
+  (cabaña, tejado, trituradora, postes, barriles, neumáticos). La basura
+  tampoco (`ModelosObjetos.basura`): cientos de piezas pequeñas cuya sombra
+  no se lee.
+- **Física de la basura**: se probó dejar solo el `Cuerpo` con colisión y
+  masa (los detalles `Massless` y sin `CanCollide`) para ahorrar contactos, y
+  se REVIRTIÓ: las piezas redondas sin aros ni tapones que las frenen rodaban
+  segundos (`reacomodo` bajaba del 90 % anclado a los 5 s) y en mascotas y
+  tesoros el "cuerpo" es solo el torso y se hundían hasta la cabeza
+  (`montonPiezas`, bajo −1,5). Colisiona todo, como antes; el ahorro real
+  vino de menos piezas por montón y de quitar sombras.
+- **Montón grande** de 200–280 a 160–200 piezas (`GameConfig.TAMANOS_MONTON`);
+  los lotes de premio no cambian, así que la economía tampoco.
+- Mallas clonadas con `RenderFidelity = Automatic` y `CollisionFidelity =
+  Box`.
+- Pendiente y solo medible en dispositivo: FPS reales, tamaño de las
+  texturas IA (ya solo `MontanaBasura`) y si en calidad baja, sin
+  Bloom/ColorCorrection, el look sigue gustando.
+
+### Interfaz "papel y tinta" (lotes 9–11, 15 sep)
+
+- Tema claro tipo pegatina (crema + contorno de tinta + sombra dura) con
+  FredokaOne/Nunito, en `Componentes` v2. Un hijo no puede pintarse detrás
+  de su padre, así que cada pegatina/botón es un envoltorio `{Sombra,
+  Cuerpo}`; los botones devuelven el cuerpo (TextButton) y su envoltorio es
+  `.Parent`. La escala del hover va en el cuerpo para no mover los layouts.
+- Iconos por registro: `Config/Iconos` (id 0 = respaldo dibujado con
+  `Utilidades/Glifos`); el arte 2D del usuario va en `assets/ui/<clave>.png`
+  (brief en `assets/ui/README.md`) y se sube con `upload_image` del MCP.
+- Táctil: el thumbstick y el salto de Roblox ocupan las esquinas de abajo →
+  dock arriba-centro, retrato junto a las píldoras, botón de lanzar de
+  ContextActionService restilizado. `Entrada.forzar()` +
+  `EjecutarPruebaCliente:Invoke("plataforma","tactil")` para capturar sin
+  dispositivo; `("hud")` avisa de solapes.
+- Los modales miden mín(máximo de diseño, 94 % del viewport ÷ escala): caben
+  en un teléfono sin diseñar dos veces.
+- Prompts: `Style = Custom` puesto **localmente** por el cliente a todos los
+  ProximityPrompt (sin re-hornear ni tocar el servidor) y pegatina propia en
+  `PromptShown`. Medido en Studio: un BillboardGui con `AlwaysOnTop = true`
+  (o en PlayerGui) no se pintaba; va dentro de la parte y sin AlwaysOnTop,
+  flotando por encima del tope del modelo.
+- Los carteles flotantes horneados se restilizan en el cliente (`Escena`) y
+  miden en studs para encoger con la distancia; el texto de los de parcela lo
+  sigue poniendo el servidor.
+- El saludo de Doña Chatarra abre la tienda al **descartar** el diálogo (como
+  Jenny), no por debajo de él; si se cierra solo por tiempo, no abre nada.
+- FredokaOne no trae "✕": la X de cerrar es una "X".
 
 ### Replicación del mundo en el cliente
 
@@ -240,7 +438,7 @@ textura de basura; con primitivas eso será un MeshPart, hoy es gris
 Al activarlo, la colina **se sustituye entera por una montaña de basura con
 su mismo bulto** (decisión del usuario, lote 5: "mucha basura, equivalente al
 tamaño del montón, no un poquito"): `numPiezas` objetos (30–40 / 80–110 /
-200–280 según tamaño) con **modelo real** (latas, llantas, barriles, botellas,
+160–200 según tamaño) con **modelo real** (latas, llantas, barriles, botellas,
 bidones, cajas de cartón, periódicos, plátanos, huesos… y los premios:
 mascotas, fragmentos, tesoros, billetes, coleccionables; sin etiquetas)
 repartidos por TODO el volumen del casquete (`puntosEnColina`: muestreo
@@ -302,6 +500,23 @@ objeto `bolsa` que **cualquiera** puede recoger (decisión del usuario: es la
 tensión social ligera del patio). Reciclar por el prompt de cerca sigue
 existiendo, pero no cuenta para Puntería.
 
+La parábola se integra paso a paso en el servidor (`PivotTo`, sin física de
+Roblox: determinista y el servidor decide el acierto) y desde el 16 sep
+**bota** al caer (petición del usuario): hasta 3 botes conservando el 40 %
+de la velocidad vertical y el 55 % de la horizontal, y contra la pared del
+contenedor sale despedida hacia fuera con el 30 %. La altura del suelo se
+mide con un raycast (patio a 1, plaza a 0,9, lote a 0,12), no con una
+constante. Medido: cae desde 21 studs, bota a ~4, luego a ~1,5 y se queda;
+todo en menos de 3 s, que es lo que espera `lanzarBolsaFallo`. También
+rebota hacia dentro contra los muros `Limite` del borde (antes una bolsa
+podía perderse fuera de la valla). Acierto o pared se deciden por el TRAMO
+entre dos ticks (por dónde cruza el plano del borde superior de la caja),
+no por el punto actual: la bolsa avanza ~1,5 studs por tick y la pared
+mide 0,5, y mirar solo el punto era una lotería (un acierto de cada cinco
+fallaba). La bolsa lanzada es la malla `ServerStorage.Arte.Bolsa` escalada
+por el llenado (`ModelosObjetos.bolsaLlena`, con el modelo de partes de
+respaldo); `lanzarBolsaFallo` apunta ahora hacia el patio (plano v3).
+
 ### Primera persona en el patio y el bug de los modales
 
 Entrar al patio (servidor: atributo `EnPatio`) pone `LockFirstPerson`. Con un
@@ -346,7 +561,7 @@ vocabulario visual.
 ## 4. Números de calibración (punto de partida)
 
 - Maxear las 7 mejoras: 232.430 $. Un montón chico deja 30–40 objetos, uno
-  mediano 80–110 y uno grande 200–280 (premios solo en 14–18 / 22–28 / 34–44
+  mediano 80–110 y uno grande 160–200 (premios solo en 14–18 / 22–28 / 34–44
   tiradas; el resto basura de relleno a 5–12 $: un grande son ~1.500–2.500 $
   solo en basura, 3–6× lo de antes); billetes 20–80 $, tesoros 150–600 $.
   Objetivo KOTAMON: ~5 h gratis → **recalibrar** VALOR_BASURA o los costes de
@@ -362,6 +577,16 @@ vocabulario visual.
 
 ## 5. Pendiente
 
+- **Guardar el place** tras hornear (el mundo v2, las variantes de
+  MaterialService y `ServerStorage.Arte` viven ahí; el `.rbxl` no va en git).
+- Interfaz, lotes 12–13: paneles (álbum con cartas estilo KOTAMON en
+  `UI/Carta`, tienda con iconos por mejora, revelación con volteo, logros,
+  base, reparación, probabilidades; retirar los alias `UI_FONDO/UI_PANEL/...`
+  de `Paleta`), pulido tablet/gamepad y docs. Plan en
+  `~/.claude/plans/bueno-ahora-que-ya-sharded-dusk.md`.
+- Arte 2D del usuario para la UI en `assets/ui/` (manos, iconos, marco de
+  carta); hasta entonces, glifos dibujados.
+- Arte pendiente del mundo: las 41 mascotas y el avatar del jugador.
 - Fijar **Max players = 6** en Game Settings / Creator Dashboard
   (`Players.MaxPlayers` es de solo lectura por script).
 - Publicar el place y activar *Studio Access to API Services* para probar el

@@ -147,16 +147,20 @@ end
 
 -- Propiedades de default.project.json
 local Lighting = game:GetService("Lighting")
-Lighting.Ambient = Color3.new(0.32, 0.32, 0.32)
-Lighting.OutdoorAmbient = Color3.new(0.38, 0.38, 0.38)
-Lighting.ColorShift_Top = Color3.new(0, 0, 0)
+Lighting.Ambient = Color3.new(0.51, 0.51, 0.51)
+Lighting.OutdoorAmbient = Color3.new(0.647, 0.667, 0.686)
+Lighting.ColorShift_Top = Color3.new(1, 0.98, 0.92)
 Lighting.ColorShift_Bottom = Color3.new(0, 0, 0)
-Lighting.Brightness = 1.3
-Lighting.ExposureCompensation = -0.35
-Lighting.EnvironmentDiffuseScale = 0.25
-Lighting.EnvironmentSpecularScale = 0
-Lighting.ClockTime = 13
+Lighting.Brightness = 2.6
+Lighting.ExposureCompensation = 0
+Lighting.EnvironmentDiffuseScale = 0.6
+Lighting.EnvironmentSpecularScale = 0.2
+Lighting.ClockTime = 13.5
 Lighting.GlobalShadows = true
+Lighting.ShadowSoftness = 0.4
+pcall(function()
+	Lighting.Technology = Enum.Technology.ShadowMap
+end)
 game.StarterPlayer.CharacterWalkSpeed = 16
 game:GetService("SoundService").RespectFilteringEnabled = true
 local baseplate = workspace:FindFirstChild("Baseplate")
@@ -164,6 +168,9 @@ if baseplate and baseplate:IsA("BasePart") then
 	baseplate.Color = Color3.new(0.647, 0.647, 0.647)
 	baseplate.Material = Enum.Material.SmoothPlastic
 	baseplate.Locked = true
+	-- Centrado bajo el mapa (ConstructorMundo.LAYOUT.LIMITE), como en default.project.json
+	baseplate.Size = Vector3.new(320, 20, 326) -- justo hasta la valla
+	baseplate.Position = Vector3.new(-36, -10, 39)
 end
 
 if grabando then

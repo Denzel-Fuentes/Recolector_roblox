@@ -11,6 +11,9 @@
 	    Invoke("panel", "Album")              descripcion del panel abierto
 	    Invoke("reticula")                    estado de reticula/raton/camara
 	    Invoke("verme", 8) / ("camaraNormal")  camara sobre el propio personaje
+	    Invoke("plataforma", "tactil")        fuerza la disposicion (tactil/gamepad/teclado; "" = real)
+	    Invoke("disposicion")                 escala, disposicion, compacto, viewport
+	    Invoke("hud")                         rectangulos del HUD y avisos de solape / fuera de pantalla
 	Fuera de Studio no crea nada.
 ]]
 
@@ -25,6 +28,7 @@ end
 
 local UI = script.Parent:WaitForChild("UI")
 local Menu = require(UI:WaitForChild("Menu"))
+local Componentes = require(UI:WaitForChild("Componentes"))
 local EstadoCliente = require(script.Parent:WaitForChild("EstadoCliente"))
 
 local gancho = Instance.new("BindableFunction")
@@ -131,6 +135,64 @@ function acciones.camaraNormal()
 		Players.LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
 	end
 	return "camara custom"
+end
+
+-- Disposicion forzada para capturas sin dispositivo
+function acciones.plataforma(p)
+	if p == nil or p == "" or p == "real" then
+		Componentes.forzarPlataforma(nil)
+	else
+		Componentes.forzarPlataforma(p)
+	end
+	task.wait(0.2)
+	return acciones.disposicion()
+end
+
+function acciones.disposicion()
+	local cam = workspace.CurrentCamera
+	local vp = cam and cam.ViewportSize or Vector2.zero
+	local dw, dh = Componentes.disenoDisponible()
+	return string.format("viewport=%dx%d escala=%.2f diseno=%dx%d disposicion=%s compacto=%s", vp.X, vp.Y, Componentes.escala(), dw, dh, Componentes.disposicion(), tostring(Componentes.compacto()))
+end
+
+-- Rectangulos (px reales) de los bloques del HUD, con avisos si alguno se sale
+-- del viewport o se solapa con otro (los que pueden hacerlo a proposito, como
+-- la base de una barra sobre su barra, no se comparan)
+function acciones.hud()
+	local pg = Players.LocalPlayer:WaitForChild("PlayerGui")
+	local hud = pg:FindFirstChild("HUD")
+	if not hud then
+		return "sin HUD"
+	end
+	local cam = workspace.CurrentCamera
+	local vp = cam and cam.ViewportSize or Vector2.new(0, 0)
+	local bloques = {}
+	for _, hijo in hud:GetChildren() do
+		if hijo:IsA("GuiObject") and hijo.Visible then
+			table.insert(bloques, hijo)
+		end
+	end
+	local lineas = {}
+	local avisos = 0
+	for i, a in bloques do
+		local ap, as = a.AbsolutePosition, a.AbsoluteSize
+		table.insert(lineas, string.format("%s: %d,%d %dx%d", a.Name, ap.X, ap.Y, as.X, as.Y))
+		if ap.X < 0 or ap.Y < 0 or ap.X + as.X > vp.X or ap.Y + as.Y > vp.Y + 1 then
+			avisos += 1
+			table.insert(lineas, "  ! fuera de pantalla")
+		end
+		for j = i + 1, #bloques do
+			local b = bloques[j]
+			local bp, bs = b.AbsolutePosition, b.AbsoluteSize
+			local solapa = ap.X < bp.X + bs.X and bp.X < ap.X + as.X and ap.Y < bp.Y + bs.Y and bp.Y < ap.Y + as.Y
+			if solapa then
+				avisos += 1
+				table.insert(lineas, "  ! solapa con " .. b.Name)
+			end
+		end
+	end
+	table.insert(lineas, 1, string.format("avisos=%d viewport=%dx%d", avisos, vp.X, vp.Y))
+	return table.concat(lineas, "\n")
 end
 
 local function ejecutar(nombre, ...)

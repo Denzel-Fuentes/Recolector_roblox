@@ -137,13 +137,15 @@ end
 function Pruebas.lanzarBolsaFallo()
 	local j = jugador()
 	local zona = Mundo.zonaAcierto()
-	teletransportar(j, zona.Position + Vector3.new(0, 0, 30))
+	-- El contenedor esta al sur del patio (plano v3): el jugador se pone al
+	-- norte, en la plaza, y apunta hacia el patio, lejos del contenedor
+	teletransportar(j, zona.Position + Vector3.new(0, 0, -30))
 	task.wait(0.3)
 	Bolsa.vaciar(j)
 	Bolsa.meter(j, { tipo = "basura", nombre = "Papel", material = "Papel", valor = 6 })
 	Bolsa.meter(j, { tipo = "fragmento", nombre = "Fragmento de Latita", id = "latita" })
 	-- apuntar lejos del contenedor, hacia el patio
-	local ok, motivo = Botin.lanzarBolsa(j, zona.Position + Vector3.new(25, 0, 60), 0.5)
+	local ok, motivo = Botin.lanzarBolsa(j, zona.Position + Vector3.new(-25, 0, -80), 0.5)
 	task.wait(3)
 	local bolsaId = nil
 	for id, obj in Botin.objetos() do

@@ -128,7 +128,7 @@ function Mundo.posicionPlaza(): Vector3
 	if spawn and spawn:IsA("BasePart") then
 		return spawn.Position + Vector3.new(0, 3, 0)
 	end
-	return Vector3.new(0, 5, -130)
+	return Vector3.new(0, 5, 121)
 end
 
 -- Sube a la parte con prompt hasta el Model que lleva el atributo/tag de interes

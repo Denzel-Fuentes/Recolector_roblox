@@ -67,11 +67,14 @@ GameConfig.RETRASO_REPOBLACION = 20
 -- (mascotas, fragmentos, tesoros, billetes, coleccionables): el resto hasta
 -- min/max es basura de relleno, asi los premios por monton no se disparan con
 -- la cantidad de basura. cantidad = montones de ese tamano (12). radio = de
--- la colina (la altura sale de min/max).
+-- la montana (media base; la altura sale de min/max). Con columnas a 50 studs
+-- y filas a 60, el radio 17 del grande deja pasillos de 16.
 GameConfig.TAMANOS_MONTON = {
-	chico = { min = 30, max = 40, lotes = { 14, 18 }, cantidad = 4, radio = 7 },
-	mediano = { min = 80, max = 110, lotes = { 22, 28 }, cantidad = 5, radio = 10 },
-	grande = { min = 200, max = 280, lotes = { 34, 44 }, cantidad = 3, radio = 14 },
+	chico = { min = 30, max = 40, lotes = { 14, 18 }, cantidad = 4, radio = 9 },
+	mediano = { min = 80, max = 110, lotes = { 22, 28 }, cantidad = 5, radio = 12 },
+	-- grande bajo de 200-280 a 160-200 piezas por rendimiento en movil: con tres
+	-- grandes y dos medianos activos habia ~900 objetos (2.800 partes) en el patio
+	grande = { min = 160, max = 200, lotes = { 34, 44 }, cantidad = 3, radio = 17 },
 }
 GameConfig.PATIO_LADO = 200
 

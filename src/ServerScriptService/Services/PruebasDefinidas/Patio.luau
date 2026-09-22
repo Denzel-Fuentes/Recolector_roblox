@@ -204,7 +204,7 @@ local function activarLejos(j)
 	Energia.fijar(j, Energia.maxima(j))
 	local ok = Botin.excavar(j, m)
 	assert(ok, "no se pudo excavar")
-	teletransportar(j, Vector3.new(0, 0, -130))
+	teletransportar(j, Comunes.fueraDelPatio())
 	task.wait(1.6) -- toda la montana brota en 1 s
 	return m, alturaAntes
 end
@@ -366,7 +366,7 @@ function Pruebas.sinRecogidaAutomatica()
 	perfil.mejoras.Iman = nivelIman
 	Perfiles.marcarSucio(j)
 	Bolsa.vaciar(j)
-	teletransportar(j, Vector3.new(0, 0, -130))
+	teletransportar(j, Comunes.fueraDelPatio())
 	return string.format("sin iman 1,5 s al lado: %d -> %d | clic cerca ok=%s (%s) | clic lejos ok=%s (%s) | con Iman 10: quedan %d de %d => %s",
 		antes, trasEsperar, tostring(ok), motivo, tostring(okLejos), motivoLejos, conIman, antes,
 		(trasEsperar == antes and ok and not okLejos and motivoLejos == "lejos" and conIman < antes - 1) and "OK" or "FALLO")
@@ -439,7 +439,7 @@ function Pruebas.enPatio()
 		local l = torso.CFrame:PointToObjectSpace(bolsa:GetPivot().Position)
 		delante = math.abs(l.X) < 0.5 and l.Z < -1.5
 	end
-	teletransportar(j, Vector3.new(0, 0, -130))
+	teletransportar(j, Comunes.fueraDelPatio())
 	task.wait(0.6)
 	local fuera = j:GetAttribute("EnPatio")
 	local bolsaFuera = ch and ch:FindFirstChild("BolsaEnManos") ~= nil

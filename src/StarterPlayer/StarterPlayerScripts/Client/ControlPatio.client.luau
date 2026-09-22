@@ -38,7 +38,9 @@ local Entrada = require(Utilidades:WaitForChild("Entrada"))
 local Geometria = require(Utilidades:WaitForChild("Geometria"))
 
 local EstadoCliente = require(script.Parent:WaitForChild("EstadoCliente"))
-local Menu = require(script.Parent:WaitForChild("UI"):WaitForChild("Menu"))
+local UI = script.Parent:WaitForChild("UI")
+local Menu = require(UI:WaitForChild("Menu"))
+local Componentes = require(UI:WaitForChild("Componentes"))
 
 local ReclamarObjetoEvent = Red.evento("ReclamarObjetoEvent")
 local LanzarObjetoEvent = Red.evento("LanzarObjetoEvent")
@@ -264,8 +266,44 @@ RunService.RenderStepped:Connect(function()
 end)
 
 ContextActionService:BindAction("Lanzar", lanzar, true, Enum.KeyCode.F, Enum.KeyCode.ButtonY)
-ContextActionService:SetTitle("Lanzar", Textos.HUD.lanzar)
-ContextActionService:SetPosition("Lanzar", UDim2.new(0.72, 0, 0.62, 0))
+ContextActionService:SetTitle("Lanzar", "")
+ContextActionService:SetPosition("Lanzar", UDim2.new(0.62, 0, 0.5, 0))
+
+-- El boton tactil lo crea ContextActionService (solo con pantalla tactil);
+-- aqui se le pone el estilo pegatina del HUD: papel, contorno de tinta, la
+-- bolsa volando y "MANTEN". Vive en ContextActionGui, sin UIScale: los
+-- tamanos son pixeles reales, y 78 px es el dedo (el salto de Roblox mide 70).
+local function estilizarBotonTactil()
+	local boton = ContextActionService:GetButton("Lanzar")
+	if not boton then
+		return
+	end
+	boton.Image = ""
+	boton.BackgroundTransparency = 0
+	boton.BackgroundColor3 = Paleta.UI_PAPEL
+	boton.Size = UDim2.fromOffset(78, 78)
+	for _, hijo in boton:GetChildren() do
+		if hijo:IsA("GuiObject") then
+			hijo.Visible = false
+		end
+	end
+	Componentes.esquinas(boton, 39)
+	Componentes.borde(boton, Paleta.UI_TINTA, 3)
+	Componentes.icono({ Parent = boton, Clave = "lanzar", Tamano = 40, Position = UDim2.new(0.5, 0, 0, 8), Anchor = Vector2.new(0.5, 0), ZIndex = 3 })
+	Componentes.texto({ Parent = boton, Texto = Textos.HUD.tocarLanzar, Size = UDim2.new(1, 0, 0, 16), Position = UDim2.new(0, 0, 1, -20), Tamano = 11, Titulo = true, Alinear = Enum.TextXAlignment.Center, ZIndex = 3 })
+	local escala = Instance.new("UIScale")
+	escala.Parent = boton
+	boton.MouseButton1Down:Connect(function()
+		escala.Scale = 0.92
+	end)
+	boton.MouseButton1Up:Connect(function()
+		escala.Scale = 1
+	end)
+	boton.MouseLeave:Connect(function()
+		escala.Scale = 1
+	end)
+end
+task.defer(estilizarBotonTactil)
 
 -- Refresca la camara si cambia (respawn)
 workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()

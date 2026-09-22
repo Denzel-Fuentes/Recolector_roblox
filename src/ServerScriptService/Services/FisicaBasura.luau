@@ -67,6 +67,11 @@ function FisicaBasura.darFisica(obj: Objeto)
 	if not principal then
 		return
 	end
+	-- Colisionan TODAS las partes de cada pieza, tambien los detalles. Se probo
+	-- dejar solo el Cuerpo (menos contactos) y salio caro: las piezas redondas
+	-- sin aros ni tapones que las frenen ruedan segundos y la montana tarda en
+	-- asentarse (reacomodo bajaba del 90 % anclado a los 5 s), y en mascotas y
+	-- tesoros el "cuerpo" solo es el torso y se hundian hasta la cabeza.
 	local partes: { BasePart } = {}
 	for _, p in modelo:GetDescendants() do
 		if p:IsA("BasePart") then

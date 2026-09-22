@@ -8,6 +8,9 @@
 #
 #   GET /index.json   lista de archivos bajo src/ (ruta relativa, bytes)
 #   GET /src/...      contenido del archivo (UTF-8)
+#   GET /assets/...   archivo binario (PNG/JPG) tal cual: es lo que lee
+#                     upload_image del MCP de Studio para subir el arte de
+#                     assets/ui/ a la cuenta del usuario (ver assets/ui/README.md)
 #
 # Uso:  powershell -ExecutionPolicy Bypass -File herramientas/servir-fuentes.ps1
 # Para parar: Ctrl+C (o cerrar la ventana).
@@ -50,6 +53,25 @@ while ($listener.IsListening) {
             if ((Test-Path $completo) -and $completo.StartsWith($raiz)) {
                 $contenido = [System.IO.File]::ReadAllText($completo, [System.Text.Encoding]::UTF8)
                 Escribir $ctx $contenido "text/plain; charset=utf-8" 200
+            }
+            else {
+                Escribir $ctx "no existe" "text/plain" 404
+            }
+        }
+        elseif ($ruta.StartsWith("/assets/")) {
+            $relativo = $ruta.Substring(1).Replace("/", "\")
+            $completo = Join-Path $raiz $relativo
+            if ((Test-Path $completo) -and $completo.StartsWith($raiz)) {
+                $bytes = [System.IO.File]::ReadAllBytes($completo)
+                $ext = [System.IO.Path]::GetExtension($completo).ToLower()
+                $tipo = "application/octet-stream"
+                if ($ext -eq ".png") { $tipo = "image/png" }
+                elseif ($ext -eq ".jpg" -or $ext -eq ".jpeg") { $tipo = "image/jpeg" }
+                $ctx.Response.StatusCode = 200
+                $ctx.Response.ContentType = $tipo
+                $ctx.Response.ContentLength64 = $bytes.Length
+                $ctx.Response.OutputStream.Write($bytes, 0, $bytes.Length)
+                $ctx.Response.OutputStream.Close()
             }
             else {
                 Escribir $ctx "no existe" "text/plain" 404

@@ -23,16 +23,32 @@ Textos.HUD = {
 	irCasa = "Ir a casa",
 	irPatio = "Ir al patio",
 	lanzar = "Lanzar",
-	mantenerLanzar = "MANTÉN {tecla} PARA LANZAR",
-	tocarLanzar = "MANTÉN EL BOTÓN PARA LANZAR",
-	mantenerRecoger = "MANTÉN {tecla} PARA RECOGER",
-	tocarRecoger = "MANTÉN EL DEDO SOBRE LA BASURA PARA RECOGER",
+	-- La tecla/boton va en una insignia al lado, no en el texto
+	mantenerLanzar = "MANTÉN PARA LANZAR",
+	tocarLanzar = "MANTÉN",
+	mantenerRecoger = "MANTÉN PARA RECOGER",
+	tocarRecoger = "TOCA LA BASURA PARA RECOGER",
+	clic = "CLIC",
 	cartas = "Cartas",
 	fuerza = "Fuerza",
 	bolsaLlenaBarra = "¡LLENA!",
 	restaurarEnergia = "RESTAURAR ENERGÍA",
 	telefono = "Teléfono",
 	cerrar = "Cerrar",
+}
+
+-- Carteles flotantes del mundo (los pinta el cliente sobre lo etiquetado)
+Textos.MUNDO = {
+	venderBasura = "VENDER BASURA",
+	restaurarEnergia = "RESTAURAR ENERGÍA",
+	chatarra = "DOÑA CHATARRA",
+	baseDe = "BASE DE {nombre}",
+	parcelaLibre = "PARCELA LIBRE",
+}
+
+Textos.DIALOGO = {
+	chatarra = "Doña Chatarra",
+	continuar = "Toca para seguir",
 }
 
 Textos.PATIO = {

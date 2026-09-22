@@ -6,6 +6,8 @@
 
 local Players = game:GetService("Players")
 
+local Mundo = require(script.Parent.Parent:WaitForChild("Mundo"))
+
 local Comunes = {}
 
 -- El primer jugador de la sesion de Play Solo
@@ -21,6 +23,12 @@ function Comunes.teletransportar(j: Player, pos: Vector3)
 	if ch then
 		ch:PivotTo(CFrame.new(pos + Vector3.new(0, 3, 0)))
 	end
+end
+
+-- Un punto fuera del patio (la plaza del spawn, este donde este en el
+-- plano): para las pruebas que salen del patio y vuelven
+function Comunes.fueraDelPatio(): Vector3
+	return Mundo.posicionPlaza()
 end
 
 return Comunes

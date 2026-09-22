@@ -26,12 +26,15 @@
 	Con el raton bloqueado en el centro, Roblox sigue pintando la flecha ahi,
 	que no parece una mira. En el patio (sin panel abierto y sin tactil) se
 	oculta la flecha (MouseIconEnabled) y se dibuja un punto en el centro de
-	la pantalla: es donde sale el rayo de recoger y de lanzar.
+	la pantalla: es donde sale el rayo de recoger y de lanzar. Un anillo fino
+	alrededor crece cuando hay un objeto al alcance bajo la mira (el Highlight
+	de ControlPatio), para que "se puede recoger" se vea sin mirar la basura.
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -52,23 +55,57 @@ pantalla.ResetOnSpawn = false
 pantalla.IgnoreGuiInset = true -- el centro de la pantalla es el centro del viewport (el del rayo)
 pantalla.DisplayOrder = 5
 pantalla.Enabled = false
-local punto = Instance.new("Frame")
-punto.Name = "Punto"
-punto.Size = UDim2.fromOffset(7, 7)
-punto.Position = UDim2.fromScale(0.5, 0.5)
-punto.AnchorPoint = Vector2.new(0.5, 0.5)
-punto.BackgroundColor3 = Paleta.UI_TEXTO
-punto.BorderSizePixel = 0
-punto.Parent = pantalla
-local redondo = Instance.new("UICorner")
-redondo.CornerRadius = UDim.new(1, 0)
-redondo.Parent = punto
-local borde = Instance.new("UIStroke")
-borde.Color = Paleta.UI_FONDO
-borde.Thickness = 1.5
-borde.Transparency = 0.2
-borde.Parent = punto
+-- Punto de papel con contorno de tinta y un anillo fino alrededor; el anillo
+-- crece cuando ControlPatio resalta un objeto al alcance (workspace.
+-- ResaltadoObjeto): es la confirmacion de "esto se puede recoger".
+local function circulo(nombre: string, diametro: number, relleno: boolean): Frame
+	local f = Instance.new("Frame")
+	f.Name = nombre
+	f.Size = UDim2.fromOffset(diametro, diametro)
+	f.Position = UDim2.fromScale(0.5, 0.5)
+	f.AnchorPoint = Vector2.new(0.5, 0.5)
+	f.BackgroundColor3 = Paleta.UI_PAPEL
+	f.BackgroundTransparency = if relleno then 0 else 1
+	f.BorderSizePixel = 0
+	f.Parent = pantalla
+	local redondo = Instance.new("UICorner")
+	redondo.CornerRadius = UDim.new(1, 0)
+	redondo.Parent = f
+	local borde = Instance.new("UIStroke")
+	borde.Color = Paleta.UI_TINTA
+	borde.Thickness = if relleno then 1.5 else 2
+	borde.Transparency = if relleno then 0 else 0.35
+	borde.Parent = f
+	return f
+end
+circulo("Punto", 7, true)
+local anillo = circulo("Anillo", 22, false)
 pantalla.Parent = jugador:WaitForChild("PlayerGui")
+
+local resaltado = workspace:FindFirstChild("ResaltadoObjeto")
+local function seguirResaltado()
+	if not resaltado or not resaltado:IsA("Highlight") then
+		return
+	end
+	resaltado:GetPropertyChangedSignal("Enabled"):Connect(function()
+		local d = if resaltado.Enabled then 30 else 22
+		TweenService:Create(anillo, TweenInfo.new(0.1), { Size = UDim2.fromOffset(d, d) }):Play()
+		local borde = anillo:FindFirstChildOfClass("UIStroke")
+		if borde then
+			borde.Transparency = if resaltado.Enabled then 0 else 0.35
+		end
+	end)
+end
+if resaltado then
+	seguirResaltado()
+else
+	workspace.ChildAdded:Connect(function(hijo)
+		if hijo.Name == "ResaltadoObjeto" and not resaltado then
+			resaltado = hijo
+			seguirResaltado()
+		end
+	end)
+end
 
 local function enPatio(): boolean
 	return jugador:GetAttribute("EnPatio") == true

@@ -3,7 +3,8 @@
 	ModelosObjetos
 	Los modelos whitebox de lo que se recoge y se lleva: basura real (16
 	formas, 4 por material), billetes, tesoros, figurinas, cintas, trajes y
-	las dos bolsas (cerrada con nudo para lanzar, abierta para las manos).
+	las dos bolsas (cerrada con nudo para lanzar, que usa la malla IA
+	ServerStorage.Arte.Bolsa si el place la tiene; abierta para las manos).
 	Las mascotas y sus fragmentos van en ModelosMascota; la colina de los
 	montones en ModelosMonton. Primitivas pone los ladrillos.
 
@@ -13,6 +14,8 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local ServerStorage = game:GetService("ServerStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
@@ -176,16 +179,44 @@ local FORMAS_BASURA: { [string]: { { nombre: string, construir: FormaBasura } } 
 local rngBasura = Random.new()
 local ESCALA_BASURA = 1.35
 
+-- Material de Roblox con el que se ve cada tipo de basura (pasada de color:
+-- latas metalicas, botellas de plastico brillante, carton, restos mate)
+local MATERIAL_BASURA = {
+	Metal = Enum.Material.Metal,
+	Plastico = Enum.Material.SmoothPlastic,
+	Papel = Enum.Material.Cardboard,
+	Organico = Enum.Material.SmoothPlastic,
+}
+
 -- Una pieza de basura de un material, con forma al azar (rng opcional para
--- pruebas deterministas). Atributo Forma = nombre de la forma.
+-- pruebas deterministas). Atributo Forma = nombre de la forma. El color ya
+-- no es el plano del set: cada pieza coge uno vivo de Paleta.BASURA (latas
+-- rojas y azules, botellas cian...), como la montana de la referencia; el
+-- material del set sigue en el atributo y en la bolsa/album.
 function ModelosObjetos.basura(material: string, rng: Random?): Model
 	local formas = FORMAS_BASURA[material] or FORMAS_BASURA.Papel
 	local r = rng or rngBasura
 	local forma = formas[r:NextInteger(1, #formas)]
 	local m = nuevoModelo("Basura_" .. forma.nombre)
 	m:SetAttribute("Forma", forma.nombre)
-	local color = Paleta.MATERIAL[material] or Paleta.MUEBLE
+	local vivos = Paleta.BASURA[material]
+	local color = if vivos then vivos[r:NextInteger(1, #vivos)] else (Paleta.MATERIAL[material] or Paleta.MUEBLE)
 	local c = forma.construir(color, m, r)
+	local materialRoblox = MATERIAL_BASURA[material] or Enum.Material.SmoothPlastic
+	for _, parte in m:GetDescendants() do
+		if parte:IsA("BasePart") then
+			parte.Material = materialRoblox
+			-- Son cientos de piezas pequenas: sin sombra propia (la montana y el
+			-- suelo ya dan la lectura). Colision y masa en todas las partes: ver
+			-- FisicaBasura.darFisica para por que no se dejo solo el Cuerpo
+			parte.CastShadow = false
+		end
+	end
+	if forma.nombre == "Llanta" then
+		-- Los neumaticos son de goma negra, no del color de la lata
+		c.Material = Enum.Material.Rubber
+		c.Color = Paleta.MUNDO.GOMA
+	end
 	m.PrimaryPart = c
 	pivoteEnSuelo(m)
 	-- Un poco mas grandes que a escala real: sobre la colina, 14-44 piezas de
@@ -254,14 +285,82 @@ function ModelosObjetos.traje(def: DefinicionesColeccionables.Traje): Model
 	return m
 end
 
+-- Pliegues y bultos de una bolsa de basura: bolas pequenas medio metidas en
+-- el cuerpo (lo que hay dentro marca la bolsa) y un tono por bulto para que
+-- no se lea como una sola bola lisa. rng con semilla fija: la misma bolsa
+-- siempre tiene los mismos bultos.
+local function bultosBolsa(m: Model, d: number, centroY: number, cuantos: number, rng: Random)
+	for i = 1, cuantos do
+		local ang = (i / cuantos) * math.pi * 2 + rng:NextNumber(-0.4, 0.4)
+		local alt = rng:NextNumber(-0.35, 0.3) -- fraccion de d, desde el centro
+		local radio = d * 0.5 * math.sqrt(math.max(0.1, 1 - (alt * 2) ^ 2)) -- sobre la superficie de la bola
+		local db = d * rng:NextNumber(0.3, 0.5)
+		local cf = CFrame.new(math.cos(ang) * radio * 0.85, centroY + alt * d, math.sin(ang) * radio * 0.85)
+		local b = esfera("Bulto" .. i, db, cf, Paleta.escalar(Paleta.BOLSA, 0.9 + rng:NextNumber(0, 0.3)), m)
+		b.Material = Enum.Material.SmoothPlastic
+	end
+end
+
+-- Malla de la bolsa generada por IA (ServerStorage.Arte.Bolsa: saco
+-- facetado low-poly atado con banda amarilla, referencia del usuario). Vive
+-- solo en el place, como el camion; sin ella se construye con partes. Solo
+-- el servidor construye bolsas (Lanzamiento, ObjetosPatio), y el clon
+-- replica con su MeshId, asi que en el cliente no hace falta buscarla.
+local function mallaBolsa(): MeshPart?
+	if not RunService:IsServer() then
+		return nil
+	end
+	local arte = ServerStorage:FindFirstChild("Arte")
+	local b = arte and arte:FindFirstChild("Bolsa")
+	return if b and b:IsA("MeshPart") then b else nil
+end
+
 -- La bolsa de basura cerrada (con nudo): proyectil y objeto caido. fraccion
--- 0..1 de llenado escala el tamano.
+-- 0..1 de llenado escala el tamano. Con malla: el saco facetado escalado
+-- (al 100 % mide ~2,6 x 3,2). Sin malla: saco abombado con bultos, base
+-- achatada (apoya, no rueda), cuello fruncido y las dos orejas del nudo.
 function ModelosObjetos.bolsaLlena(fraccion: number): Model
 	local m = nuevoModelo("Bolsa")
-	local d = 1.4 * (0.8 + 0.6 * math.clamp(fraccion, 0, 1))
-	local c = esfera("Cuerpo", d, CFrame.new(0, d / 2, 0), Paleta.BOLSA, m)
-	cilindroVertical("Nudo", d * 0.35, d * 0.3, CFrame.new(0, d + d * 0.1, 0), Paleta.escalar(Paleta.BOLSA, 1.25), m)
-	bloque("Asa", Vector3.new(d * 0.5, d * 0.12, d * 0.12), CFrame.new(0, d + d * 0.3, 0), Paleta.escalar(Paleta.BOLSA, 1.25), m)
+	local malla = mallaBolsa()
+	if malla then
+		local c = malla:Clone()
+		c.Name = "Cuerpo"
+		local s = 0.55 + 0.32 * math.clamp(fraccion, 0, 1)
+		c.Size = malla.Size * s
+		c.CFrame = CFrame.new(0, c.Size.Y / 2, 0)
+		c.Anchored = true
+		c.CanCollide = false
+		c.CanTouch = false
+		c.CanQuery = true
+		c.CastShadow = false
+		c.Parent = m
+		m.PrimaryPart = c
+		pivoteEnSuelo(m)
+		return m
+	end
+	local rng = semilla("bolsa" .. tostring(math.floor(fraccion * 10)))
+	local d = 1.5 * (0.8 + 0.6 * math.clamp(fraccion, 0, 1))
+	local claro = Paleta.escalar(Paleta.BOLSA, 1.3)
+	-- Cuerpo: bola con una base ancha y plana debajo (la bolsa se aplasta
+	-- contra el suelo) y un segundo abombado un poco mas arriba
+	local c = esfera("Cuerpo", d, CFrame.new(0, d * 0.48, 0), Paleta.BOLSA, m)
+	cilindroVertical("Base", d * 0.9, d * 0.22, CFrame.new(0, d * 0.11, 0), Paleta.escalar(Paleta.BOLSA, 0.85), m)
+	esfera("Panza", d * 0.8, CFrame.new(d * 0.08, d * 0.7, -d * 0.05), Paleta.escalar(Paleta.BOLSA, 1.08), m)
+	bultosBolsa(m, d, d * 0.48, 5, rng)
+	-- Cuello fruncido y nudo
+	local cuelloY = d * 1.02
+	cilindroVertical("Cuello", d * 0.3, d * 0.2, CFrame.new(0, cuelloY, 0), Paleta.escalar(Paleta.BOLSA, 0.8), m)
+	esfera("Nudo", d * 0.28, CFrame.new(0, cuelloY + d * 0.14, 0), claro, m)
+	-- Las dos orejas del nudo, abiertas en V
+	for i, lado in { -1, 1 } do
+		cuna({
+			Nombre = "Oreja" .. i,
+			Size = Vector3.new(d * 0.14, d * 0.32, d * 0.24),
+			CFrame = CFrame.new(lado * d * 0.16, cuelloY + d * 0.3, 0) * CFrame.Angles(0, 0, lado * math.rad(-40)) * CFrame.Angles(math.rad(180), 0, 0),
+			Color = claro,
+			Parent = m,
+		})
+	end
 	m.PrimaryPart = c
 	pivoteEnSuelo(m)
 	return m
@@ -279,6 +378,8 @@ function ModelosObjetos.bolsaAbierta(fraccion: number): (Model, number)
 	local d = 2.3 * s
 	local alto = d * 0.9
 	local c = esfera("Cuerpo", d, CFrame.new(0, d / 2, 0), Paleta.BOLSA, m)
+	-- Bultos de lo que ya lleva dentro (mas cuantos mas llena)
+	bultosBolsa(m, d, d / 2, 2 + math.floor(fraccion * 3), semilla("abierta"))
 	local boca = d * 0.8
 	cilindroVertical("Boca", boca, 0.24, CFrame.new(0, alto, 0), Paleta.escalar(Paleta.BOLSA, 1.35), m)
 	cilindroVertical("Interior", boca * 0.78, 0.1, CFrame.new(0, alto + 0.08, 0), Paleta.gris(28), m)
