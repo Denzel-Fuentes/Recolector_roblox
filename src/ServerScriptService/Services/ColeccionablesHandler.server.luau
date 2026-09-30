@@ -1,12 +1,17 @@
 --!strict
 --[[
 	ColeccionablesHandler
-	Las 6 figurinas FIJAS del patio: al arrancar se instancia el modelo de cada
-	una en su marcador (tag FigurinaFija, atributo FigurinaId). Son visibles
-	para todos y cada jugador puede recogerla UNA vez: un bucle mide la
-	distancia de cada jugador a cada figurina y, si esta a menos de 3 studs y
-	no la tiene, se la da. El cliente la oculta localmente al verla en su perfil
-	(FigurinasFijas en el cliente), asi que para los demas sigue ahi.
+	Cablea los coleccionables:
+
+	  PonerTrajeEvent(idTraje | nil)  ponerse o quitarse un traje. Los de pago
+	                                  se poseen por Game Pass, no por hallazgo.
+
+	Figurinas FIJAS del patio (solo con la funcion FIGURINAS, pospuesta en la
+	v2): al arrancar se instancia el modelo de cada una en su marcador (tag
+	FigurinaFija, atributo FigurinaId). Son visibles para todos y cada jugador
+	puede recogerla UNA vez: un bucle mide la distancia de cada jugador a cada
+	figurina y, si esta a menos de 3 studs y no la tiene, se la da. El cliente
+	la oculta localmente al verla en su perfil.
 
 	Tambien avisa por toast de cintas y trajes nuevos (vengan de donde vengan).
 ]]
@@ -17,6 +22,8 @@ local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local GameConfig = require(Shared:WaitForChild("Config"):WaitForChild("GameConfig"))
+local Productos = require(Shared:WaitForChild("Config"):WaitForChild("Productos"))
 local Textos = require(Shared:WaitForChild("Config"):WaitForChild("Textos"))
 local DefinicionesColeccionables = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesColeccionables"))
 local ModelosObjetos = require(Shared:WaitForChild("Utilidades"):WaitForChild("ModelosObjetos"))
@@ -27,8 +34,38 @@ local Servicios = ServerScriptService:WaitForChild("Services")
 local Mundo = require(Servicios:WaitForChild("Mundo"))
 local Perfiles = require(Servicios:WaitForChild("Perfiles"))
 local Coleccionables = require(Servicios:WaitForChild("Coleccionables"))
+local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
 
 local NotificacionEvent = Red.evento("NotificacionEvent")
+local PonerTrajeEvent = Red.evento("PonerTrajeEvent")
+
+local function notificar(jugador: Player, texto: string, tipo: string)
+	NotificacionEvent:FireClient(jugador, texto, tipo)
+end
+
+-- === Traje ===
+PonerTrajeEvent.OnServerEvent:Connect(function(jugador, idTraje)
+	if idTraje ~= nil and typeof(idTraje) ~= "string" then
+		return
+	end
+	if idTraje ~= nil and not Coleccionables.tiene(jugador, "traje", idTraje) then
+		local pase = Productos.paseParaTraje(idTraje)
+		if pase and Monetizacion.tienePase(jugador, pase.id) then
+			Coleccionables.agregar(jugador, "traje", idTraje)
+		end
+	end
+	local ok = Coleccionables.ponerTraje(jugador, idTraje)
+	if ok and idTraje then
+		local def = DefinicionesColeccionables.TRAJE_POR_ID[idTraje]
+		if def then
+			notificar(jugador, Textos.formatear(Textos.NOTIFICACIONES.trajePuesto, { nombre = def.nombre }), "exito")
+		end
+	elseif not ok then
+		notificar(jugador, Textos.TIENDA.noEncontrado, "aviso")
+	end
+end)
+
+-- === Figurinas fijas (pospuestas) ===
 
 local carpeta = Instance.new("Folder")
 carpeta.Name = "FigurinasFijas"
@@ -37,7 +74,7 @@ carpeta.Parent = workspace
 type FigurinaMundo = { id: string, modelo: Model, posicion: Vector3 }
 local figurinas: { FigurinaMundo } = {}
 
-for _, marcador in Mundo.figurinasFijas() do
+for _, marcador in (if GameConfig.activa("FIGURINAS") then Mundo.figurinasFijas() else {}) do
 	local id = marcador:GetAttribute("FigurinaId")
 	local def = if typeof(id) == "string" then DefinicionesColeccionables.FIGURINA_POR_ID[id] else nil
 	if def then
@@ -52,6 +89,9 @@ end
 
 local acumulado = 0
 RunService.Heartbeat:Connect(function(dt)
+	if #figurinas == 0 then
+		return
+	end
 	acumulado += dt
 	if acumulado < 0.3 then
 		return

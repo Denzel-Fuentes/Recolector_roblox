@@ -1,11 +1,13 @@
 --!strict
 --[[
 	Iman (ModuleScript)
-	Unica responsabilidad: la mejora Iman, lo UNICO que recoge basura sin
-	clic (decision del usuario). Cada INTERVALO_IMAN, para cada jugador con
-	Iman: lo que esta dentro de su radio se suelta de la montana y se arrastra
-	hacia el; cuando un objeto arrastrado llega a DISTANCIA_RECLAMO_IMAN entra
-	en la bolsa. No se usa .Touched.
+	Unica responsabilidad: el iman, lo UNICO que recoge basura sin clic
+	(decision del usuario). En la v2 no es una mejora: lo dan las mascotas
+	Raras y Epicas equipadas, y cada una solo atrae las piezas de SU material
+	(6 studs una Rara, 10 una Epica). Cada INTERVALO_IMAN, para cada jugador
+	con algun iman: lo que esta dentro del radio de su material se suelta de
+	la montana y se arrastra hacia el; cuando un objeto arrastrado llega a
+	DISTANCIA_RECLAMO_IMAN entra en la bolsa. No se usa .Touched.
 
 	Con cientos de objetos por montana, primero se descartan montanas enteras
 	por distancia a su centro y solo despues se mide objeto a objeto (a la
@@ -27,11 +29,11 @@ local ModelosMonton = require(Utilidades:WaitForChild("ModelosMonton"))
 local Servicios = ServerScriptService:WaitForChild("Services")
 local TiposPatio = require(Servicios:WaitForChild("TiposPatio"))
 local Perfiles = require(Servicios:WaitForChild("Perfiles"))
-local Mejoras = require(Servicios:WaitForChild("Mejoras"))
 local Bolsa = require(Servicios:WaitForChild("Bolsa"))
 local ObjetosPatio = require(Servicios:WaitForChild("ObjetosPatio"))
 local FisicaBasura = require(Servicios:WaitForChild("FisicaBasura"))
 local Montones = require(Servicios:WaitForChild("Montones"))
+local Mascotas = require(Servicios:WaitForChild("Mascotas"))
 
 type Monton = TiposPatio.Monton
 
@@ -50,13 +52,27 @@ local function montonesCercanos(posicion: Vector3, radio: number): { [Monton]: b
 	return cerca
 end
 
-local function atraer(jugador: Player, posicion: Vector3, radioIman: number)
+-- Radio del iman de cada material para este jugador (material -> studs):
+-- sus mascotas Raras y Epicas equipadas
+local function radiosPorMaterial(jugador: Player): { [string]: number }
+	return Mascotas.radiosIman(jugador)
+end
+
+local function atraer(jugador: Player, posicion: Vector3, radios: { [string]: number })
 	local paso = VELOCIDAD_ARRASTRE * GameConfig.INTERVALO_IMAN
 	local bolsaLlena = Bolsa.estaLlena(jugador)
-	local alcance = radioIman + 6 -- filtro barato antes de medir la caja
+	local mayor = 0
+	for _, r in radios do
+		mayor = math.max(mayor, r)
+	end
+	local alcance = mayor + 6 -- filtro barato antes de medir la caja
 	local cerca = montonesCercanos(posicion, alcance)
 	for id, obj in ObjetosPatio.todos() do
 		if obj.reclamadoPor or obj.item.tipo == "bolsa" or not (obj.suelto or (obj.monton and cerca[obj.monton])) then
+			continue
+		end
+		local radio = radios[obj.item.material or ""] or 0
+		if radio <= 0 or not ObjetosPatio.puedeReclamar(jugador, obj) then
 			continue
 		end
 		local pivot = obj.modelo:GetPivot()
@@ -68,7 +84,7 @@ local function atraer(jugador: Player, posicion: Vector3, radioIman: number)
 		if obj.suelto and d <= GameConfig.DISTANCIA_RECLAMO_IMAN then
 			-- Solo lo que el iman ha arrastrado entra solo en la bolsa
 			ObjetosPatio.reclamar(jugador, id, "iman")
-		elseif d <= radioIman and not bolsaLlena then
+		elseif d <= radio and not bolsaLlena then
 			FisicaBasura.soltar(obj)
 			local avance = math.min(paso, delta.Magnitude - 1.5)
 			if avance > 0 then
@@ -83,9 +99,11 @@ local function bucle()
 	for _, jugador in Players:GetPlayers() do
 		local personaje = jugador.Character
 		local root = personaje and personaje:FindFirstChild("HumanoidRootPart")
-		local radioIman = Mejoras.valor(jugador, "Iman")
-		if root and root:IsA("BasePart") and radioIman > 0 and Perfiles.obtener(jugador) then
-			atraer(jugador, root.Position, radioIman)
+		if root and root:IsA("BasePart") and Perfiles.obtener(jugador) then
+			local radios = radiosPorMaterial(jugador)
+			if next(radios) then
+				atraer(jugador, root.Position, radios)
+			end
 		end
 	end
 end

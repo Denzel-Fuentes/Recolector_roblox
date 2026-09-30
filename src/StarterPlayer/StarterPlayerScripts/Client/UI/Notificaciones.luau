@@ -1,41 +1,47 @@
 --!strict
 --[[
 	Notificaciones (ModuleScript)
-	Tres canales de texto efimero, y solo estos tres (el dialogo de los NPC es
-	otra cosa: UI/Dialogo):
+	Tres canales de texto efimero, y solo estos tres (no hay dialogos de NPC:
+	se quitaron el 29 sep):
 
-	  toast   lo que te pasa a TI ("+$40", "Bolsa llena"). Pila arriba-centro:
-	          chip de papel con el contorno y una marca del color del tipo, 3.5 s.
+	  toast   lo que te pasa a TI ("+$40", "Bolsa llena"). Pila pegada arriba
+	          en el centro (peticion del usuario, 29 sep: a 122 px caian a
+	          media pantalla en el movil, que mide ~500 px de alto); baja
+	          por debajo de la tarjeta de logro mientras esta se ve. En
+	          tactil la botonera sube arriba-izquierda y los contadores
+	          (dinero, fragmentos) se apartan de las barras hacia el centro:
+	          la pila se centra en el hueco libre entre los dos, medido en
+	          pantalla. Tarjeta blanca con contorno marino y una franja del
+	          color del tipo, 3.5 s.
 	  feed    lo que pasa en el SERVIDOR (alguien activo un monton grande,
 	          encontro una Rara, Dona Chatarra repuso). Arriba a la derecha, es
 	          la senal social del GDD: invita a ir donde esta pasando algo.
-	  logro   tarjeta grande centrada con el trofeo, 4 s.
+	  logro   tarjeta grande que baja desde arriba con el trofeo, 4 s (las
+	          insignias; llegan en el lote 7).
 
-	Se conecta a NotificacionEvent, FeedEvent y LogroEvent al cargarse.
+	Cada aviso vive en su propio scope de Fusion: su aparicion y su fundido
+	son Tweens de un Value de transparencia, y al acabar se limpia entero.
+	Se conecta a NotificacionEvent y FeedEvent al cargarse.
 ]]
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Paleta = require(Shared:WaitForChild("Config"):WaitForChild("Paleta"))
 local Textos = require(Shared:WaitForChild("Config"):WaitForChild("Textos"))
-local DefinicionesLogros = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesLogros"))
 local Red = require(Shared:WaitForChild("Utilidades"):WaitForChild("Red"))
+local Fusion = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Fusion"))
 
-local Componentes = require(script.Parent:WaitForChild("Componentes"))
+local Kit = require(script.Parent:WaitForChild("Kit"))
+local Tema = require(script.Parent:WaitForChild("Kit"):WaitForChild("Tema"))
+local Escala = require(script.Parent:WaitForChild("Kit"):WaitForChild("Escala"))
+
+local Children = Fusion.Children
 
 local Notificaciones = {}
 
-local pantalla = Componentes.pantalla("Notificaciones", 20)
-
--- Toasts: arriba-centro (debajo del dock tactil, que va a 8..70)
-local pilaToasts = Componentes.marco({ Parent = pantalla, Size = UDim2.fromOffset(400, 300), Position = UDim2.new(0.5, 0, 0, 76), Anchor = Vector2.new(0.5, 0), Transparencia = 1, Nombre = "Toasts" })
-Componentes.lista(pilaToasts, 6, false, Enum.HorizontalAlignment.Center)
-
--- Feed: arriba-derecha, debajo de los botones de teletransporte
-local pilaFeed = Componentes.marco({ Parent = pantalla, Size = UDim2.fromOffset(320, 220), Position = UDim2.new(1, -16, 0, 62), Anchor = Vector2.new(1, 0), Transparencia = 1, Nombre = "Feed" })
-Componentes.lista(pilaFeed, 4, false, Enum.HorizontalAlignment.Right)
+local scope = Fusion.scoped(Fusion, Kit)
 
 local COLOR_TIPO = {
 	aviso = Paleta.UI_ENERGIA,
@@ -48,113 +54,246 @@ local COLOR_TIPO = {
 
 local MAX_TOASTS = 5
 local MAX_FEED = 6
+local FUNDIDO = TweenInfo.new(0.3)
 
-local function desvanecer(etiqueta: TextLabel, tras: number)
-	task.delay(tras, function()
-		if not etiqueta.Parent then
+-- Toasts: arriba-centro; mientras se ve una tarjeta de logro (12..112), por
+-- debajo de ella. centroToasts < 0 = centrados en la pantalla; si no, el x
+-- (px de diseno) del hueco libre en tactil (recolocarToasts)
+local ANCHO_TOASTS = 440
+local logrosEnPantalla = scope:Value(0)
+local centroToasts = scope:Value(-1)
+local anchoToasts = scope:Value(ANCHO_TOASTS)
+local pilaToasts = scope:New("Frame")({
+	Name = "Toasts",
+	Size = scope:Computed(function(use)
+		return UDim2.fromOffset(use(anchoToasts), 320)
+	end),
+	Position = scope:Spring(
+		scope:Computed(function(use)
+			local y = if use(logrosEnPantalla) > 0 then 122 else 12
+			local x = use(centroToasts)
+			return if x < 0 then UDim2.new(0.5, 0, 0, y) else UDim2.new(0, x, 0, y)
+		end),
+		25,
+		0.8
+	),
+	AnchorPoint = Vector2.new(0.5, 0),
+	BackgroundTransparency = 1,
+	[Children] = scope:Lista({ Espacio = 6, Alinear = Enum.HorizontalAlignment.Center }),
+})
+
+-- Feed: arriba-derecha, debajo de los contadores del HUD (dinero y
+-- fragmentos: 16 + 58 + 8 + 30). En tactil los contadores se apartan de las
+-- barras verticales y el feed con ellos (recolocarFeed): pegado al borde
+-- caia encima de las barras de bolsa y fuerza.
+local posicionFeed = scope:Value(UDim2.new(1, -16, 0, 124))
+local pilaFeed = scope:New("Frame")({
+	Name = "Feed",
+	Size = UDim2.fromOffset(340, 240),
+	Position = posicionFeed,
+	AnchorPoint = Vector2.new(1, 0),
+	BackgroundTransparency = 1,
+	[Children] = scope:Lista({ Espacio = 4, Alinear = Enum.HorizontalAlignment.Right }),
+})
+
+local pantalla = scope:Pantalla({ Nombre = "Notificaciones", Orden = 20, Hijos = { pilaToasts, pilaFeed } })
+
+-- Avisos vivos por pila (el mas viejo primero), para recortar
+type Aviso = { scope: any, orden: number }
+local vivos: { [Frame]: { Aviso } } = { [pilaToasts] = {}, [pilaFeed] = {} }
+
+local function retirar(pila: Frame, aviso: Aviso)
+	local lista = vivos[pila]
+	local i = table.find(lista, aviso)
+	if i then
+		table.remove(lista, i)
+		Fusion.doCleanup(aviso.scope)
+	end
+end
+
+-- Monta un aviso en su scope: aparece, espera `dura` s, se funde y se limpia
+local function aviso(pila: Frame, max: number, dura: number, construir: (scope: any, opacidad: any) -> Instance)
+	local s = scope:innerScope()
+	local transparencia = s:Value(1)
+	local opacidad = s:Tween(transparencia, FUNDIDO)
+	local instancia = construir(s, opacidad)
+	instancia.Parent = pila
+	local entrada: Aviso = { scope = s, orden = #vivos[pila] }
+	table.insert(vivos[pila], entrada)
+	while #vivos[pila] > max do
+		retirar(pila, vivos[pila][1])
+	end
+	transparencia:set(0)
+	task.delay(dura, function()
+		-- Pudo recortarse antes (llegaron mas avisos): entonces ya esta limpio
+		if not table.find(vivos[pila], entrada) then
 			return
 		end
-		local t = TweenService:Create(etiqueta, TweenInfo.new(0.35), { TextTransparency = 1, BackgroundTransparency = 1 })
-		t:Play()
-		for _, hijo in etiqueta:GetChildren() do
-			if hijo:IsA("UIStroke") then
-				TweenService:Create(hijo, TweenInfo.new(0.35), { Transparency = 1 }):Play()
-			elseif hijo:IsA("Frame") then
-				TweenService:Create(hijo, TweenInfo.new(0.35), { BackgroundTransparency = 1 }):Play()
-			end
-		end
-		t.Completed:Wait()
-		etiqueta:Destroy()
+		transparencia:set(1)
+		task.wait(FUNDIDO.Time + 0.05)
+		retirar(pila, entrada)
 	end)
 end
 
-local function recortar(pila: Frame, max: number)
-	local hijos = {}
-	for _, h in pila:GetChildren() do
-		if h:IsA("TextLabel") then
-			table.insert(hijos, h)
-		end
+-- En tactil, centra la pila en el hueco de arriba entre la botonera y los
+-- contadores del HUD (sus posiciones reales en pantalla, en px de diseno:
+-- la UI de Kit/Pantalla va escalada por Escala.valor()). En escritorio la
+-- botonera esta a media altura y el centro de arriba esta libre.
+local function recolocarToasts()
+	local gui = Players.LocalPlayer:FindFirstChild("PlayerGui")
+	local hud = gui and gui:FindFirstChild("HUD")
+	local botonera = hud and hud:FindFirstChild("Botonera")
+	local contadores = hud and hud:FindFirstChild("Contadores")
+	if Escala.disposicionActual() ~= "tactil" or not botonera or not contadores then
+		centroToasts:set(-1)
+		anchoToasts:set(ANCHO_TOASTS)
+		return
 	end
-	table.sort(hijos, function(a, b)
-		return a.LayoutOrder < b.LayoutOrder
-	end)
-	while #hijos > max do
-		local viejo = table.remove(hijos, 1)
-		if viejo then
-			viejo:Destroy()
-		end
+	local escala = Escala.valor()
+	local izquierda = ((botonera :: GuiObject).AbsolutePosition.X + (botonera :: GuiObject).AbsoluteSize.X) / escala + 8
+	local derecha = (contadores :: GuiObject).AbsolutePosition.X / escala - 8
+	anchoToasts:set(math.clamp(derecha - izquierda, 220, ANCHO_TOASTS))
+	centroToasts:set((izquierda + derecha) / 2)
+end
+
+-- En tactil, el feed bajo los contadores y alineado con su borde derecho
+local function recolocarFeed()
+	local gui = Players.LocalPlayer:FindFirstChild("PlayerGui")
+	local hud = gui and gui:FindFirstChild("HUD")
+	local contadores = hud and hud:FindFirstChild("Contadores")
+	if Escala.disposicionActual() ~= "tactil" or not contadores then
+		posicionFeed:set(UDim2.new(1, -16, 0, 124))
+		return
 	end
+	local escala = Escala.valor()
+	local c = contadores :: GuiObject
+	local derecha = (c.AbsolutePosition.X + c.AbsoluteSize.X) / escala
+	local abajo = (c.AbsolutePosition.Y + c.AbsoluteSize.Y) / escala + 6
+	posicionFeed:set(UDim2.new(0, derecha, 0, abajo))
 end
 
 local ordenToast = 0
 function Notificaciones.mostrar(texto: string, tipo: string?)
+	recolocarToasts()
 	ordenToast += 1
 	local color = COLOR_TIPO[tipo or "info"] or Paleta.UI_TINTA_SUAVE
-	local t = Componentes.texto({
-		Parent = pilaToasts,
-		Texto = texto,
-		Size = UDim2.new(1, 0, 0, 36),
-		Tamano = 15,
-		Negrita = true,
-		Alinear = Enum.TextXAlignment.Center,
-		Fondo = Paleta.UI_PAPEL,
-		Color = Paleta.UI_TINTA,
-		Orden = ordenToast,
-	})
-	t.AutomaticSize = Enum.AutomaticSize.Y
-	Componentes.padding(t, 22, 8)
-	Componentes.borde(t, color, 2.5)
-	-- Marca del tipo: una pestana de color pegada al borde izquierdo
-	Componentes.marco({ Parent = t, Size = UDim2.new(0, 8, 1, -12), Position = UDim2.fromOffset(-16, 6), Color = color, Radio = 4, Nombre = "Marca", ZIndex = 2 })
-	t.TextTransparency = 1
-	TweenService:Create(t, TweenInfo.new(0.15), { TextTransparency = 0 }):Play()
-	recortar(pilaToasts, MAX_TOASTS)
-	desvanecer(t, 3.5)
+	local orden = ordenToast
+	aviso(pilaToasts, MAX_TOASTS, 3.5, function(s, opacidad)
+		return s:New("Frame")({
+			Name = "Toast",
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			LayoutOrder = orden,
+			BackgroundColor3 = Paleta.UI_PAPEL,
+			BackgroundTransparency = opacidad,
+			[Children] = {
+				s:New("UICorner")({ CornerRadius = UDim.new(0, Tema.RADIO) }),
+				s:New("UIStroke")({ Color = Paleta.UI_TINTA, Thickness = Tema.GROSOR, Transparency = opacidad }),
+				s:New("UIPadding")({
+					PaddingLeft = UDim.new(0, 24),
+					PaddingRight = UDim.new(0, 14),
+					PaddingTop = UDim.new(0, 8),
+					PaddingBottom = UDim.new(0, 8),
+				}),
+				-- Franja del color del tipo pegada al borde izquierdo
+				s:New("Frame")({
+					Name = "Marca",
+					Size = UDim2.new(0, 10, 1, 4),
+					Position = UDim2.new(0, -18, 0, -2),
+					BackgroundColor3 = color,
+					BackgroundTransparency = opacidad,
+					[Children] = s:New("UICorner")({ CornerRadius = UDim.new(0, 5) }),
+				}),
+				s:New("TextLabel")({
+					Name = "Texto",
+					Size = UDim2.new(1, 0, 0, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					Text = texto,
+					TextColor3 = Paleta.UI_TINTA,
+					TextTransparency = opacidad,
+					TextSize = 17,
+					TextWrapped = true,
+					FontFace = Tema.FUENTE_TITULO,
+				}),
+			},
+		})
+	end)
 end
 
 local ordenFeed = 0
 function Notificaciones.feed(texto: string)
+	recolocarFeed()
 	ordenFeed += 1
-	local t = Componentes.texto({
-		Parent = pilaFeed,
-		Texto = texto,
-		Size = UDim2.new(1, 0, 0, 26),
-		Tamano = 12,
-		Negrita = true,
-		Alinear = Enum.TextXAlignment.Right,
-		Fondo = Paleta.UI_PAPEL,
-		Color = Paleta.UI_TINTA,
-		Orden = ordenFeed,
-	})
-	t.AutomaticSize = Enum.AutomaticSize.Y
-	t.BackgroundTransparency = 0.12
-	Componentes.padding(t, 10, 4)
-	Componentes.borde(t, Paleta.UI_TINTA, 1.5)
-	recortar(pilaFeed, MAX_FEED)
-	desvanecer(t, 9)
+	local orden = ordenFeed
+	aviso(pilaFeed, MAX_FEED, 9, function(s, opacidad)
+		return s:New("Frame")({
+			Name = "Noticia",
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			LayoutOrder = orden,
+			BackgroundColor3 = Paleta.UI_TINTA,
+			BackgroundTransparency = s:Computed(function(use)
+				return 0.15 + (use(opacidad) :: number) * 0.85
+			end),
+			[Children] = {
+				s:New("UICorner")({ CornerRadius = UDim.new(0, 10) }),
+				s:New("UIPadding")({
+					PaddingLeft = UDim.new(0, 10),
+					PaddingRight = UDim.new(0, 10),
+					PaddingTop = UDim.new(0, 5),
+					PaddingBottom = UDim.new(0, 5),
+				}),
+				s:New("TextLabel")({
+					Name = "Texto",
+					Size = UDim2.new(1, 0, 0, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					Text = texto,
+					TextColor3 = Paleta.UI_PAPEL,
+					TextTransparency = opacidad,
+					TextSize = 14,
+					TextWrapped = true,
+					TextXAlignment = Enum.TextXAlignment.Right,
+					FontFace = Tema.FUENTE_NEGRITA,
+				}),
+			},
+		})
+	end)
 end
 
 function Notificaciones.logro(nombre: string, descripcion: string)
-	local tarjeta, cuerpo = Componentes.pegatina({
-		Parent = pantalla,
+	local s = scope:innerScope()
+	local dentro = s:Value(false)
+	local posicion = s:Spring(
+		s:Computed(function(use)
+			return if use(dentro) then UDim2.new(0.5, 0, 0, 12) else UDim2.new(0.5, 0, 0, -120)
+		end),
+		22,
+		0.7
+	)
+	s:Tarjeta({
 		Nombre = "Logro",
-		Size = UDim2.fromOffset(400, 92),
-		Position = UDim2.new(0.5, 0, 0, -110),
-		Anchor = Vector2.new(0.5, 0),
-		Radio = 16,
-		Contorno = Paleta.UI_PRIMARIO,
-		Grosor = 3,
-	})
-	Componentes.icono({ Parent = cuerpo, Clave = "trofeo", Tamano = 54, Position = UDim2.new(0, 14, 0.5, 0), Anchor = Vector2.new(0, 0.5), ZIndex = 3 })
-	Componentes.texto({ Parent = cuerpo, Texto = Textos.LOGROS.desbloqueado, Size = UDim2.new(1, -92, 0, 20), Position = UDim2.fromOffset(80, 8), Tamano = 12, Color = Paleta.UI_TINTA_SUAVE, Titulo = true, ZIndex = 3 })
-	Componentes.texto({ Parent = cuerpo, Texto = nombre, Size = UDim2.new(1, -92, 0, 26), Position = UDim2.fromOffset(80, 28), Tamano = 19, Titulo = true, ZIndex = 3 })
-	Componentes.texto({ Parent = cuerpo, Texto = descripcion, Size = UDim2.new(1, -92, 0, 20), Position = UDim2.fromOffset(80, 56), Tamano = 12, Negrita = true, Color = Paleta.UI_TINTA_SUAVE, ZIndex = 3 })
-	TweenService:Create(tarjeta, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Position = UDim2.new(0.5, 0, 0, 12) }):Play()
+		Size = UDim2.fromOffset(440, 100),
+		Position = posicion,
+		AnchorPoint = Vector2.new(0.5, 0),
+		Color = Paleta.UI_PRIMARIO,
+		Radio = 18,
+		Relleno = 14,
+		Hijos = {
+			s:Icono({ Clave = "trofeo", Tamano = 62, Position = UDim2.new(0, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5) }),
+			s:Texto({ Texto = Textos.LOGROS.desbloqueado, Size = UDim2.new(1, -76, 0, 22), Position = UDim2.fromOffset(74, 0), Tamano = 15, Fuente = "titulo", Color = Paleta.UI_PAPEL, Contorno = Paleta.UI_TINTA, Mayusculas = true }),
+			s:Texto({ Texto = nombre, Size = UDim2.new(1, -76, 0, 28), Position = UDim2.fromOffset(74, 22), Tamano = 22, Fuente = "titulo", Color = Paleta.UI_PAPEL, Contorno = Paleta.UI_TINTA }),
+			s:Texto({ Texto = descripcion, Size = UDim2.new(1, -76, 0, 20), Position = UDim2.fromOffset(74, 50), Tamano = 14, Fuente = "negrita", Color = Paleta.UI_TINTA }),
+		},
+	}).Parent = pantalla
+	dentro:set(true)
+	logrosEnPantalla:set(Fusion.peek(logrosEnPantalla) + 1)
 	task.delay(4, function()
-		local t = TweenService:Create(tarjeta, TweenInfo.new(0.3), { Position = UDim2.new(0.5, 0, 0, -110) })
-		t:Play()
-		t.Completed:Wait()
-		tarjeta:Destroy()
+		dentro:set(false)
+		task.wait(0.8)
+		logrosEnPantalla:set(math.max(0, Fusion.peek(logrosEnPantalla) - 1))
+		Fusion.doCleanup(s)
 	end)
 end
 
@@ -167,13 +306,6 @@ end)
 Red.evento("FeedEvent").OnClientEvent:Connect(function(texto)
 	if typeof(texto) == "string" then
 		Notificaciones.feed(texto)
-	end
-end)
-
-Red.evento("LogroEvent").OnClientEvent:Connect(function(idLogro)
-	local def = DefinicionesLogros.POR_ID[idLogro]
-	if def then
-		Notificaciones.logro(def.nombre, def.descripcion)
 	end
 end)
 

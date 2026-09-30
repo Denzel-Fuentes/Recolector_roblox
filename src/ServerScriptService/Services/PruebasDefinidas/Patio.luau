@@ -1,7 +1,7 @@
 --!nonstrict
 --[[
 	Pruebas del patio: montones, activacion, reclamo atomico, fisica de la
-	basura, recogida solo por clic (o Iman), variedad de basura, EnPatio.
+	basura, recogida solo por clic, variedad de basura, EnPatio.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,10 +12,9 @@ local ModelosObjetos = require(Shared:WaitForChild("Utilidades"):WaitForChild("M
 local ModelosMonton = require(Shared:WaitForChild("Utilidades"):WaitForChild("ModelosMonton"))
 
 local Servicios = script.Parent.Parent
-local Perfiles = require(Servicios:WaitForChild("Perfiles"))
-local Energia = require(Servicios:WaitForChild("Energia"))
 local Bolsa = require(Servicios:WaitForChild("Bolsa"))
 local Botin = require(Servicios:WaitForChild("Botin"))
+local Mundo = require(Servicios:WaitForChild("Mundo"))
 
 local Comunes = require(script.Parent:WaitForChild("Comunes"))
 local jugador, teletransportar = Comunes.jugador, Comunes.teletransportar
@@ -37,13 +36,14 @@ end
 -- Excava el monton N (teletransportando al jugador al lado)
 function Pruebas.excavar(indice)
 	local j = jugador()
-	local m = Botin.montones()[tonumber(indice) or 1]
+	-- Sin indice, el primer monton lleno de un cuadrante abierto (el 1 esta
+	-- en la zona de metal, tras la barrera del Rebirth 1)
+	local m = if indice then Botin.montones()[tonumber(indice) or 1] else Comunes.montonesLlenos(1)[1]
 	assert(m, "no existe el monton")
 	teletransportar(j, m.ranura.Position + Vector3.new(GameConfig.TAMANOS_MONTON[m.tamano].radio + 6, 0, 0))
 	task.wait(0.2)
-	local energiaAntes = Energia.actual(j)
 	local piezas = m.numPiezas
-	local ok, motivo = Botin.excavar(j, m)
+	local ok, motivo = Comunes.excavar(j, m)
 	task.wait(1.4) -- toda la montana brota en 1 s
 	local conteo = {}
 	for _, obj in Botin.objetos() do
@@ -60,7 +60,7 @@ function Pruebas.excavar(indice)
 	for _, n in conteo do
 		total += n
 	end
-	return string.format("excavar monton %d (%s): ok=%s motivo=%s energia %d->%d | piezas=%d objetos=%d (%s) | %s", m.id, m.tamano, tostring(ok), motivo, energiaAntes, Energia.actual(j), piezas, total, if piezas == total then "IGUAL OK" else "DIFERENTE", table.concat(partes, " "))
+	return string.format("excavar monton %d (%s): ok=%s motivo=%s | piezas=%d objetos=%d (%s) | %s", m.id, m.tamano, tostring(ok), motivo, piezas, total, if piezas == total then "IGUAL OK" else "DIFERENTE", table.concat(partes, " "))
 end
 
 -- Reclama todos los objetos libres para el jugador
@@ -86,18 +86,10 @@ end
 -- Dos reclamantes sobre el mismo objeto: exactamente uno gana
 function Pruebas.reclamoAtomico()
 	local j = jugador()
-	local m = nil
-	for _, monton in Botin.montones() do
-		if monton.estado == "lleno" then
-			m = monton
-			break
-		end
-	end
-	assert(m, "no queda monton lleno")
+	local m = Comunes.montonesLlenos(1)[1]
 	teletransportar(j, m.ranura.Position + Vector3.new(GameConfig.TAMANOS_MONTON[m.tamano].radio + 6, 0, 0))
 	task.wait(0.2)
-	Energia.fijar(j, Energia.maxima(j))
-	assert(Botin.excavar(j, m))
+	assert(Comunes.excavar(j, m))
 	task.wait(0.3)
 	local basuras = {}
 	for id, obj in Botin.objetos() do
@@ -106,6 +98,9 @@ function Pruebas.reclamoAtomico()
 		end
 	end
 	assert(#basuras >= 2, "hacen falta 2 basuras, hay " .. #basuras)
+	-- Sin la prioridad del excavador (la prueba "prioridadExcavador" la mira
+	-- aparte): aqui solo cuenta quien llega primero
+	m.activadoEn = os.clock() - GameConfig.PRIORIDAD_EXCAVADOR - 1
 	local falso = { Name = "Falso", Parent = nil }
 	-- Caso 1: el falso llega primero
 	local ok1, mot1 = Botin.reclamar(falso, basuras[1], "toque")
@@ -123,12 +118,7 @@ function Pruebas.repoblar()
 end
 
 local function primerMontonLleno()
-	for _, monton in Botin.montones() do
-		if monton.estado == "lleno" then
-			return monton
-		end
-	end
-	error("no queda monton lleno")
+	return Comunes.montonesLlenos(1)[1]
 end
 
 -- Apoyo de la basura de un monton: un objeto esta apoyado si su caja casi
@@ -201,8 +191,7 @@ local function activarLejos(j)
 	local alturaAntes = m.params.h
 	teletransportar(j, m.ranura.Position + Vector3.new(GameConfig.TAMANOS_MONTON[m.tamano].radio + 6, 0, 0))
 	task.wait(0.2)
-	Energia.fijar(j, Energia.maxima(j))
-	local ok = Botin.excavar(j, m)
+	local ok = Comunes.excavar(j, m)
 	assert(ok, "no se pudo excavar")
 	teletransportar(j, Comunes.fueraDelPatio())
 	task.wait(1.6) -- toda la montana brota en 1 s
@@ -316,7 +305,8 @@ function Pruebas.reacomodo()
 			and altoDespues < altoAntes and m.estado == "agotado" and resto) and "OK" or "FALLO")
 end
 
--- Nada se recoge por pasar al lado: solo el clic (y el Iman, si se tiene)
+-- Nada se recoge por pasar al lado: solo el clic (el iman de las mascotas lo
+-- prueba "imanMaterial")
 function Pruebas.sinRecogidaAutomatica()
 	local j = jugador()
 	local m = activarLejos(j)
@@ -328,10 +318,7 @@ function Pruebas.sinRecogidaAutomatica()
 			cercano = cercano or obj
 		end
 	end
-	-- pegado a un objeto, sin Iman (el nivel se toca en el perfil: no hay setter)
-	local perfil = Perfiles.obtener(j)
-	local nivelIman = perfil.mejoras.Iman or 0
-	perfil.mejoras.Iman = 0
+	-- pegado a un objeto
 	teletransportar(j, cercano.modelo:GetPivot().Position + Vector3.new(1.5, 0, 0))
 	task.wait(1.5)
 	local trasEsperar = 0
@@ -353,23 +340,11 @@ function Pruebas.sinRecogidaAutomatica()
 	teletransportar(j, m.ranura.Position + Vector3.new(GameConfig.TAMANOS_MONTON[m.tamano].radio + 25, 0, 0))
 	task.wait(0.2)
 	local okLejos, motivoLejos = Botin.reclamar(j, lejano.id, "clic")
-	-- con Iman al maximo, vuelan solos
-	perfil.mejoras.Iman = GameConfig.NIVEL_MAX_MEJORA
-	teletransportar(j, m.ranura.Position + Vector3.new(GameConfig.TAMANOS_MONTON[m.tamano].radio * 0.5, 0, 0))
-	task.wait(2.5)
-	local conIman = 0
-	for _, obj in Botin.objetos() do
-		if obj.monton == m then
-			conIman += 1
-		end
-	end
-	perfil.mejoras.Iman = nivelIman
-	Perfiles.marcarSucio(j)
 	Bolsa.vaciar(j)
 	teletransportar(j, Comunes.fueraDelPatio())
-	return string.format("sin iman 1,5 s al lado: %d -> %d | clic cerca ok=%s (%s) | clic lejos ok=%s (%s) | con Iman 10: quedan %d de %d => %s",
-		antes, trasEsperar, tostring(ok), motivo, tostring(okLejos), motivoLejos, conIman, antes,
-		(trasEsperar == antes and ok and not okLejos and motivoLejos == "lejos" and conIman < antes - 1) and "OK" or "FALLO")
+	return string.format("1,5 s al lado: %d -> %d | clic cerca ok=%s (%s) | clic lejos ok=%s (%s) => %s",
+		antes, trasEsperar, tostring(ok), motivo, tostring(okLejos), motivoLejos,
+		(trasEsperar == antes and ok and not okLejos and motivoLejos == "lejos") and "OK" or "FALLO")
 end
 
 -- La basura tiene variedad de formas reales (latas, llantas, cajas, botellas...)
@@ -420,7 +395,9 @@ end
 -- pose de brazos tambien en el servidor (Transform del hombro)
 function Pruebas.enPatio()
 	local j = jugador()
-	teletransportar(j, Vector3.new(0, 0, 0))
+	-- Sobre el camino entre las dos columnas de cuadrantes (x = -26,25): el
+	-- resto del patio esta lleno de montones
+	teletransportar(j, Vector3.new(-26.25, 0, 0))
 	task.wait(0.6)
 	local dentro = j:GetAttribute("EnPatio")
 	local ch = j.Character
@@ -446,6 +423,81 @@ function Pruebas.enPatio()
 	return string.format("dentro: EnPatio=%s bolsa=%s abierta=%s delante=%s brazoElevado=%s | fuera: EnPatio=%s bolsa=%s => %s",
 		tostring(dentro), tostring(bolsa ~= nil), tostring(abierta), tostring(delante), tostring(elevado), tostring(fuera), tostring(bolsaFuera),
 		(dentro == true and bolsa and abierta and delante and elevado and fuera == false and not bolsaFuera) and "OK" or "FALLO")
+end
+
+-- ===========================================================================
+-- Limites de rendimiento: 1 monton a medias por jugador y tope del patio
+-- ===========================================================================
+
+local montonesLlenos = Comunes.montonesLlenos
+
+local function objetosEnPatio()
+	local total = 0
+	for _, m in Botin.montones() do
+		if m.estado == "activo" then
+			total += m.objetosVivos
+		end
+	end
+	return total
+end
+
+-- Excava de verdad (con limites) al lado del monton; el tope del patio se
+-- sube salvo que se pida lo contrario, para no depender de pruebas previas
+local function excavarJunto(j, m, conTope)
+	teletransportar(j, m.ranura.Position + Vector3.new(GameConfig.TAMANOS_MONTON[m.tamano].radio + 6, 0, 0))
+	task.wait(0.2)
+	local tope = GameConfig.MAX_OBJETOS_PATIO
+	if not conTope then
+		GameConfig.MAX_OBJETOS_PATIO = math.huge
+	end
+	local ok, motivo = Botin.excavar(j, m)
+	GameConfig.MAX_OBJETOS_PATIO = tope
+	return ok, motivo
+end
+
+-- Segundo monton sin terminar el primero: "yaTienesUno"; al recoger el 75 %
+-- del primero ya se puede
+function Pruebas.limiteJugador()
+	local j = jugador()
+	Botin.liberarMontones(j)
+	local llenos = montonesLlenos(2)
+	local m1, m2 = llenos[1], llenos[2]
+	local ok1 = excavarJunto(j, m1)
+	task.wait(1.6)
+	local ok2, mot2 = excavarJunto(j, m2)
+	-- Recoge hasta dejar menos del 25 %
+	local limite = math.floor(m1.objetosIniciales * GameConfig.FRACCION_MONTON_DISPONIBLE)
+	for id, obj in Botin.objetos() do
+		if m1.objetosVivos < limite then
+			break
+		end
+		if obj.monton == m1 then
+			if Bolsa.estaLlena(j) then
+				Bolsa.vaciar(j)
+			end
+			Botin.reclamar(j, id, "toque")
+		end
+	end
+	local activos = Botin.montonesActivosDe(j)
+	local ok3, mot3 = excavarJunto(j, m2)
+	Bolsa.vaciar(j)
+	return string.format("1o=%s | 2o=%s(%s) | tras recoger quedan %d/%d, activos=%d | 2o otra vez=%s(%s) => %s",
+		tostring(ok1), tostring(ok2), tostring(mot2), m1.objetosVivos, m1.objetosIniciales, activos, tostring(ok3), tostring(mot3),
+		(ok1 and not ok2 and mot2 == "yaTienesUno" and activos == 0 and ok3) and "OK" or "FALLO")
+end
+
+-- Con el patio al tope no se abre nada
+function Pruebas.topePatio()
+	local j = jugador()
+	Botin.liberarMontones(j)
+	local m = montonesLlenos(1)[1]
+	local tope = GameConfig.MAX_OBJETOS_PATIO
+	GameConfig.MAX_OBJETOS_PATIO = objetosEnPatio() + m.numPiezas - 1
+	local ok, motivo = excavarJunto(j, m, true)
+	GameConfig.MAX_OBJETOS_PATIO = tope
+	return string.format("excavar con el patio lleno: ok=%s motivo=%s estado=%s => %s",
+		tostring(ok), tostring(motivo), m.estado,
+		(not ok and motivo == "patioLleno" and m.estado == "lleno") and "OK" or "FALLO")
 end
 
 return Pruebas

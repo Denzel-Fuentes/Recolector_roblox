@@ -5,11 +5,11 @@
 	pruebas necesitan saber. Por dentro son cinco modulos con una
 	responsabilidad cada uno (y sin ciclos entre ellos):
 
-	  GeneradorBotin  que sale de un monton (pity, lotes, relleno)
+	  GeneradorBotin  que sale de un monton (lotes, relleno)
 	  ObjetosPatio    registro de objetos y reclamo atomico
 	  FisicaBasura    la basura cae, se amontona y se ancla
 	  Montones        colina -> montana de basura -> agotado -> repoblado
-	  Iman            la unica recogida sin clic
+	  Iman            la unica recogida sin clic (mascotas Raras y Epicas)
 	  Lanzamiento     la punteria (lanzar la bolsa al contenedor)
 
 	Tipos compartidos en TiposPatio. Este modulo no tiene logica propia: solo
@@ -40,6 +40,8 @@ Botin.reclamar = ObjetosPatio.reclamar
 Botin.montones = Montones.todos
 Botin.montonDe = Montones.de
 Botin.excavar = Montones.excavar
+Botin.montonesActivosDe = Montones.activosDe
+Botin.liberarMontones = Montones.liberar
 Botin.repoblarAhora = Montones.repoblarAhora
 Botin.lanzarBolsa = Lanzamiento.lanzarBolsa
 

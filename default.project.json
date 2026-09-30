@@ -4,6 +4,12 @@
     "$className": "DataModel",
 
     "ReplicatedStorage": {
+      "Packages": {
+        "$className": "Folder",
+        "Fusion": {
+          "$path": "src/ReplicatedStorage/Packages/Fusion"
+        }
+      },
       "Shared": {
         "$className": "Folder",
         "Config": {
@@ -30,6 +36,18 @@
       }
     },
 
+    "Players": {
+      "$properties": {
+        "CharacterAutoLoads": false
+      }
+    },
+
+    "StarterGui": {
+      "$properties": {
+        "ScreenOrientation": "LandscapeSensor"
+      }
+    },
+
     "StarterPlayer": {
       "$className": "StarterPlayer",
       "$properties": {
@@ -53,11 +71,11 @@
         "$ignoreUnknownInstances": true,
         "$properties": {
           "Anchored": true,
-          "Color": [0.647, 0.647, 0.647],
+          "Color": [0.376, 0.659, 0.227],
           "Locked": true,
           "Material": "SmoothPlastic",
-          "Position": [-36, -10, 39],
-          "Size": [320, 20, 326]
+          "Position": [-26.25, -10, 39],
+          "Size": [145.5, 20, 276]
         }
       }
     },

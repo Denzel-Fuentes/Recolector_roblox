@@ -9,6 +9,7 @@
 
 	    X.server.luau  -> Script         X.client.luau -> LocalScript
 	    X.luau         -> ModuleScript   X.model.json  -> instancia (className)
+	    carpeta con init.luau -> ModuleScript con hijos (Fusion, PruebasDefinidas)
 	    carpetas       -> Folder (o el contenedor ya existente: StarterPlayerScripts)
 
 	Solo escribe Source si cambio, y borra lo que sobre dentro de las carpetas
@@ -84,6 +85,44 @@ for _, entrada in indice do
 	table.remove(segmentos, 1) -- "src"
 	local archivo = table.remove(segmentos)
 	local nombre, clase = claseYNombre(archivo)
+	-- init.luau: la CARPETA es el ModuleScript y sus archivos, sus hijos
+	-- (Rojo 7). Si la carpeta ya existia como Folder se convierte, llevandose
+	-- los hijos que ya se hubieran instalado.
+	if nombre == "init" and #segmentos > 1 then
+		nombre = table.remove(segmentos)
+		local abuelo = contenedor(segmentos)
+		local previo = abuelo:FindFirstChild(nombre)
+		if previo and previo.ClassName ~= clase then
+			local nuevo = Instance.new(clase)
+			nuevo.Name = nombre
+			for _, hijo in previo:GetChildren() do
+				hijo.Parent = nuevo
+			end
+			if gestionadas[previo] then
+				gestionadas[nuevo] = gestionadas[previo]
+				gestionadas[previo] = nil
+			end
+			previo:Destroy()
+			nuevo.Parent = abuelo
+		end
+		local padre = abuelo
+		local fuente = get("/" .. ruta)
+		carpetaGestionada(padre)[nombre] = true
+		local existente = padre:FindFirstChild(nombre)
+		if not existente then
+			existente = Instance.new(clase)
+			existente.Name = nombre
+			existente.Parent = padre
+			creados += 1
+		end
+		if existente.Source ~= fuente then
+			existente.Source = fuente
+			actualizados += 1
+		else
+			iguales += 1
+		end
+		continue
+	end
 	if nombre and clase then
 		local padre = contenedor(segmentos)
 		local fuente = get("/" .. ruta)
@@ -162,15 +201,19 @@ pcall(function()
 	Lighting.Technology = Enum.Technology.ShadowMap
 end)
 game.StarterPlayer.CharacterWalkSpeed = 16
+-- El servidor carga cada personaje cuando su perfil esta listo (AparicionHandler)
+game:GetService("Players").CharacterAutoLoads = false
+-- En el movil, siempre en horizontal (hacia cualquiera de los dos lados)
+game:GetService("StarterGui").ScreenOrientation = Enum.ScreenOrientation.LandscapeSensor
 game:GetService("SoundService").RespectFilteringEnabled = true
 local baseplate = workspace:FindFirstChild("Baseplate")
 if baseplate and baseplate:IsA("BasePart") then
-	baseplate.Color = Color3.new(0.647, 0.647, 0.647)
+	baseplate.Color = Color3.fromRGB(96, 168, 58)
 	baseplate.Material = Enum.Material.SmoothPlastic
 	baseplate.Locked = true
 	-- Centrado bajo el mapa (ConstructorMundo.LAYOUT.LIMITE), como en default.project.json
-	baseplate.Size = Vector3.new(320, 20, 326) -- justo hasta la valla
-	baseplate.Position = Vector3.new(-36, -10, 39)
+	baseplate.Size = Vector3.new(145.5, 20, 276) -- justo hasta la valla
+	baseplate.Position = Vector3.new(-26.25, -10, 39)
 end
 
 if grabando then

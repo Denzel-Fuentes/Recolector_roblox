@@ -1,6 +1,8 @@
 # GDD — Réplica fiel de KOTAMON para Roblox
 ## "Recíclatas" (título de trabajo)
 
+> **26 sep 2026 — alcance actual reducido a MVP.** Tras una auditoría de diseño, energía, gemas, Sobre Premium, Pase de la Suerte, Montón extra, cintas, fusión y ensamblaje manual están apagados (`GameConfig.FUNCIONES`), la colección es un set variado de **10 mascotas** con **acompañante**, la bolsa fallida es solo de su dueño y hay tutorial. Este GDD describe el diseño completo; lo que está activo y por qué está en `CONTEXTO.md` §3 "Recorte por la auditoría".
+
 > Este documento reemplaza el enfoque del GDD anterior ("MVP inventado desde cero") por una **réplica mecánica fiel** de KOTAMON, mecanismo por mecanismo, adaptada a Roblox con 3 decisiones de diseño ya definidas: **temática de mascotas de basura reciclada**, **mundo compartido sin robo + base personal por jugador**, y **monetización mixta** (boosts + auto-farm/cosméticos + packs premium con probabilidades visibles).
 
 ---

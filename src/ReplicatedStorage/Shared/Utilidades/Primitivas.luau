@@ -174,9 +174,9 @@ function Primitivas.etiqueta(modelo: Model, texto: string, color: Color3?, altur
 	bb.Parent = base
 	local tl = Instance.new("TextLabel")
 	tl.Size = UDim2.fromScale(1, 1)
-	tl.BackgroundColor3 = Paleta.UI_FONDO
+	tl.BackgroundColor3 = Paleta.UI_PAPEL
 	tl.BackgroundTransparency = 0.35
-	tl.TextColor3 = color or Paleta.UI_TEXTO
+	tl.TextColor3 = color or Paleta.UI_TINTA
 	tl.Text = texto
 	tl.TextScaled = true
 	tl.Font = Enum.Font.GothamMedium

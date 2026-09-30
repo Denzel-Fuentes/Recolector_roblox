@@ -70,19 +70,6 @@ function Mundo.figurinasFijas(): { BasePart }
 	return lista
 end
 
-function Mundo.parcelas(): { Model }
-	local lista = {}
-	for _, inst in conTag("Parcela") do
-		if inst:IsA("Model") then
-			table.insert(lista, inst)
-		end
-	end
-	table.sort(lista, function(a, b)
-		return (a:GetAttribute("IndiceParcela") or 0) < (b:GetAttribute("IndiceParcela") or 0)
-	end)
-	return lista
-end
-
 function Mundo.contenedor(): Model?
 	for _, inst in conTag("Contenedor") do
 		if inst:IsA("Model") then
@@ -101,15 +88,6 @@ function Mundo.zonaAcierto(): BasePart?
 	return if zona and zona:IsA("BasePart") then zona else nil
 end
 
-function Mundo.maquinaRefrescos(): Model?
-	for _, inst in conTag("MaquinaRefrescos") do
-		if inst:IsA("Model") then
-			return inst
-		end
-	end
-	return nil
-end
-
 function Mundo.npc(nombre: string): Model?
 	local r = Mundo.asegurar()
 	for _, d in r:GetDescendants() do
@@ -120,15 +98,18 @@ function Mundo.npc(nombre: string): Model?
 	return nil
 end
 
--- Posicion del spawn de la plaza (a donde se vuelve con "Ir al patio")
-function Mundo.posicionPlaza(): Vector3
-	local r = Mundo.asegurar()
-	local plaza = r:FindFirstChild("Plaza")
-	local spawn = plaza and plaza:FindFirstChild("Spawn")
-	if spawn and spawn:IsA("BasePart") then
-		return spawn.Position + Vector3.new(0, 3, 0)
+-- Donde aparece todo el mundo: en la plaza, junto al borde sur del patio y
+-- mirandolo (diseno v2: sin base, se aparece junto al patio). Un marcador
+-- horneado con el tag PuntoAparicion manda; sin el, la plaza de siempre.
+local PLAZA = Vector3.new(0, 5, 96)
+
+function Mundo.cframeAparicion(): CFrame
+	for _, inst in conTag("PuntoAparicion") do
+		if inst:IsA("BasePart") then
+			return inst.CFrame + Vector3.new(0, 4, 0)
+		end
 	end
-	return Vector3.new(0, 5, 121)
+	return CFrame.lookAt(PLAZA, Vector3.new(0, PLAZA.Y, 0))
 end
 
 -- Sube a la parte con prompt hasta el Model que lleva el atributo/tag de interes
@@ -136,17 +117,6 @@ function Mundo.modeloDe(inst: Instance): Model?
 	local actual: Instance? = inst
 	while actual and actual ~= workspace do
 		if actual:IsA("Model") then
-			return actual
-		end
-		actual = actual.Parent
-	end
-	return nil
-end
-
-function Mundo.parcelaDe(inst: Instance): Model?
-	local actual: Instance? = inst
-	while actual and actual ~= workspace do
-		if actual:IsA("Model") and CollectionService:HasTag(actual, "Parcela") then
 			return actual
 		end
 		actual = actual.Parent

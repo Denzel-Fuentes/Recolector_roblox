@@ -3,22 +3,44 @@
 	ControlPatio
 	Input del patio en el cliente. Solo envia INTENCION; el servidor valida.
 
-	  MANTENER clic / dedo / ButtonX          -> ReclamarObjetoEvent(id) de lo que
+	  MANTENER clic / ButtonX                 -> ReclamarObjetoEvent(id) de lo que
 	                                            pase por la mira, cada INTERVALO_RECOGIDA
+	  DEDO en la pantalla (tactil)           -> lo mismo, mientras se mueve la mira
 	  MANTENER F / ButtonY / boton tactil    -> carga la fuerza; al soltar,
 	                                            LanzarObjetoEvent(punto, fuerza)
-	  Resaltado del objeto bajo el cursor si esta al Alcance
+	  Resaltado del objeto bajo la mira si esta al Alcance
 
-	Excavar, reciclar, refresco y hablar NO estan aqui: son ProximityPrompts y
-	llegan al servidor directamente.
+	Excavar y reciclar a mano NO estan aqui: son ProximityPrompts y llegan al
+	servidor directamente.
+
+	En tactil (29 sep, tras probarlo el usuario en el movil) el que elige es
+	el PUNTO de mira del centro, no el dedo: mientras un dedo arrastra la
+	pantalla para mover la mira (girar la camara) se recoge lo que va
+	pasando por ella y esta al alcance, como al mantener el clic en PC; sin
+	dedo no se recoge nada ("quiero poder mover el puntero": una version
+	intermedia recogia sola solo con apuntar). Lo que hay bajo el dedo no
+	cuenta. Los dedos del joystick y de los botones no (llegan procesados).
+	El reclamo va marcado "por mira": el servidor aplica las reglas del clic
+	pero sin avisos, que al barrer un monton ajeno o una bolsa ajena
+	saldrian sin parar. El resaltado sigue a la mira siempre, para ver que
+	se va a llevar antes de tocar.
+
+	Solo se lanza con la BOLSA LLENA (decision del usuario, 29 sep): el boton
+	tactil y la pista "MANTEN F" solo aparecen entonces, y F no hace nada
+	antes. Es una regla de flujo, no de seguridad: el servidor sigue
+	aceptando una bolsa a medias (no da ventaja) y a mano se entrega
+	siempre en el contenedor.
 
 	El punto de lanzamiento es donde apunta el jugador: raycast desde la camara
-	por el cursor (raton) o por el centro de la pantalla (gamepad/tactil). Si no
-	hay nada delante, 40 studs en esa direccion. Apuntar al hueco del Contenedor
-	es la habilidad: la ZonaAcierto no bloquea el raycast, asi que el rayo llega
-	al piso interior del contenedor.
+	por el cursor (raton libre) o por el centro de la pantalla (primera
+	persona, gamepad y tactil: en el movil el ultimo toque es el del boton de
+	lanzar, no un sitio al que apuntar). Si no hay nada delante, 40 studs en
+	esa direccion. Apuntar al hueco del Contenedor es la habilidad: la
+	ZonaAcierto no bloquea el raycast, asi que el rayo llega al piso interior
+	del contenedor.
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -38,9 +60,12 @@ local Entrada = require(Utilidades:WaitForChild("Entrada"))
 local Geometria = require(Utilidades:WaitForChild("Geometria"))
 
 local EstadoCliente = require(script.Parent:WaitForChild("EstadoCliente"))
+local LineaTrayectoria = require(script.Parent:WaitForChild("LineaTrayectoria"))
 local UI = script.Parent:WaitForChild("UI")
 local Menu = require(UI:WaitForChild("Menu"))
-local Componentes = require(UI:WaitForChild("Componentes"))
+local Kit = require(UI:WaitForChild("Kit"))
+local Tema = require(UI:WaitForChild("Kit"):WaitForChild("Tema"))
+local Fusion = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Fusion"))
 
 local ReclamarObjetoEvent = Red.evento("ReclamarObjetoEvent")
 local LanzarObjetoEvent = Red.evento("LanzarObjetoEvent")
@@ -51,8 +76,8 @@ local camara = workspace.CurrentCamera
 local resaltado = Instance.new("Highlight")
 resaltado.Name = "ResaltadoObjeto"
 resaltado.FillTransparency = 0.7
-resaltado.FillColor = Paleta.UI_ACENTO
-resaltado.OutlineColor = Paleta.UI_ACENTO
+resaltado.FillColor = Paleta.UI_PRIMARIO
+resaltado.OutlineColor = Paleta.UI_PRIMARIO
 resaltado.OutlineTransparency = 0
 resaltado.Enabled = false
 resaltado.Parent = workspace
@@ -64,6 +89,11 @@ local function parametrosRay(): RaycastParams
 	if jugador.Character then
 		table.insert(excluir, jugador.Character)
 	end
+	-- Las barreras de los cuadrantes cerrados se ven a traves: el rayo tambien
+	-- (apuntar un lanzamiento por encima de ellas, ver lo que espera)
+	for _, barrera in CollectionService:GetTagged("BarreraCuadrante") do
+		table.insert(excluir, barrera)
+	end
 	p.FilterDescendantsInstances = excluir
 	p.RespectCanCollide = false
 	return p
@@ -71,6 +101,11 @@ end
 
 local function alcanceActual(): number
 	return DefinicionesMejoras.valor("Alcance", EstadoCliente.nivelMejora("Alcance")) + 2
+end
+
+-- Solo se lanza con la bolsa llena (ver cabecera); llena, la mira no recoge
+local function bolsaLlena(bolsa: any): boolean
+	return bolsa.capacidad > 0 and #bolsa.items >= bolsa.capacidad
 end
 
 -- Un objeto es una pieza de montana (BasePart con ObjetoId) o un modelo con
@@ -103,8 +138,8 @@ end
 
 local function posicionCursor(): Vector2?
 	local plataforma = Entrada.plataforma()
-	-- Gamepad y primera persona (raton bloqueado en el centro): rayo central
-	if plataforma == "gamepad" or UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter then
+	-- Gamepad, tactil y primera persona (raton bloqueado en el centro): rayo central
+	if plataforma == "gamepad" or plataforma == "tactil" or UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter then
 		return nil
 	end
 	local pos = UserInputService:GetMouseLocation()
@@ -130,7 +165,7 @@ RunService.RenderStepped:Connect(function(dt)
 		return
 	end
 	acumulado = 0
-	if Menu.hayAbierto() or Entrada.plataforma() == "tactil" then
+	if Menu.hayAbierto() then
 		resaltado.Enabled = false
 		return
 	end
@@ -144,26 +179,35 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
--- === Mantener el clic para recoger ===
--- Mientras se mantiene el clic izquierdo (el dedo en tactil, X en gamepad) se
--- recoge lo que vaya pasando por la mira, una pieza cada INTERVALO_RECOGIDA:
--- el servidor tiene su propio cooldown por remote (COOLDOWN_REMOTE), asi que
--- enviar mas rapido no recoge mas. Un mismo objeto no se reenvia hasta que el
--- servidor lo retira (o pasa medio segundo): al reclamarlo vuela a la bolsa y
--- el rayo ya pasa a la siguiente pieza.
+-- === Recoger ===
+-- Mientras se mantiene el clic izquierdo (X en gamepad; en tactil, un dedo
+-- moviendo la mira) se recoge lo que vaya pasando por la mira, una pieza
+-- cada INTERVALO_RECOGIDA: el servidor tiene su propio cooldown por remote
+-- (COOLDOWN_REMOTE), asi que enviar mas rapido no recoge mas. Un mismo objeto
+-- no se reenvia hasta que el servidor lo retira (o pasa medio segundo): al
+-- reclamarlo vuela a la bolsa y el rayo ya pasa a la siguiente pieza.
 local recogiendo = false
-local posicionTactil: Vector2? = nil
+-- Dedos que mueven la mira ahora mismo (tactil; ver cabecera)
+local dedos: { [InputObject]: boolean } = {}
 local ultimoIntento = 0
 local ultimoId: string? = nil
 local ultimoIdEn = 0
 
-local function intentarReclamar(posPantalla: Vector2?)
+-- El objeto al alcance que hay en ese punto de la pantalla (nil = la mira)
+local function objetoAlAlcance(posPantalla: Vector2?): PVInstance?
 	local resultado = rayoDesdePantalla(posPantalla)
 	local objeto = resultado and objetoDesde(resultado.Instance)
-	if not objeto then
-		return
+	if objeto and distanciaAlPersonaje(objeto) <= alcanceActual() then
+		return objeto
 	end
-	if distanciaAlPersonaje(objeto) > alcanceActual() then
+	return nil
+end
+
+-- porMira: la recogida con el dedo moviendo la mira en el movil (el
+-- servidor no avisa si la rechaza)
+local function intentarReclamar(posPantalla: Vector2?, porMira: boolean?)
+	local objeto = objetoAlAlcance(posPantalla)
+	if not objeto then
 		return
 	end
 	local id = objeto:GetAttribute("ObjetoId")
@@ -173,13 +217,13 @@ local function intentarReclamar(posPantalla: Vector2?)
 			return
 		end
 		ultimoId, ultimoIdEn = id, os.clock()
-		ReclamarObjetoEvent:FireServer(id)
+		ReclamarObjetoEvent:FireServer(id, porMira == true)
 	end
 end
 
 local function recogerAhora()
 	ultimoIntento = os.clock()
-	intentarReclamar(if posicionTactil then posicionTactil else posicionCursor())
+	intentarReclamar(posicionCursor())
 end
 
 UserInputService.InputBegan:Connect(function(input, procesado)
@@ -190,9 +234,9 @@ UserInputService.InputBegan:Connect(function(input, procesado)
 		recogiendo = true
 		recogerAhora()
 	elseif input.UserInputType == Enum.UserInputType.Touch then
-		posicionTactil = Vector2.new(input.Position.X, input.Position.Y)
-		recogiendo = true
-		recogerAhora()
+		-- Un dedo en la vista (no en el joystick ni en un boton: esos llegan
+		-- procesados) mueve la mira: mientras este, recoge lo que pase por ella
+		dedos[input] = true
 	elseif input.KeyCode == Enum.KeyCode.ButtonX then
 		-- Gamepad: lo que hay en el centro de la pantalla
 		recogiendo = true
@@ -200,24 +244,24 @@ UserInputService.InputBegan:Connect(function(input, procesado)
 	end
 end)
 
-UserInputService.InputChanged:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.Touch and posicionTactil then
-		posicionTactil = Vector2.new(input.Position.X, input.Position.Y)
-	end
-end)
-
 UserInputService.InputEnded:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.KeyCode == Enum.KeyCode.ButtonX then
 		recogiendo = false
 	elseif input.UserInputType == Enum.UserInputType.Touch then
-		recogiendo = false
-		posicionTactil = nil
+		dedos[input] = nil
 	end
 end)
 
 RunService.RenderStepped:Connect(function()
-	if recogiendo and not Menu.hayAbierto() and os.clock() - ultimoIntento >= GameConfig.INTERVALO_RECOGIDA then
+	if Menu.hayAbierto() or os.clock() - ultimoIntento < GameConfig.INTERVALO_RECOGIDA then
+		return
+	end
+	if recogiendo then
 		recogerAhora()
+	elseif next(dedos) ~= nil and not bolsaLlena(EstadoCliente.bolsa) then
+		-- Tactil: el dedo mueve la mira y se recoge lo que tiene debajo
+		ultimoIntento = os.clock()
+		intentarReclamar(nil, true)
 	end
 end)
 
@@ -241,7 +285,7 @@ local function lanzar(_nombre: string, estado: Enum.UserInputState)
 		return Enum.ContextActionResult.Pass
 	end
 	if estado == Enum.UserInputState.Begin then
-		if #EstadoCliente.bolsa.items == 0 then
+		if not bolsaLlena(EstadoCliente.bolsa) then
 			return Enum.ContextActionResult.Pass
 		end
 		cargando = os.clock()
@@ -251,6 +295,7 @@ local function lanzar(_nombre: string, estado: Enum.UserInputState)
 		cargando = nil
 		local fuerza = EstadoCliente.cargaLanzamiento
 		EstadoCliente.fijarCarga(0)
+		LineaTrayectoria.ocultar()
 		if inicio and estado == Enum.UserInputState.End and os.clock() - inicio >= GameConfig.FUERZA_LANZAMIENTO.minimo then
 			LanzarObjetoEvent:FireServer(puntoObjetivo(), math.max(fuerza, 0.15))
 		end
@@ -262,6 +307,8 @@ end
 RunService.RenderStepped:Connect(function()
 	if cargando then
 		EstadoCliente.fijarCarga((os.clock() - cargando) / GameConfig.FUERZA_LANZAMIENTO.segundosCarga)
+		-- Ayuda de punteria en los primeros lanzamientos
+		LineaTrayectoria.dibujar(puntoObjetivo(), EstadoCliente.cargaLanzamiento)
 	end
 end)
 
@@ -278,30 +325,49 @@ local function estilizarBotonTactil()
 	if not boton then
 		return
 	end
-	boton.Image = ""
-	boton.BackgroundTransparency = 0
-	boton.BackgroundColor3 = Paleta.UI_PAPEL
-	boton.Size = UDim2.fromOffset(78, 78)
 	for _, hijo in boton:GetChildren() do
 		if hijo:IsA("GuiObject") then
 			hijo.Visible = false
 		end
 	end
-	Componentes.esquinas(boton, 39)
-	Componentes.borde(boton, Paleta.UI_TINTA, 3)
-	Componentes.icono({ Parent = boton, Clave = "lanzar", Tamano = 40, Position = UDim2.new(0.5, 0, 0, 8), Anchor = Vector2.new(0.5, 0), ZIndex = 3 })
-	Componentes.texto({ Parent = boton, Texto = Textos.HUD.tocarLanzar, Size = UDim2.new(1, 0, 0, 16), Position = UDim2.new(0, 0, 1, -20), Tamano = 11, Titulo = true, Alinear = Enum.TextXAlignment.Center, ZIndex = 3 })
-	local escala = Instance.new("UIScale")
-	escala.Parent = boton
-	boton.MouseButton1Down:Connect(function()
-		escala.Scale = 0.92
-	end)
-	boton.MouseButton1Up:Connect(function()
-		escala.Scale = 1
-	end)
-	boton.MouseLeave:Connect(function()
-		escala.Scale = 1
-	end)
+	-- El boton es de Roblox: Fusion lo "hidrata" con el estilo del Kit. Solo
+	-- se ve con la bolsa llena (ver cabecera)
+	local scope = Fusion.scoped(Fusion, Kit)
+	local pulsado = scope:Value(false)
+	scope:Hydrate(boton)({
+		Image = "",
+		BackgroundTransparency = 0,
+		BackgroundColor3 = Paleta.UI_FUERZA,
+		Size = UDim2.fromOffset(78, 78),
+		Visible = scope:Computed(function(use)
+			return bolsaLlena(use(EstadoCliente.reactivo.bolsa))
+		end),
+		[Fusion.OnEvent("MouseButton1Down")] = function()
+			pulsado:set(true)
+		end,
+		[Fusion.OnEvent("MouseButton1Up")] = function()
+			pulsado:set(false)
+		end,
+		[Fusion.OnEvent("MouseLeave")] = function()
+			pulsado:set(false)
+		end,
+		[Fusion.Children] = {
+			scope:New("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+			scope:New("UIStroke")({ Color = Paleta.UI_TINTA, Thickness = Tema.GROSOR }),
+			scope:New("UIGradient")({ Color = Tema.DEGRADADO, Rotation = 90 }),
+			scope:New("UIScale")({
+				Scale = scope:Spring(
+					scope:Computed(function(use)
+						return if use(pulsado) then 0.9 else 1
+					end),
+					50,
+					0.6
+				),
+			}),
+			scope:Icono({ Clave = "lanzar", Tamano = 40, Position = UDim2.new(0.5, 0, 0, 8), AnchorPoint = Vector2.new(0.5, 0), ZIndex = 3 }),
+			scope:Texto({ Texto = Textos.HUD.tocarLanzar, Size = UDim2.new(1, 0, 0, 16), Position = UDim2.new(0, 0, 1, -20), Tamano = 12, Fuente = "titulo", Color = Paleta.UI_PAPEL, Contorno = Paleta.UI_TINTA, Alinear = Enum.TextXAlignment.Center, ZIndex = 3 }),
+		},
+	})
 end
 task.defer(estilizarBotonTactil)
 

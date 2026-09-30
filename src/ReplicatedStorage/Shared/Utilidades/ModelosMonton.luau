@@ -220,7 +220,10 @@ local function monticulo(nombre: string, l: Loma, color: Color3, rng: Random, pa
 	return primera
 end
 
-function ModelosMonton.monton(tamano: string, agotado: boolean, indice: number?, numPiezas: number?): Model
+-- `material` tine la colina hacia el color de ese material: el que destaca
+-- en las zonas ricas del norte (GameConfig.ZONAS); las del patio abierto,
+-- de basura revuelta, no llevan
+function ModelosMonton.monton(tamano: string, agotado: boolean, indice: number?, numPiezas: number?, material: string?): Model
 	local m = nuevoModelo("Monton")
 	local radio = ModelosMonton.radioMonton(tamano)
 	if agotado then
@@ -239,10 +242,15 @@ function ModelosMonton.monton(tamano: string, agotado: boolean, indice: number?,
 	-- Cada pico con un tono distinto del azul-gris de bolsas para que no se
 	-- lea como un solo bloque
 	local rngColor = semilla("color" .. tamano .. tostring(indice or 0))
+	local colorBase = Paleta.MONTON_BASURA
+	local colorMaterial = material and Paleta.MATERIAL[material]
+	if colorMaterial then
+		colorBase = colorBase:Lerp(colorMaterial, 0.5)
+	end
 	local principal: BasePart? = nil
 	for i, l in params.lomas do
 		local tono = 0.85 + rngColor:NextNumber(0, 0.3)
-		local p = monticulo("Loma_" .. i, l, Paleta.escalar(Paleta.MONTON_BASURA, tono), rngColor, m)
+		local p = monticulo("Loma_" .. i, l, Paleta.escalar(colorBase, tono), rngColor, m)
 		if i == 1 then
 			principal = p
 		end

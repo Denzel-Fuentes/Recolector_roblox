@@ -1,16 +1,17 @@
 --!strict
 --[[
 	Mejoras (ModuleScript)
-	Unica responsabilidad: el nivel de cada una de las 7 mejoras por jugador y
-	su VALOR EFECTIVO (incluyendo los bonus de los Game Passes), y aplicar al
-	personaje lo que dependa de ellas (Velocidad -> WalkSpeed).
+	Unica responsabilidad: el nivel de cada mejora por jugador y
+	su VALOR EFECTIVO, y aplicar al personaje lo que dependa de ellas
+	(Velocidad -> WalkSpeed).
 
 	Los numeros base viven en Config/DefinicionesMejoras para que la tienda pinte
-	lo mismo que aqui se aplica. Los pases multiplican encima:
-	  PaseVelocidad  x1.25 sobre Velocidad
-	  PaseIman       x1.5  sobre Iman
+	lo mismo que aqui se aplica. La v2 no vende velocidad ni iman (servirian
+	para quitarle piezas a los demas en el patio compartido); el unico pase que
+	toca una mejora sera Bolsa XL (lote 8).
 
-	Comprar cobra y sube de nivel en la misma llamada, o no hace nada.
+	Comprar cobra y sube de nivel en la misma llamada, o no hace nada. Todas
+	vuelven a 0 al renacer (Rebirths); `todasAlMaximo` es su requisito.
 ]]
 
 local Players = game:GetService("Players")
@@ -19,13 +20,16 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local DefinicionesMejoras = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesMejoras"))
+local Senal = require(Shared:WaitForChild("Utilidades"):WaitForChild("Senal"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
 local Perfiles = require(Servicios:WaitForChild("Perfiles"))
 local Economia = require(Servicios:WaitForChild("Economia"))
-local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
 
 local Mejoras = {}
+
+-- (jugador, id, nivelNuevo) tras cada compra; la escucha el Tutorial
+Mejoras.alComprar = Senal.nueva() :: Senal.Senal<Player, string, number>
 
 function Mejoras.nivel(jugador: Player, id: string): number
 	local perfil = Perfiles.obtener(jugador)
@@ -35,41 +39,22 @@ function Mejoras.nivel(jugador: Player, id: string): number
 	return perfil.mejoras[id] or 0
 end
 
--- Valor efectivo con pases. Es lo que usan Energia, Bolsa, Botin, etc.
+-- Valor efectivo. Es lo que usan Bolsa, ObjetosPatio, Lanzamiento...
 function Mejoras.valor(jugador: Player, id: string): number
-	local base = DefinicionesMejoras.valor(id, Mejoras.nivel(jugador, id))
-	if id == "Velocidad" and Monetizacion.tienePase(jugador, "PaseVelocidad") then
-		return base * 1.25
-	elseif id == "Iman" and Monetizacion.tienePase(jugador, "PaseIman") then
-		return base * 1.5
-	end
-	return base
+	return DefinicionesMejoras.valor(id, Mejoras.nivel(jugador, id))
 end
 
 function Mejoras.costeSiguiente(jugador: Player, id: string): number?
 	return DefinicionesMejoras.coste(id, Mejoras.nivel(jugador, id))
 end
 
-function Mejoras.numMaximas(jugador: Player): number
-	local n = 0
+function Mejoras.todasAlMaximo(jugador: Player): boolean
 	for _, def in DefinicionesMejoras.LISTA do
-		if Mejoras.nivel(jugador, def.id) >= DefinicionesMejoras.NIVEL_MAX then
-			n += 1
+		if Mejoras.nivel(jugador, def.id) < DefinicionesMejoras.NIVEL_MAX then
+			return false
 		end
 	end
-	return n
-end
-
-function Mejoras.todasAlMaximo(jugador: Player): boolean
-	return Mejoras.numMaximas(jugador) == #DefinicionesMejoras.LISTA
-end
-
-function Mejoras.nivelMasAlto(jugador: Player): number
-	local mayor = 0
-	for _, def in DefinicionesMejoras.LISTA do
-		mayor = math.max(mayor, Mejoras.nivel(jugador, def.id))
-	end
-	return mayor
+	return true
 end
 
 function Mejoras.aplicarVelocidad(jugador: Player)
@@ -101,10 +86,11 @@ function Mejoras.comprar(jugador: Player, id: string): (boolean, string)
 	if id == "Velocidad" then
 		Mejoras.aplicarVelocidad(jugador)
 	end
+	Mejoras.alComprar:Fire(jugador, id, nivel + 1)
 	return true, tostring(nivel + 1)
 end
 
--- Velocidad al aparecer el personaje y cuando cambian los pases
+-- Velocidad al aparecer el personaje
 local function engancharPersonaje(jugador: Player)
 	jugador.CharacterAdded:Connect(function()
 		task.defer(Mejoras.aplicarVelocidad, jugador)
@@ -120,10 +106,6 @@ for _, jugador in Players:GetPlayers() do
 end
 
 Perfiles.alCargar:Connect(function(jugador)
-	Mejoras.aplicarVelocidad(jugador)
-end)
-
-Monetizacion.alCambiarPases:Connect(function(jugador)
 	Mejoras.aplicarVelocidad(jugador)
 end)
 

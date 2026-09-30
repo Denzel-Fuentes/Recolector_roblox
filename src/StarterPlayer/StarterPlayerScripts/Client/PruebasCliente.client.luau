@@ -5,15 +5,17 @@
 	(BindableFunction) con acciones con nombre que corren DENTRO de la VM del
 	cliente (la de execute_luau es la del plugin y no comparte modulos):
 
-	    Invoke("abrir", "Album", argumento)   Menu.abrir
+	    Invoke("abrir", "Tienda", argumento)  Menu.abrir
 	    Invoke("cerrar")                      Menu.cerrarTodo
 	    Invoke("estado")                      resumen de EstadoCliente
-	    Invoke("panel", "Album")              descripcion del panel abierto
+	    Invoke("panel", "Tienda")             descripcion del panel abierto
 	    Invoke("reticula")                    estado de reticula/raton/camara
 	    Invoke("verme", 8) / ("camaraNormal")  camara sobre el propio personaje
 	    Invoke("plataforma", "tactil")        fuerza la disposicion (tactil/gamepad/teclado; "" = real)
 	    Invoke("disposicion")                 escala, disposicion, compacto, viewport
 	    Invoke("hud")                         rectangulos del HUD y avisos de solape / fuera de pantalla
+	    Invoke("recicladora")                 estado de la animacion de la recicladora (Recicladora.client)
+	    Invoke("trayectoria", 0.8)            dibuja la linea de ayuda como si se cargara el tiro (0 la quita)
 	Fuera de Studio no crea nada.
 ]]
 
@@ -28,7 +30,7 @@ end
 
 local UI = script.Parent:WaitForChild("UI")
 local Menu = require(UI:WaitForChild("Menu"))
-local Componentes = require(UI:WaitForChild("Componentes"))
+local Escala = require(UI:WaitForChild("Kit"):WaitForChild("Escala"))
 local EstadoCliente = require(script.Parent:WaitForChild("EstadoCliente"))
 
 local gancho = Instance.new("BindableFunction")
@@ -36,6 +38,29 @@ gancho.Name = "EjecutarPruebaCliente"
 gancho.Parent = ReplicatedStorage
 
 local acciones = {}
+
+function acciones.trayectoria(carga)
+	local LineaTrayectoria = require(script.Parent:WaitForChild("LineaTrayectoria"))
+	local fuerza = tonumber(carga) or 0.8
+	if fuerza <= 0 then
+		LineaTrayectoria.ocultar()
+		return "linea oculta"
+	end
+	local root = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return "sin personaje"
+	end
+	LineaTrayectoria.dibujar(root.Position + root.CFrame.LookVector * 60, fuerza)
+	local carpeta = workspace:FindFirstChild("LineaTrayectoria")
+	local visibles, ultimo = 0, nil
+	for _, p in (if carpeta then carpeta:GetChildren() else {}) do
+		if p:IsA("BasePart") and p.Transparency < 1 then
+			visibles += 1
+			ultimo = p.Position
+		end
+	end
+	return string.format("activa=%s puntos visibles=%d ultimo=%s", tostring(LineaTrayectoria.activa()), visibles, tostring(ultimo))
+end
 
 function acciones.abrir(nombre, argumento)
 	Menu.abrir(nombre, argumento)
@@ -50,9 +75,9 @@ end
 
 function acciones.estado()
 	local p = EstadoCliente.perfil
-	return string.format("perfil=%s cargado=%s modoDev=%s dinero=%s bolsa=%d/%d energia=%d/%d mascotas=%d",
+	return string.format("perfil=%s cargado=%s modoDev=%s dinero=%s bolsa=%d/%d",
 		tostring(p ~= nil), tostring(EstadoCliente.cargado), tostring(EstadoCliente.modoDev), tostring(p and p.dinero),
-		#EstadoCliente.bolsa.items, EstadoCliente.bolsa.capacidad, EstadoCliente.energia.actual, EstadoCliente.energia.max, EstadoCliente.cuentaMascotas())
+		#EstadoCliente.bolsa.items, EstadoCliente.bolsa.capacidad)
 end
 
 function acciones.panel(nombre)
@@ -140,9 +165,9 @@ end
 -- Disposicion forzada para capturas sin dispositivo
 function acciones.plataforma(p)
 	if p == nil or p == "" or p == "real" then
-		Componentes.forzarPlataforma(nil)
+		Escala.forzarPlataforma(nil)
 	else
-		Componentes.forzarPlataforma(p)
+		Escala.forzarPlataforma(p)
 	end
 	task.wait(0.2)
 	return acciones.disposicion()
@@ -151,8 +176,8 @@ end
 function acciones.disposicion()
 	local cam = workspace.CurrentCamera
 	local vp = cam and cam.ViewportSize or Vector2.zero
-	local dw, dh = Componentes.disenoDisponible()
-	return string.format("viewport=%dx%d escala=%.2f diseno=%dx%d disposicion=%s compacto=%s", vp.X, vp.Y, Componentes.escala(), dw, dh, Componentes.disposicion(), tostring(Componentes.compacto()))
+	local dw, dh = Escala.disenoDisponible()
+	return string.format("viewport=%dx%d escala=%.2f diseno=%dx%d disposicion=%s compacto=%s", vp.X, vp.Y, Escala.valor(), dw, dh, Escala.disposicionActual(), tostring(Escala.esCompacto()))
 end
 
 -- Rectangulos (px reales) de los bloques del HUD, con avisos si alguno se sale
@@ -193,6 +218,24 @@ function acciones.hud()
 	end
 	table.insert(lineas, 1, string.format("avisos=%d viewport=%dx%d", avisos, vp.X, vp.Y))
 	return table.concat(lineas, "\n")
+end
+
+-- Lo que publica Recicladora.client en workspace.RecicladoraEfectos: si
+-- encontro el modelo, cuanta basura va por la cinta y cuantos bloques hay en
+-- la rampa. Tras la prueba de servidor "recicladora": EnCinta > 0 enseguida,
+-- y a los ~6 s un bloque.
+function acciones.recicladora()
+	local efectos = workspace:FindFirstChild("RecicladoraEfectos")
+	if not efectos then
+		return "sin RecicladoraEfectos (no corre Recicladora.client)"
+	end
+	local modelo = nil
+	for _, m in game:GetService("CollectionService"):GetTagged("RecicladoraArte") do
+		modelo = m
+	end
+	return string.format("modelo=%s lista=%s enCinta=%s bloques=%s objetos=%d",
+		modelo and modelo:GetFullName() or "nil", tostring(efectos:GetAttribute("Lista")), tostring(efectos:GetAttribute("EnCinta")),
+		tostring(efectos:GetAttribute("Bloques")), #efectos:GetChildren())
 end
 
 local function ejecutar(nombre, ...)

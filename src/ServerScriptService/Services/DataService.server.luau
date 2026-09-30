@@ -90,8 +90,7 @@ local function cargar(jugador: Player)
 	if not jugador.Parent then
 		return
 	end
-	local perfil = Perfiles.migrar(datos)
-	Perfiles.registrar(jugador, perfil, cargado)
+	Perfiles.registrar(jugador, Perfiles.completar(datos), cargado)
 	if not cargado then
 		-- El cliente puede no tener aun la UI: se reintenta un poco despues.
 		task.delay(3, function()
@@ -133,7 +132,7 @@ for _, jugador in Players:GetPlayers() do
 end
 
 Players.PlayerRemoving:Connect(function(jugador)
-	-- Otros modulos (Bolsa, Parcelas) tambien escuchan PlayerRemoving y tocan
+	-- Otros modulos (Bolsa, Lanzamiento) tambien escuchan PlayerRemoving y tocan
 	-- el perfil al salir. El orden entre conexiones no esta garantizado, asi que
 	-- se cede un instante para guardar DESPUES de ellos.
 	task.wait(0.2)

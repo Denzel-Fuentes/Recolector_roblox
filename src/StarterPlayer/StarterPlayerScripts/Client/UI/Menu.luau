@@ -8,6 +8,10 @@
 	Gamepad: al abrir un panel se selecciona su primer boton
 	(GuiService.SelectedObject) y ButtonB / Esc lo cierran. El HUD llama a
 	alternar(nombre) desde sus botones; los paneles se registran al cargar.
+
+	Menu.abiertoR es el mismo dato como Value de Fusion: las ventanas del Kit
+	se muestran con Computed(use(abiertoR) == nombre) y no necesitan
+	cerrar/estaAbierto propios (el registro los admite opcionales).
 ]]
 
 local GuiService = game:GetService("GuiService")
@@ -16,17 +20,23 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Utilidades = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Utilidades")
 local Senal = require(Utilidades:WaitForChild("Senal"))
 local Entrada = require(Utilidades:WaitForChild("Entrada"))
+local Fusion = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Fusion"))
 
 export type Panel = {
 	abrir: (argumento: any?) -> (),
-	cerrar: () -> (),
-	estaAbierto: () -> boolean,
+	cerrar: (() -> ())?,
+	estaAbierto: (() -> boolean)?,
 	primerSeleccionable: (() -> GuiObject?)?,
 }
 
 local Menu = {}
 
 Menu.alCambiar = Senal.nueva() :: Senal.Senal<string?>
+Menu.abiertoR = Fusion.scoped(Fusion):Value(nil :: string?)
+-- Senal:Fire corre los oyentes en el acto (task.spawn): abiertoR va al dia
+Menu.alCambiar:Connect(function(nombre)
+	Menu.abiertoR:set(nombre)
+end)
 
 local paneles: { [string]: Panel } = {}
 local abierto: string? = nil
@@ -46,8 +56,9 @@ end
 function Menu.cerrarTodo()
 	local previo = abierto
 	abierto = nil
-	if previo and paneles[previo] then
-		paneles[previo].cerrar()
+	local panelPrevio = if previo then paneles[previo] else nil
+	if panelPrevio and panelPrevio.cerrar then
+		panelPrevio.cerrar()
 	end
 	GuiService.SelectedObject = nil
 	if previo then
@@ -64,7 +75,7 @@ function Menu.abrir(nombre: string, argumento: any?)
 	if abierto and abierto ~= nombre then
 		local previo = paneles[abierto]
 		abierto = nil
-		if previo then
+		if previo and previo.cerrar then
 			previo.cerrar()
 		end
 	end

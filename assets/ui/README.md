@@ -5,6 +5,46 @@ Cada PNG de esta carpeta se llama como su clave en
 `0`, la UI dibuja el icono por código (`Utilidades/Glifos`); en cuanto tiene id,
 usa la imagen. Nada más cambia.
 
+## Iconos en uso (23 sep): set "Simulator Icon Pack" de la Creator Store
+
+Las claves con id salen de un set gratuito de estilo simulador (el mismo
+estilo que el "UI KIT GENERAL" de referencia). Las copias de la Toolbox
+traían scripts maliciosos: se usaron solo sus imágenes (ver CONTEXTO).
+
+| Clave | Imagen del set | Id |
+|---|---|---|
+| billete | Cash/CashIcon | 15402858705 |
+| cartas | Menus/Pets (huella) | 16697439085 |
+| gema | Gems/GemIcon | 17368064384 |
+| rayo | Stats/Energy | 17368078790 |
+| bolsa | Menus/Inventory (mochila) | 15402958715 |
+| libreta | Menus/Index (libro) | 127110909372919 |
+| telefono | Menus/Shop | 17368217589 |
+| trofeo | Stats/Trophies/Wins | 12129301834 |
+| casa | Misc/House | 15403180857 |
+| montana | Menus/Teleport (portal) | 17368164592 |
+| lanzar | Stats/Rocket | 16670799841 |
+| mano | Cursors/Click | 17260727409 |
+| raton | Cursors/Classic | 13443203578 |
+| flecha | Stats/Strength | 15403007921 |
+| sobre | RNG/Box | 17368122337 |
+| contenedorDorado | RNG/Crate | 17368402884 |
+| estrella | Stars/Star | 17368097932 |
+| corona | Menus/VIP | 16912465495 |
+| check | Misc/Accept | 17368190066 |
+| candado | Misc/LockClosed | 17368080973 |
+| corazon | Stats/Health | 17368075795 |
+| nota, cinta | Misc/Disc | 95668779942949 |
+| engranaje | Menus/Settings | 17368089841 |
+| bota | Stats/Speed | 17368052918 |
+| cofre | Gems/GemChest | 15402896733 |
+| cruz | Misc/Deny | 17368208554 |
+| pocion | Potions/BluePotion | 15403275152 |
+
+Siguen dibujadas (sin equivalente en el set): `lata`, `figurina`, `iman`,
+los `set*`, las `manos*`, `marcoCarta`, `papel`, `logo`.
+Los briefs de abajo sirven para encargar esas.
+
 ## Estilo común
 
 - PNG con transparencia, fondo vacío, sin texto dentro (el texto lo pone el
@@ -53,7 +93,6 @@ usa la imagen. Nada más cambia.
 | `marcoCarta.png` | 512×720 | Marco de carta **en blanco** (se tiñe por rareza con `ImageColor3`), ventana central transparente para el modelo 3D, banda inferior para el nombre |
 | `papel.png` | 512×512 repetible | Textura sutil de papel/cartón, casi blanca (se pone al 15 % sobre el crema) |
 | `logo.png` | 1024×512 | Logotipo "Recíclatas" |
-| `retratoChatarra.png` | 512×512 | Retrato de Doña Chatarra para el diálogo (si no, se usa su modelo) |
 
 ## Cómo se suben
 

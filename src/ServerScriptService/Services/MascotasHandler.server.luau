@@ -1,17 +1,19 @@
 --!strict
 --[[
 	MascotasHandler
-	Atiende las acciones del album que no pasan por la mesa ni por la tienda:
+	Cablea las mascotas: arranca los seguidores y atiende
 
-	  FusionarEvent(idMascota, estado)   3 copias limpias -> 1 en estado+1
-	  VenderMascotaEvent(uid)            vender UNA copia a Dona Chatarra
-	  VenderDuplicadosEvent()            vender todas las sobrantes
-	  ExhibirEvent(uid | nil, indice)    poner/quitar del pedestal
+	  EquiparMascotaEvent(id, poner)  ponerse o quitarse una mascota
+	  UsarFragmentoEvent(setId)       gastar un fragmento libre (pedidos) en ese set
 
-	Y avisa de los hitos de coleccion (Rey Reciclon, set completo) que detecta
-	el modulo Mascotas.
+	Y avisa de lo que pasa con los fragmentos al reciclarlos
+	(Services/Fragmentos): cada uno, con un aviso ("Latita 3/5"; el primero
+	dice que mascota se esta montando); al completar una, la revelacion
+	(RevelacionEvent, UI/Revelacion) y, si es Rara o mejor y nueva, el feed.
+	Tambien anuncia el Rey.
 ]]
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
@@ -22,76 +24,96 @@ local Red = require(Shared:WaitForChild("Utilidades"):WaitForChild("Red"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
 local Mascotas = require(Servicios:WaitForChild("Mascotas"))
+local Fragmentos = require(Servicios:WaitForChild("Fragmentos"))
+local Seguidores = require(Servicios:WaitForChild("Seguidores"))
+local Bolsa = require(Servicios:WaitForChild("Bolsa"))
 
-local FusionarEvent = Red.evento("FusionarEvent")
-local VenderMascotaEvent = Red.evento("VenderMascotaEvent")
-local VenderDuplicadosEvent = Red.evento("VenderDuplicadosEvent")
-local ExhibirEvent = Red.evento("ExhibirEvent")
+local EquiparMascotaEvent = Red.evento("EquiparMascotaEvent")
+local UsarFragmentoEvent = Red.evento("UsarFragmentoEvent")
+local RevelacionEvent = Red.evento("RevelacionEvent")
 local NotificacionEvent = Red.evento("NotificacionEvent")
 local FeedEvent = Red.evento("FeedEvent")
 
-local function notificar(jugador: Player, texto: string, tipo: string)
-	NotificacionEvent:FireClient(jugador, texto, tipo)
-end
+Seguidores.iniciar()
 
 local ultimo: { [Player]: number } = {}
-local function enCooldown(jugador: Player): boolean
+local function enCooldown(jugador: Player, segundos: number): boolean
 	local ahora = os.clock()
-	if ahora - (ultimo[jugador] or 0) < 0.2 then
+	if ahora - (ultimo[jugador] or 0) < segundos then
 		return true
 	end
 	ultimo[jugador] = ahora
 	return false
 end
 
-FusionarEvent.OnServerEvent:Connect(function(jugador, id, estado)
-	if typeof(id) ~= "string" or typeof(estado) ~= "number" or enCooldown(jugador) then
+EquiparMascotaEvent.OnServerEvent:Connect(function(jugador, id, poner)
+	if typeof(id) ~= "string" or typeof(poner) ~= "boolean" or enCooldown(jugador, 0.25) then
 		return
 	end
-	local ok = Mascotas.fusionar(jugador, id, math.floor(estado))
-	local def = DefinicionesMascotas.obtener(id)
-	if ok and def then
-		notificar(jugador, Textos.formatear(Textos.NOTIFICACIONES.fusion, { nombre = def.nombre, estado = DefinicionesMascotas.nombreEstado(estado + 1) }), "exito")
+	local ok, motivo = Mascotas.equipar(jugador, id, poner)
+	if ok and motivo == "equipada" then
+		local def = DefinicionesMascotas.obtener(id)
+		NotificacionEvent:FireClient(jugador, Textos.formatear(Textos.NOTIFICACIONES.mascotaEquipada, { nombre = if def then def.nombre else id }), "exito")
+	elseif motivo == "huecosLlenos" then
+		NotificacionEvent:FireClient(jugador, Textos.MASCOTAS.huecosLlenos, "aviso")
 	end
 end)
 
-VenderMascotaEvent.OnServerEvent:Connect(function(jugador, uid)
-	if typeof(uid) ~= "string" or enCooldown(jugador) then
+UsarFragmentoEvent.OnServerEvent:Connect(function(jugador, setId)
+	if typeof(setId) ~= "string" or enCooldown(jugador, 0.5) then
 		return
 	end
-	local ok, valor = Mascotas.vender(jugador, uid)
-	if ok then
-		notificar(jugador, Textos.formatear(Textos.TIENDA.vendidos, { n = 1, dinero = valor }), "dinero")
+	Fragmentos.usarLibre(jugador, setId)
+end)
+
+Fragmentos.alAgregar:Connect(function(jugador, r)
+	if not jugador.Parent then
+		return -- reciclado al desconectar: cuenta, pero no hay a quien avisar
+	end
+	local def = DefinicionesMascotas.obtener(r.id)
+	local nombre = if def then def.nombre else r.id
+	local completa = r.completa
+	if not completa then
+		local plantilla = if r.empezada then Textos.NOTIFICACIONES.fragmentoNuevo else Textos.NOTIFICACIONES.fragmento
+		NotificacionEvent:FireClient(jugador, Textos.formatear(plantilla, {
+			nombre = nombre,
+			rareza = DefinicionesMascotas.NOMBRE_RAREZA[r.rareza] or r.rareza,
+			n = r.n,
+			total = r.total,
+		}), "exito")
+		return
+	end
+	RevelacionEvent:FireClient(jugador, {
+		set = r.set,
+		rareza = r.rareza,
+		id = r.id,
+		nueva = completa.nueva,
+		nivel = completa.nivel,
+		dinero = completa.dinero,
+	})
+	if r.rareza ~= "Comun" and completa.nueva then
+		FeedEvent:FireAllClients(Textos.formatear(Textos.FEED.mascota, {
+			jugador = jugador.DisplayName,
+			mascota = nombre,
+			rareza = DefinicionesMascotas.NOMBRE_RAREZA[r.rareza] or r.rareza,
+		}))
 	end
 end)
 
-VenderDuplicadosEvent.OnServerEvent:Connect(function(jugador)
-	if enCooldown(jugador) then
-		return
-	end
-	local n, dinero = Mascotas.venderDuplicados(jugador)
-	if n > 0 then
-		notificar(jugador, Textos.formatear(Textos.TIENDA.vendidos, { n = n, dinero = dinero }), "dinero")
-	else
-		notificar(jugador, Textos.TIENDA.sinDuplicados, "aviso")
+-- Fragmentos de un set que el jugador aun no tiene abierto (los excavo otro)
+Bolsa.alResumen:Connect(function(jugador, resumen)
+	for _, setId in resumen.cerrados do
+		local set = DefinicionesMascotas.SET_POR_ID[setId]
+		if set and jugador.Parent then
+			NotificacionEvent:FireClient(jugador, Textos.formatear(Textos.NOTIFICACIONES.fragmentoCerrado, { set = set.nombre, n = set.rebirth }), "aviso")
+		end
 	end
 end)
 
-ExhibirEvent.OnServerEvent:Connect(function(jugador, uid, indice)
-	if (uid ~= nil and typeof(uid) ~= "string") or typeof(indice) ~= "number" or enCooldown(jugador) then
-		return
-	end
-	local ok, motivo = Mascotas.exhibir(jugador, uid, math.floor(indice))
-	if not ok and motivo == "sucia" then
-		notificar(jugador, Textos.ALBUM.limpiar .. ": " .. Textos.ALBUM.sucia, "aviso")
-	end
-end)
-
-Mascotas.alCoronar:Connect(function(jugador)
-	notificar(jugador, Textos.NOTIFICACIONES.rey, "exito")
+Mascotas.alRey:Connect(function(jugador)
 	FeedEvent:FireAllClients(Textos.formatear(Textos.FEED.rey, { jugador = jugador.DisplayName }))
 end)
 
-game:GetService("Players").PlayerRemoving:Connect(function(jugador)
+Players.PlayerRemoving:Connect(function(jugador)
 	ultimo[jugador] = nil
 end)

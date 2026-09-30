@@ -35,14 +35,17 @@ local ok, res = xpcall(function()
 	local mundo = ConstructorMundo.construir()
 	local CS = game:GetService("CollectionService")
 	return string.format(
-		"v%s desc=%d ranuras=%d parcelas=%d contenedor=%d maquina=%d figurinas=%d",
+		"v%s desc=%d ranuras=%d barreras=%d aparicion=%d contenedor=%d limites=%d figurinas=%d parcelas=%d maquina=%d",
 		tostring(mundo:GetAttribute("Version")),
 		#mundo:GetDescendants(),
 		#CS:GetTagged("RanuraMonton"),
-		#CS:GetTagged("Parcela"),
+		#CS:GetTagged("BarreraCuadrante"),
+		#CS:GetTagged("PuntoAparicion"),
 		#CS:GetTagged("Contenedor"),
-		#CS:GetTagged("MaquinaRefrescos"),
-		#CS:GetTagged("FigurinaFija")
+		#CS:GetTagged("Limite"),
+		#CS:GetTagged("FigurinaFija"),
+		#CS:GetTagged("Parcela"),
+		#CS:GetTagged("MaquinaRefrescos")
 	)
 end, debug.traceback)
 return tostring(ok) .. ": " .. tostring(res)

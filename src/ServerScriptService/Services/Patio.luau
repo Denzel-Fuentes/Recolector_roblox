@@ -4,8 +4,8 @@
 	Unica responsabilidad: saber quien esta DENTRO del patio de basura y hacer
 	visible que va a recoger: brazos extendidos y la bolsa abierta en las manos.
 
-	Se decide en el servidor (posicion del personaje dentro del cuadrado de
-	GameConfig.PATIO_LADO) y se publica como atributo EnPatio del Player:
+	Se decide en el servidor (posicion del personaje dentro del rectangulo de
+	GameConfig.PATIO) y se publica como atributo EnPatio del Player:
 	  - el cliente lo lee para pasar a primera persona y mostrar sus manos;
 	  - los demas ven la bolsa porque se suelda aqui, en el servidor.
 
@@ -43,8 +43,8 @@ function Patio.estaDentro(jugador: Player): boolean
 end
 
 function Patio.posicionEnPatio(pos: Vector3): boolean
-	local mitad = GameConfig.PATIO_LADO / 2
-	return math.abs(pos.X) < mitad and math.abs(pos.Z) < mitad
+	local p = GameConfig.PATIO
+	return pos.X > p.oeste and pos.X < p.este and pos.Z > p.norte and pos.Z < p.sur
 end
 
 local function quitarBolsa(personaje: Model)

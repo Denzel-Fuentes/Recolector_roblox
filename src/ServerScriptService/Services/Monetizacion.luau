@@ -37,7 +37,6 @@ local Senal = require(Shared:WaitForChild("Utilidades"):WaitForChild("Senal"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
 local Perfiles = require(Servicios:WaitForChild("Perfiles"))
-local Economia = require(Servicios:WaitForChild("Economia"))
 
 local Monetizacion = {}
 
@@ -110,14 +109,23 @@ function Monetizacion.marcarPase(jugador: Player, idPase: string)
 	Monetizacion.alCambiarPases:Fire(jugador)
 end
 
--- Lo que hace un producto al otorgarse. Devuelve false si no se reconoce.
+-- Lo que hace cada producto al otorgarse lo decide el servicio dueno de ese
+-- efecto (p. ej. el Turbo de dinero), que se registra aqui: asi Monetizacion
+-- no depende de todos los sistemas que se venden.
+local otorgadores: { [string]: (Player) -> boolean } = {}
+
+function Monetizacion.registrarProducto(idProducto: string, otorgar: (Player) -> boolean)
+	otorgadores[idProducto] = otorgar
+end
+
+-- Devuelve false si el producto no tiene quien lo otorgue o no se pudo.
 local function otorgarProducto(jugador: Player, producto: Productos.Producto): boolean
-	if producto.gemas > 0 then
-		Economia.ganarGemas(jugador, producto.gemas)
-		Monetizacion.alComprarProducto:Fire(jugador, producto.id)
-		return true
+	local otorgar = otorgadores[producto.id]
+	if not otorgar or not otorgar(jugador) then
+		return false
 	end
-	return false
+	Monetizacion.alComprarProducto:Fire(jugador, producto.id)
+	return true
 end
 
 local function recordarRecibo(perfil: Perfiles.Perfil, purchaseId: string)

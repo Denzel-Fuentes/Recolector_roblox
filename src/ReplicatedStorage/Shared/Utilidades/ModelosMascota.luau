@@ -1,27 +1,27 @@
 --!strict
 --[[
 	ModelosMascota
-	Construye por codigo las 41 mascotas (en sus 5 estados, sucias o no) y sus
-	fragmentos. Solo primitivas (Primitivas.luau), sin texturas. La basura,
-	tesoros, coleccionables y bolsas estan en ModelosObjetos; la colina de los
-	montones en ModelosMonton.
+	Construye por codigo las 41 mascotas de la coleccion segun su nivel. Solo
+	primitivas (Primitivas.luau), sin texturas. La basura, tesoros,
+	coleccionables y bolsas estan en ModelosObjetos; la colina de los montones
+	en ModelosMonton.
 
-	Lo usa el servidor para lo que hay en el mundo y el cliente para las
-	previsualizaciones del album (ViewportFrame): un solo vocabulario visual.
+	Lo usa el servidor para las mascotas que te siguen y el cliente para el
+	album y la revelacion (ViewportFrame): un solo vocabulario visual.
 
 	Reglas de lectura a distancia:
 	  - color del CUERPO = material del set (Paleta.MATERIAL);
 	  - disco bajo la mascota = rareza (Paleta.RAREZA);
 	  - tamano crece con la rareza (Comun 1x .. Mitica 2.2x);
-	  - el ESTADO se ve: Danada = una pieza torcida y translucida, Regular =
-	    color apagado, Excelente = reflectancia, Perfecta = detalles en Neon;
-	  - sucia = manchas oscuras pegadas al cuerpo.
+	  - el NIVEL se ve arriba del todo: nivel 4 = reflectancia, nivel 5 =
+	    detalles y disco en Neon (el aspecto "Perfecta" de antes).
 
-	Todas las partes van ANCLADAS: el modelo se mueve con PivotTo (arrastre del
-	iman, pedestal). El origen del modelo esta en el suelo, bajo el centro.
+	Todas las partes van ANCLADAS: el modelo se mueve con PivotTo (la mascota
+	que te sigue). El origen del modelo esta en el suelo, bajo el centro.
 
-	La forma de cada mascota es determinista (Random con semilla de su id): dos
-	copias de Latita son identicas y dos mascotas del mismo set no lo son.
+	La silueta sale del set y de `forma` (4 por set): dentro de un set, una
+	Comun y una Rara con la misma forma solo se distinguen por tamano y disco.
+	Siluetas propias por mascota: pendiente de arte.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,8 +32,8 @@ local Paleta = require(Config:WaitForChild("Paleta"))
 local DefinicionesMascotas = require(Config:WaitForChild("DefinicionesMascotas"))
 local Primitivas = require(Shared:WaitForChild("Utilidades"):WaitForChild("Primitivas"))
 
-local cuna, cilindroVertical, cilindroHorizontal, esfera, bloque, semilla, nuevoModelo, pivoteEnSuelo, aclarar =
-	Primitivas.cuna, Primitivas.cilindroVertical, Primitivas.cilindroHorizontal, Primitivas.esfera, Primitivas.bloque, Primitivas.semilla, Primitivas.nuevoModelo, Primitivas.pivoteEnSuelo, Primitivas.aclarar
+local cuna, cilindroVertical, cilindroHorizontal, esfera, bloque, nuevoModelo, pivoteEnSuelo, aclarar =
+	Primitivas.cuna, Primitivas.cilindroVertical, Primitivas.cilindroHorizontal, Primitivas.esfera, Primitivas.bloque, Primitivas.nuevoModelo, Primitivas.pivoteEnSuelo, Primitivas.aclarar
 
 type Mascota = DefinicionesMascotas.Mascota
 
@@ -174,24 +174,13 @@ local function detalles(def: Mascota, s: number, color: Color3, yCabeza: number,
 	return lista
 end
 
-local function manchas(def: Mascota, s: number, cuerpo: BasePart, m: Model)
-	local rng = semilla(def.id .. "sucia")
-	local size = cuerpo.Size
-	for i = 1, 3 do
-		local dx = rng:NextNumber(-0.4, 0.4) * size.X
-		local dy = rng:NextNumber(-0.3, 0.3) * size.Y
-		local d = rng:NextNumber(0.3, 0.5) * s
-		esfera("Mancha" .. i, d, cuerpo.CFrame * CFrame.new(dx, dy, -size.Z / 2), Paleta.gris(60), m)
-	end
-end
-
-function ModelosMascota.mascota(def: Mascota, estado: number, sucia: boolean?): Model
+function ModelosMascota.mascota(def: Mascota, nivel: number): Model
 	local m = nuevoModelo(def.nombre)
 	m:SetAttribute("MascotaId", def.id)
-	m:SetAttribute("Estado", estado)
+	nivel = math.clamp(nivel, 1, DefinicionesMascotas.NIVEL_MAX)
+	m:SetAttribute("Nivel", nivel)
 	local s = ESCALA_RAREZA[def.rareza] or 1
-	estado = math.clamp(estado, 1, 5)
-	local color = Paleta.escalar(Paleta.MATERIAL[def.material] or Paleta.MUEBLE, Paleta.FACTOR_ESTADO[estado])
+	local color = Paleta.MATERIAL[def.material] or Paleta.MUEBLE
 
 	-- Disco de rareza en el suelo
 	local disco = cilindroVertical("Disco", 2.2 * s, 0.25, CFrame.new(0, 0.125, 0), Paleta.RAREZA[def.rareza] or Paleta.RAREZA.Comun, m)
@@ -220,25 +209,16 @@ function ModelosMascota.mascota(def: Mascota, estado: number, sucia: boolean?): 
 	end
 	local lista = detalles(def, s, color, yCabeza, dCabeza, m)
 
-	-- Estado de conservacion
-	if estado == 1 and #lista > 0 then
-		local pieza = lista[1]
-		pieza.CFrame = pieza.CFrame * CFrame.Angles(0, 0, math.rad(28))
-		pieza.Transparency = 0.35
-		cabeza.CFrame = cabeza.CFrame * CFrame.Angles(0, 0, math.rad(-12))
-	elseif estado == 4 then
+	-- Nivel: brilla al 4, luce al 5
+	if nivel == 4 then
 		cuerpo.Reflectance = 0.3
 		cabeza.Reflectance = 0.3
-	elseif estado == 5 then
+	elseif nivel >= 5 then
 		for _, pieza in lista do
 			pieza.Material = Enum.Material.Neon
 		end
 		disco.Material = Enum.Material.Neon
 		cuerpo.Reflectance = 0.15
-	end
-
-	if sucia then
-		manchas(def, s, cuerpo, m)
 	end
 
 	m.PrimaryPart = cuerpo
@@ -250,28 +230,6 @@ end
 function ModelosMascota.alturaMascota(def: Mascota): number
 	local s = ESCALA_RAREZA[def.rareza] or 1
 	return 3.2 * s
-end
-
--- ===========================================================================
--- Fragmentos
--- ===========================================================================
-
-function ModelosMascota.fragmento(def: Mascota, indice: number): Model
-	local m = nuevoModelo("Fragmento de " .. def.nombre)
-	m:SetAttribute("MascotaId", def.id)
-	local color = Paleta.MATERIAL[def.material] or Paleta.MUEBLE
-	local rng = semilla(def.id .. tostring(indice))
-	local c = cuna({
-		Nombre = "Cuerpo",
-		Size = Vector3.new(1.1, 0.7, 1.0),
-		CFrame = CFrame.new(0, 0.35, 0) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0),
-		Color = color,
-		Parent = m,
-	})
-	bloque("Borde", Vector3.new(1.15, 0.08, 1.05), c.CFrame * CFrame.new(0, -0.31, 0), Paleta.FRAGMENTO_BORDE, m)
-	m.PrimaryPart = c
-	pivoteEnSuelo(m)
-	return m
 end
 
 return ModelosMascota

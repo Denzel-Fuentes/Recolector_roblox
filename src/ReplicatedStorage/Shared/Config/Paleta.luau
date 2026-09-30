@@ -37,9 +37,7 @@ Paleta.MONTON = gris(140)
 Paleta.MONTON_BASURA = Color3.fromRGB(112, 124, 150) -- colina vestida: azul-gris de bolsas de basura
 Paleta.DECORADO = gris(140)
 Paleta.CAMINOS = gris(165)
-Paleta.MUROS = gris(165)
 Paleta.MONTON_AGOTADO = gris(165)
-Paleta.LOSA_PARCELA = gris(195)
 Paleta.CONTENEDOR = gris(195)
 Paleta.MUEBLE = gris(215)
 Paleta.NPC = gris(215)
@@ -68,43 +66,60 @@ Paleta.TESORO = Color3.fromRGB(230, 190, 60)
 Paleta.DORADO = Color3.fromRGB(230, 190, 60)
 Paleta.FIGURINA = gris(215)
 Paleta.CINTA = gris(50)
-Paleta.FRAGMENTO_BORDE = gris(240)
 -- La bolsa de basura (azul oscuro, como en KOTAMON): proyectil, objeto caido,
 -- bolsa en manos y la "imagen" de manos del cliente
 Paleta.BOLSA = Color3.fromRGB(52, 74, 128)
 Paleta.PIEL = Color3.fromRGB(232, 196, 160)
 
--- UI: tema claro "papel y tinta" (estilo pegatina, referencia KOTAMON).
--- Todo lo que se dibuja en pantalla es papel crema con contorno de tinta y
--- una sombra dura; el color solo dice de que va cada cosa (dinero verde,
--- cartas azul, gemas morado, energia ambar, bolsa azul oscuro, fuerza naranja).
-Paleta.UI_PAPEL = Color3.fromRGB(255, 247, 230) -- fondo de pegatinas y paneles
-Paleta.UI_PAPEL_OSCURO = Color3.fromRGB(243, 231, 205) -- filas, viewports, pistas
-Paleta.UI_PAPEL_SOMBRA = Color3.fromRGB(226, 211, 182) -- separadores, pips vacios, pestanas sin elegir
-Paleta.UI_TINTA = Color3.fromRGB(48, 42, 60) -- contornos y texto principal
-Paleta.UI_TINTA_SUAVE = Color3.fromRGB(122, 114, 132) -- texto secundario
-Paleta.UI_SOMBRA = Color3.fromRGB(48, 42, 60) -- sombra dura (se usa con transparencia)
-Paleta.UI_PRIMARIO = Color3.fromRGB(255, 200, 60) -- botones de accion y seleccion
-Paleta.UI_DINERO = Color3.fromRGB(72, 160, 78)
-Paleta.UI_DINERO_CLARO = Color3.fromRGB(150, 214, 120)
-Paleta.UI_CARTAS = Color3.fromRGB(70, 130, 220)
-Paleta.UI_GEMAS = Color3.fromRGB(150, 90, 210)
-Paleta.UI_ENERGIA = Color3.fromRGB(255, 176, 50)
-Paleta.UI_FUERZA = Color3.fromRGB(255, 120, 70)
-Paleta.UI_BOLSA = Color3.fromRGB(84, 114, 184) -- Paleta.BOLSA aclarada para leerse sobre papel
-Paleta.UI_PELIGRO = Color3.fromRGB(226, 76, 76)
-Paleta.UI_EXITO = Color3.fromRGB(72, 160, 78)
-Paleta.UI_BLOQUEADO = Color3.fromRGB(196, 190, 182)
-Paleta.UI_TECLA = Paleta.UI_TINTA -- insignias de tecla (letra en papel)
+-- UI: estilo "UI Kit" de simulador (referencia del usuario, 23 sep): blanco
+-- con contorno azul marino grueso, barras de titulo de color, botones de
+-- colores intensos con texto blanco contorneado y studs donde el kit pone
+-- cuadros. Lo pinta Client/UI/Kit (Fusion). El color sigue diciendo de que va
+-- cada cosa (dinero verde, cartas azul, gemas morado, energia ambar...).
+Paleta.UI_PAPEL = Color3.fromRGB(255, 255, 255) -- cuerpo de ventanas y pildoras
+Paleta.UI_PAPEL_OSCURO = Color3.fromRGB(233, 236, 243) -- tarjetas, filas, viewports
+Paleta.UI_PAPEL_SOMBRA = Color3.fromRGB(203, 208, 222) -- separadores, pips vacios, huecos de barra
+Paleta.UI_TINTA = Color3.fromRGB(27, 29, 58) -- contornos y texto principal (marino)
+Paleta.UI_TINTA_SUAVE = Color3.fromRGB(104, 108, 138) -- texto secundario
+Paleta.UI_SOMBRA = Color3.fromRGB(27, 29, 58) -- sombra dura (se usa con transparencia)
+Paleta.UI_PRIMARIO = Color3.fromRGB(255, 196, 28) -- amarillo de seleccion y destacados
+Paleta.UI_DINERO = Color3.fromRGB(58, 206, 62)
+Paleta.UI_DINERO_CLARO = Color3.fromRGB(150, 232, 120)
+Paleta.UI_CARTAS = Color3.fromRGB(42, 140, 255)
+Paleta.UI_GEMAS = Color3.fromRGB(146, 70, 245)
+Paleta.UI_ENERGIA = Color3.fromRGB(255, 168, 20)
+Paleta.UI_FUERZA = Color3.fromRGB(255, 110, 50)
+Paleta.UI_BOLSA = Color3.fromRGB(64, 104, 200) -- Paleta.BOLSA aclarada para leerse sobre blanco
+Paleta.UI_PELIGRO = Color3.fromRGB(240, 52, 64)
+Paleta.UI_EXITO = Color3.fromRGB(58, 206, 62)
+Paleta.UI_BLOQUEADO = Color3.fromRGB(176, 181, 196)
+Paleta.UI_TECLA = Paleta.UI_TINTA -- insignias de tecla (letra blanca sobre marino)
 Paleta.UI_SELECCION = Paleta.UI_PRIMARIO -- contorno del boton elegido con gamepad
--- Alias del tema oscuro anterior, mapeados al claro para que los paneles que
--- aun no se han rediseñado sigan siendo legibles. Se retiran con los paneles.
-Paleta.UI_FONDO = Paleta.UI_PAPEL
-Paleta.UI_PANEL = Paleta.UI_PAPEL_OSCURO
-Paleta.UI_PANEL_CLARO = Paleta.UI_PAPEL_SOMBRA
-Paleta.UI_TEXTO = Paleta.UI_TINTA
-Paleta.UI_TEXTO_SUAVE = Paleta.UI_TINTA_SUAVE
-Paleta.UI_ACENTO = Paleta.UI_PRIMARIO
+
+-- Botones: colores intensos del kit. Cada boton toma uno FIJO segun su
+-- nombre (Kit/Tema.colorBoton, decision del usuario: "diferentes colores"),
+-- salvo los que significan algo: rojo peligro/cerrar, morado Robux/Gemas,
+-- verde comprar/aceptar. Todos oscuros: el texto va en blanco contorneado.
+Paleta.UI_KIT = {
+	Color3.fromRGB(58, 206, 62), -- verde
+	Color3.fromRGB(42, 140, 255), -- azul
+	Color3.fromRGB(146, 70, 245), -- morado
+	Color3.fromRGB(255, 142, 20), -- naranja
+	Color3.fromRGB(255, 72, 150), -- rosa
+	Color3.fromRGB(16, 190, 214), -- cian
+}
+Paleta.UI_KIT_PELIGRO = Paleta.UI_PELIGRO
+Paleta.UI_KIT_GEMAS = Paleta.UI_GEMAS
+Paleta.UI_KIT_EXITO = Paleta.UI_EXITO
+-- Barra de titulo de cada ventana (por nombre de panel); el resto, marino
+Paleta.CABECERA_PANEL = {
+	Tienda = Color3.fromRGB(240, 52, 64),
+	Mascotas = Color3.fromRGB(42, 140, 255),
+	Rebirth = Color3.fromRGB(146, 70, 245),
+	Pedidos = Color3.fromRGB(255, 142, 20),
+	Revelacion = Color3.fromRGB(255, 176, 20),
+}
+Paleta.CABECERA_DEFECTO = Color3.fromRGB(38, 42, 86)
 
 -- ===========================================================================
 -- Arte del mundo (pasada de color sobre el whitebox, referencia KOTAMON)
@@ -114,6 +129,8 @@ Paleta.UI_ACENTO = Paleta.UI_PRIMARIO
 Paleta.MUNDO = {
 	CESPED = Color3.fromRGB(127, 198, 75),
 	CESPED_OSCURO = Color3.fromRGB(96, 168, 58),
+	-- borde del patio: separa su cesped del cesped de alrededor
+	BORDE_PATIO = Color3.fromRGB(214, 48, 49),
 	TIERRA = Color3.fromRGB(172, 138, 96),
 	TIERRA_OSCURA = Color3.fromRGB(150, 116, 80),
 	MADERA = Color3.fromRGB(216, 168, 107),
@@ -124,6 +141,7 @@ Paleta.MUNDO = {
 	AZUL_MAQUINA = Color3.fromRGB(47, 95, 191),
 	PARED = Color3.fromRGB(241, 217, 192),
 	AMARILLO = Color3.fromRGB(242, 183, 5),
+	NARANJA = Color3.fromRGB(242, 138, 30),
 	NEGRO = Color3.fromRGB(38, 36, 40),
 	VERDE_CONTENEDOR = Color3.fromRGB(79, 175, 92),
 	METAL = Color3.fromRGB(154, 163, 173),
@@ -142,11 +160,9 @@ Paleta.MUNDO = {
 	CIELO = Color3.fromRGB(150, 205, 245),
 }
 
--- Lo que Parcelas repinta cuando una base no lleva skin (partes Pintable):
--- con el mundo vestido, madera y no gris. Sobrescriben los grises de arriba.
-Paleta.LOSA_PARCELA = Paleta.MUNDO.MADERA_CLARA
+-- Con el mundo vestido, el color por defecto de las partes es madera y no
+-- gris: sobrescribe el gris de arriba.
 Paleta.MUEBLE = Paleta.MUNDO.MADERA_CLARA
-Paleta.MUROS = Paleta.MUNDO.VALLA
 
 -- Variantes de material generadas por IA en Studio (MaterialService). Se
 -- usan por NOMBRE: si en un place no existen, la parte se queda con el
@@ -173,9 +189,7 @@ Paleta.BASURA = {
 	Organico = { Color3.fromRGB(230, 200, 60), Color3.fromRGB(120, 170, 70), Color3.fromRGB(200, 90, 70), Color3.fromRGB(170, 120, 70) },
 }
 
--- Estados de conservacion: como se apaga o brilla el color base
-Paleta.FACTOR_ESTADO = { 0.7, 0.85, 1, 1, 1 }
-
+-- Aclara u oscurece un color multiplicando sus canales
 function Paleta.escalar(color: Color3, factor: number): Color3
 	return Color3.new(
 		math.clamp(color.R * factor, 0, 1),

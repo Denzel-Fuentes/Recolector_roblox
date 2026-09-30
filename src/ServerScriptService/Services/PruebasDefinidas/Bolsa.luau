@@ -1,9 +1,12 @@
 --!nonstrict
 --[[
-	Pruebas de la bolsa: deposito de cerca, bonus por bolsa llena, que recoger
-	nunca paga (billetes incluidos), la bolsa al desconectar y la punteria
-	(lanzar la bolsa, acierto y fallo).
+	Pruebas de la bolsa: deposito de cerca, que recoger nunca paga (billetes
+	incluidos), la bolsa al desconectar y la punteria (lanzar la bolsa,
+	acierto, fallo y bolsa protegida).
 ]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("GameConfig"))
 
 local Servicios = script.Parent.Parent
 local Perfiles = require(Servicios:WaitForChild("Perfiles"))
@@ -35,19 +38,7 @@ function Pruebas.depositar()
 	if not resumen then
 		return "bolsa vacia"
 	end
-	return string.format("deposito: %d objetos, +$%d (bonus=%s), quedaron=%d, nuevas=%d | dinero %d->%d", resumen.objetos, resumen.dinero, tostring(resumen.bonus), resumen.quedaron, #resumen.mascotasNuevas, dineroAntes, Economia.dinero(j))
-end
-
--- Bolsa llena de basura -> +25%
-function Pruebas.bonusBolsaLlena()
-	local j = jugador()
-	local cap = Bolsa.capacidad(j)
-	for i = Bolsa.cuenta(j) + 1, cap do
-		Bolsa.meter(j, { tipo = "basura", nombre = "Papel", material = "Papel", valor = 6 })
-	end
-	local esperado = math.floor(valorEsperado(j) * 1.25 + 0.5)
-	local resumen = Bolsa.depositar(j)
-	return string.format("bolsa %d/%d -> $%d (esperado %d con bonus) bonus=%s => %s", cap, cap, resumen.dinero, esperado, tostring(resumen.bonus), (resumen.bonus and resumen.dinero == esperado) and "OK" or "FALLO")
+	return string.format("deposito: %d objetos, +$%d (bonus=%s) | dinero %d->%d", resumen.objetos, resumen.dinero, tostring(resumen.bonus), dineroAntes, Economia.dinero(j))
 end
 
 -- Un billete ocupa un hueco y NO paga al meterlo: paga al depositar
@@ -68,17 +59,10 @@ end
 function Pruebas.sinDineroAlRecoger()
 	local j = jugador()
 	Bolsa.vaciar(j)
-	local m = nil
-	for _, monton in Botin.montones() do
-		if monton.estado == "lleno" then
-			m = monton
-			break
-		end
-	end
-	assert(m, "no queda ningun monton lleno")
+	local m = Comunes.montonesLlenos(1)[1]
 	teletransportar(j, m.ranura.Position + Vector3.new(6, 0, 0))
 	task.wait(0.3)
-	local excavado, motivo = Botin.excavar(j, m)
+	local excavado, motivo = Comunes.excavar(j, m)
 	assert(excavado, "no se pudo excavar: " .. tostring(motivo))
 	task.wait(1.6)
 	local dineroAntes = Economia.dinero(j)
@@ -104,20 +88,40 @@ function Pruebas.sinDineroAlRecoger()
 		(recogidos > 0 and cuenta == recogidos and dineroDespues == dineroAntes) and "OK" or "FALLO")
 end
 
--- Simula un jugador que sale con la bolsa a medias: la basura se pierde y la
--- mascota va al almacen (se comprueba a mano desconectando)
+-- Simula un jugador que sale con la bolsa a medias: se recicla sin bonus (se
+-- comprueba a mano desconectando; la prueba "salirRecicla" lo comprueba sin
+-- salir)
 function Pruebas.bolsaAlSalir()
 	local j = jugador()
 	Bolsa.meter(j, { tipo = "basura", nombre = "Papel", material = "Papel", valor = 6 })
-	Bolsa.meter(j, { tipo = "mascota", nombre = "Latita", id = "latita", estado = 2, sucia = false })
-	return "bolsa " .. Bolsa.cuenta(j) .. "/" .. Bolsa.capacidad(j) .. " (al desconectar: papel se pierde, latita -> almacen)"
+	Bolsa.meter(j, { tipo = "billete", nombre = "Billete", valor = 50 })
+	return "bolsa " .. Bolsa.cuenta(j) .. "/" .. Bolsa.capacidad(j) .. " (al desconectar: $56 sin bonus)"
 end
 
--- Lanzar la bolsa entera a la zona de acierto desde 20 studs
+-- Al salir la bolsa se recicla sin bonus (se llama a lo mismo que PlayerRemoving)
+function Pruebas.salirRecicla()
+	local j = jugador()
+	local items = {
+		{ tipo = "basura", nombre = "Chatarra", material = "Metal", valor = 12 },
+		{ tipo = "billete", nombre = "Billete", valor = 50 },
+	}
+	local esperado = 0
+	for _, item in items do
+		esperado += Bolsa.valorDeposito(j, item)
+	end
+	local antes = Economia.dinero(j)
+	local resumen = Bolsa.reciclarSinBonus(j, items)
+	local cobrado = Economia.dinero(j) - antes
+	return string.format("esperado $%d, resumen $%d, cobrado $%d => %s", esperado, resumen.dinero, cobrado, (resumen.dinero == esperado and cobrado == esperado) and "OK" or "FALLO")
+end
+
+-- Lanzar la bolsa entera a la zona de acierto desde 20 studs, desde el
+-- frente (al norte, -Z): detras esta la trituradora, que ya colisiona
 function Pruebas.lanzarBolsa()
 	local j = jugador()
+	Comunes.yaLanzo(j)
 	local zona = Mundo.zonaAcierto()
-	teletransportar(j, zona.Position + Vector3.new(0, 0, 20))
+	teletransportar(j, zona.Position + Vector3.new(0, 0, -20))
 	task.wait(0.3)
 	for _ = 1, 3 do
 		Bolsa.meter(j, { tipo = "basura", nombre = "Chatarra", material = "Metal", valor = 12 })
@@ -128,14 +132,17 @@ function Pruebas.lanzarBolsa()
 	local vacia = Bolsa.cuenta(j) == 0
 	task.wait(2.5)
 	local aciertos = Perfiles.leerEstadistica(j, "aciertos")
-	return string.format("lanzarBolsa ok=%s (%s) bolsa vacia al lanzar=%s aciertos %d->%d dinero %d->%d (3 chatarras x12 x1.5 = 54, mas logros) => %s",
+	return string.format("lanzarBolsa ok=%s (%s) bolsa vacia al lanzar=%s aciertos %d->%d dinero %d->%d (3 chatarras x12 x(1 + 0,4 desde 20 studs + racha) >= 54) => %s",
 		tostring(ok), motivo, tostring(vacia), aciertosAntes, aciertos, dineroAntes, Economia.dinero(j),
 		(ok and vacia and aciertos > aciertosAntes and Economia.dinero(j) - dineroAntes >= 54) and "OK" or "FALLO")
 end
 
--- Lanzar al suelo: la bolsa cae como objeto y otro (un falso) la recoge
+-- Lanzar al suelo: la bolsa cae como objeto y su dueno la recoge (que otro
+-- no pueda lo comprueba "bolsaProtegida"). Con el Brazo a nivel 0 (25 studs)
+-- y media fuerza, la bolsa cae a ~12 studs, hacia el patio.
 function Pruebas.lanzarBolsaFallo()
 	local j = jugador()
+	Comunes.yaLanzo(j)
 	local zona = Mundo.zonaAcierto()
 	-- El contenedor esta al sur del patio (plano v3): el jugador se pone al
 	-- norte, en la plaza, y apunta hacia el patio, lejos del contenedor
@@ -143,7 +150,7 @@ function Pruebas.lanzarBolsaFallo()
 	task.wait(0.3)
 	Bolsa.vaciar(j)
 	Bolsa.meter(j, { tipo = "basura", nombre = "Papel", material = "Papel", valor = 6 })
-	Bolsa.meter(j, { tipo = "fragmento", nombre = "Fragmento de Latita", id = "latita" })
+	Bolsa.meter(j, { tipo = "billete", nombre = "Billete", valor = 50 })
 	-- apuntar lejos del contenedor, hacia el patio
 	local ok, motivo = Botin.lanzarBolsa(j, zona.Position + Vector3.new(-25, 0, -80), 0.5)
 	task.wait(3)
@@ -160,6 +167,155 @@ function Pruebas.lanzarBolsaFallo()
 	return string.format("lanzar ok=%s (%s) | bolsa en el suelo=%s | recogida=%s (%s) | bolsa ahora %d/%d => %s",
 		tostring(ok), motivo, tostring(bolsaId ~= nil), tostring(recogida), motivoRec, Bolsa.cuenta(j), Bolsa.capacidad(j),
 		(ok and bolsaId and recogida and Bolsa.cuenta(j) == 2) and "OK" or "FALLO")
+end
+
+-- La bolsa que falla solo la recoge su dueno, y no se recicla sola: sigue en
+-- el suelo pasado el tiempo que antes tenia (20 s) hasta que vuelve a por ella
+function Pruebas.bolsaProtegida()
+	local j = jugador()
+	Comunes.yaLanzo(j)
+	local zona = Mundo.zonaAcierto()
+	teletransportar(j, zona.Position + Vector3.new(0, 0, -30))
+	task.wait(0.3)
+	Bolsa.vaciar(j)
+	Bolsa.meter(j, { tipo = "basura", nombre = "Papel", material = "Papel", valor = 6 })
+	local lanzo = Botin.lanzarBolsa(j, zona.Position + Vector3.new(-25, 0, -80), 0.5)
+	-- vuelo + botes (hasta VIDA_PROYECTIL)
+	task.wait(3.2)
+	local obj = nil
+	for _, o in Botin.objetos() do
+		if o.item.tipo == "bolsa" and o.item.duenoId == j.UserId then
+			obj = o
+		end
+	end
+	if not obj then
+		return "no quedo bolsa en el suelo => FALLO"
+	end
+	-- Otro jugador (simulado cambiando el dueno) no puede recogerla
+	obj.item.duenoId = -1
+	local recogidaAjena, motivo = Botin.reclamar(j, obj.id, "toque")
+	obj.item.duenoId = j.UserId
+	local dineroAntes = Economia.dinero(j)
+	task.wait(21)
+	local sigueEnElSuelo = Botin.objetos()[obj.id] ~= nil
+	local cobrado = Economia.dinero(j) - dineroAntes
+	-- Y su dueno la recupera
+	local recogida = Botin.reclamar(j, obj.id, "toque")
+	local enLaBolsa = Bolsa.cuenta(j)
+	Bolsa.vaciar(j)
+	return string.format("lanzo=%s | ajena: recogida=%s (%s) | a los 21 s: sigue=%s cobrado=$%d | el dueno la recoge=%s (%d en la bolsa) => %s",
+		tostring(lanzo), tostring(recogidaAjena), tostring(motivo), tostring(sigueEnElSuelo), cobrado, tostring(recogida), enLaBolsa,
+		(lanzo and not recogidaAjena and motivo == "ajena" and sigueEnElSuelo and cobrado == 0 and recogida and enLaBolsa == 1) and "OK" or "FALLO")
+end
+
+-- La bolsa lanzada choca con la recicladora: desde delante de la caja de
+-- salida se apunta a la parte baja de su frente (z = -3,95 en el marco del
+-- pivote; apuntando a su centro el tiro cae sobre el techo); debe rebotar y
+-- quedar en el suelo delante, no dentro de ninguna caja de ColisionRecicladora
+function Pruebas.lanzarContraRecicladora()
+	local j = jugador()
+	Comunes.yaLanzo(j)
+	local rec = game:GetService("CollectionService"):GetTagged("RecicladoraArte")[1]
+	local caseta = rec and rec.Parent
+	local colision = caseta and caseta:FindFirstChild("ColisionRecicladora")
+	if not colision then
+		return "sin recicladora o sin ColisionRecicladora => FALLO"
+	end
+	local pivote = rec:GetPivot()
+	teletransportar(j, pivote:PointToWorldSpace(Vector3.new(9.4, 3, 14)))
+	task.wait(0.3)
+	Bolsa.vaciar(j)
+	Bolsa.meter(j, { tipo = "basura", nombre = "Papel", material = "Papel", valor = 6 })
+	local ok, motivo = Botin.lanzarBolsa(j, pivote:PointToWorldSpace(Vector3.new(9.4, 2, -3.9)), 1)
+	task.wait(4.5)
+	local bolsaId, pos = nil, nil
+	for id, obj in Botin.objetos() do
+		if obj.item.tipo == "bolsa" and obj.modelo then
+			bolsaId, pos = id, obj.modelo:GetPivot().Position
+		end
+	end
+	if not pos then
+		return string.format("lanzar ok=%s (%s) | no quedo bolsa en el suelo => FALLO", tostring(ok), motivo)
+	end
+	local dentro = nil
+	for _, p in colision:GetChildren() do
+		local l = p.CFrame:PointToObjectSpace(pos + Vector3.new(0, 0.5, 0))
+		if math.abs(l.X) < p.Size.X / 2 and math.abs(l.Y) < p.Size.Y / 2 and math.abs(l.Z) < p.Size.Z / 2 then
+			dentro = p.Name
+		end
+	end
+	local local_ = pivote:PointToObjectSpace(pos)
+	if bolsaId then
+		Botin.reclamar(j, bolsaId, "toque")
+	end
+	return string.format("lanzar ok=%s (%s) | bolsa en local (%.1f, %.1f, %.1f) dentro de=%s => %s",
+		tostring(ok), motivo, local_.X, local_.Y, local_.Z, tostring(dentro),
+		(ok and dentro == nil and local_.Z > -3.9) and "OK" or "FALLO")
+end
+
+-- Una bolsa fallada que quedaria en alto (por defecto se apunta a la
+-- carcasa de la recicladora, techo a y = 10,7; x y z en el marco de su
+-- pivote) se baja al suelo junto al contenedor: ya no se recicla sola, asi
+-- que ahi arriba se perderia
+function Pruebas.bolsaEnAlto(fuerza, x, y, z)
+	local j = jugador()
+	Comunes.yaLanzo(j)
+	local rec = game:GetService("CollectionService"):GetTagged("RecicladoraArte")[1]
+	if not rec then
+		return "sin recicladora => FALLO"
+	end
+	local pivote = rec:GetPivot()
+	teletransportar(j, pivote:PointToWorldSpace(Vector3.new(9.4, 3, 14)))
+	task.wait(0.3)
+	Bolsa.vaciar(j)
+	Bolsa.meter(j, { tipo = "basura", nombre = "Papel", material = "Papel", valor = 6 })
+	local objetivo = pivote:PointToWorldSpace(Vector3.new(tonumber(x) or 5.5, tonumber(y) or 10.7, tonumber(z) or -6.4))
+	-- (con 0,7 cae en el techo de la carcasa; medido el 29 sep)
+	local ok, motivo = Botin.lanzarBolsa(j, objetivo, tonumber(fuerza) or 0.7)
+	task.wait(4.5)
+	local bolsaId, pos, bajadaDesde = nil, nil, nil
+	for id, obj in Botin.objetos() do
+		if obj.item.tipo == "bolsa" and obj.item.duenoId == j.UserId and obj.modelo then
+			bolsaId, pos, bajadaDesde = id, obj.modelo:GetPivot().Position, obj.modelo:GetAttribute("BajadaDesde")
+		end
+	end
+	if not pos then
+		return string.format("lanzar ok=%s (%s) | no quedo bolsa (entro?) => FALLO", tostring(ok), motivo)
+	end
+	local zona = Mundo.zonaAcierto()
+	local alContenedor = Vector3.new(pos.X - zona.Position.X, 0, pos.Z - zona.Position.Z).Magnitude
+	local recogida = Botin.reclamar(j, bolsaId, "toque")
+	Bolsa.vaciar(j)
+	teletransportar(j, Comunes.fueraDelPatio())
+	return string.format("lanzar ok=%s (%s) | cayo en alto=%s | bolsa a y=%.1f, a %.1f studs del contenedor | recogida=%s => %s",
+		tostring(ok), motivo, if bajadaDesde then string.format("si, a y=%.1f", bajadaDesde) else "no", pos.Y, alContenedor, tostring(recogida),
+		(ok and pos.Y <= 4 and recogida) and "OK" or "FALLO")
+end
+
+-- Deposito de cerca con basura de los cuatro materiales: Bolsa.alDepositar
+-- debe salir con todos los objetos (BotinHandler lo reenvia a los clientes y
+-- la cinta de la recicladora los transporta; se mira con PruebasCliente
+-- "recicladora" y una captura). El jugador queda al norte, mirando la maquina.
+function Pruebas.recicladora()
+	local j = jugador()
+	local zona = Mundo.zonaAcierto()
+	teletransportar(j, zona.Position + Vector3.new(0, 0, -14))
+	task.wait(0.3)
+	Bolsa.vaciar(j)
+	local materiales = { "Metal", "Plastico", "Papel", "Organico", "Plastico", "Metal" }
+	for _, m in materiales do
+		Bolsa.meter(j, { tipo = "basura", nombre = m, material = m, valor = 5 })
+	end
+	local recibidos = -1
+	local conexion = Bolsa.alDepositar:Connect(function(quien, items)
+		if quien == j then
+			recibidos = #items
+		end
+	end)
+	Bolsa.depositar(j)
+	task.wait(0.2)
+	conexion:Disconnect()
+	return string.format("deposito de %d objetos -> alDepositar con %d => %s", #materiales, recibidos, recibidos == #materiales and "OK" or "FALLO")
 end
 
 return Pruebas

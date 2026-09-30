@@ -4,20 +4,14 @@
 	Detalles de presentacion del mundo que solo importan a ESTE cliente:
 
 	  Figurinas fijas  las que ya tienes se ocultan localmente (transparencia
-	                   local): para los demas siguen en su escondite.
-	  Radios           las de todas las parcelas con CintaId puesto giran los
-	                   carretes y muestran el titulo de la cinta (y "sin audio"
-	                   mientras el id sea placeholder).
-	  Exhibidas        las mascotas Perfectas de los pedestales giran despacio.
+	                   local): para los demas siguen en su escondite (solo con
+	                   la funcion FIGURINAS, pospuesta en la v2).
 	  Brazos           quien esta en el patio (EnPatio) lleva los brazos al frente
 	                   sujetando la bolsa (Utilidades/PoseBrazos en Stepped).
 	  Carteles         los carteles flotantes horneados (ConstructorMundo.
-	                   cartelFlotante) se restilizan aqui como pegatinas de papel
-	                   y tinta, y lo etiquetado que no tenia cartel (la maquina)
-	                   recibe uno: "VENDER BASURA", "RESTAURAR ENERGIA", "DONA
-	                   CHATARRA" (Textos.MUNDO). El texto de los carteles de
-	                   parcela lo sigue poniendo el servidor (Parcelas.ponerCartel):
-	                   aqui solo se cambia el aspecto, no se duplica la logica.
+	                   cartelFlotante) se restilizan aqui con el estilo del Kit
+	                   (blanco, contorno marino) y su rotulo: "VENDER BASURA",
+	                   "DONA CHATARRA" (Textos.MUNDO).
 
 	Nada de esto toca el estado del juego; es puro RenderStepped.
 ]]
@@ -30,15 +24,13 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Textos = require(Shared:WaitForChild("Config"):WaitForChild("Textos"))
 local Paleta = require(Shared:WaitForChild("Config"):WaitForChild("Paleta"))
-local DefinicionesColeccionables = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesColeccionables"))
-local DefinicionesMascotas = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesMascotas"))
 local PoseBrazos = require(Shared:WaitForChild("Utilidades"):WaitForChild("PoseBrazos"))
 
 local EstadoCliente = require(script.Parent:WaitForChild("EstadoCliente"))
-local Componentes = require(script.Parent:WaitForChild("UI"):WaitForChild("Componentes"))
+local Tema = require(script.Parent:WaitForChild("UI"):WaitForChild("Kit"):WaitForChild("Tema"))
 
 -- ===========================================================================
--- Carteles: pegatinas de papel y tinta
+-- Carteles: estilo del Kit (blanco, contorno marino, FredokaOne)
 -- ===========================================================================
 
 -- Y del punto mas alto de una parte o de su modelo (la loma de una colina, el
@@ -55,7 +47,7 @@ end
 
 -- Restiliza un BillboardGui horneado (o creado aqui) que tenga un TextLabel
 -- "Texto": papel, contorno de tinta, FredokaOne. `texto` sustituye el rotulo
--- (los carteles de parcela no lo pasan: su texto es del servidor). El tamano
+-- (sin el, se queda el horneado). El tamano
 -- va en studs, no en pixeles: asi el cartel se hace pequeno con la distancia,
 -- como un letrero de verdad, y no tapa media pantalla desde lejos. Flota 3,4
 -- studs por encima del tope del modelo, por encima del prompt (1,2).
@@ -75,7 +67,7 @@ local function estilizarCartel(bb: BillboardGui, texto: string?)
 	tl.BackgroundColor3 = Paleta.UI_PAPEL
 	tl.BackgroundTransparency = 0
 	tl.TextColor3 = Paleta.UI_TINTA
-	tl.FontFace = Componentes.FUENTE_TITULO
+	tl.FontFace = Tema.FUENTE_TITULO
 	tl.TextScaled = true
 	if texto then
 		tl.Text = texto
@@ -86,9 +78,14 @@ local function estilizarCartel(bb: BillboardGui, texto: string?)
 		esquinas.Parent = tl
 	end
 	esquinas.CornerRadius = UDim.new(0.3, 0)
-	if not tl:FindFirstChildOfClass("UIStroke") then
-		Componentes.borde(tl, Paleta.UI_TINTA, 3)
+	local contorno = tl:FindFirstChildOfClass("UIStroke")
+	if not contorno then
+		contorno = Instance.new("UIStroke")
+		contorno.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		contorno.Parent = tl
 	end
+	contorno.Color = Paleta.UI_TINTA
+	contorno.Thickness = Tema.GROSOR
 	local relleno = tl:FindFirstChildOfClass("UIPadding")
 	if not relleno then
 		relleno = Instance.new("UIPadding")
@@ -98,23 +95,6 @@ local function estilizarCartel(bb: BillboardGui, texto: string?)
 	relleno.PaddingRight = UDim.new(0.06, 0)
 	relleno.PaddingTop = UDim.new(0.12, 0)
 	relleno.PaddingBottom = UDim.new(0.12, 0)
-end
-
-local function crearCartel(parte: BasePart, texto: string, altura: number): BillboardGui
-	local bb = Instance.new("BillboardGui")
-	bb.Name = "Cartel"
-	bb.Size = UDim2.fromOffset(240, 54)
-	bb.StudsOffset = Vector3.new(0, altura, 0)
-	bb.AlwaysOnTop = false
-	bb.MaxDistance = 110
-	local tl = Instance.new("TextLabel")
-	tl.Name = "Texto"
-	tl.Size = UDim2.fromScale(1, 1)
-	tl.Text = texto
-	tl.Parent = bb
-	bb.Parent = parte
-	estilizarCartel(bb, nil)
-	return bb
 end
 
 -- El modelo etiquetado que contiene a un cartel decide su rotulo
@@ -141,14 +121,6 @@ local function considerarCartel(d: Instance)
 		cartelesVistos[d] = true
 		task.defer(function()
 			estilizarCartel(d, rotuloPara(d))
-		end)
-	elseif d:IsA("Model") and CollectionService:HasTag(d, "MaquinaRefrescos") then
-		cartelesVistos[d] = true
-		task.defer(function()
-			local cuerpo = d:WaitForChild("Cuerpo", 10)
-			if cuerpo and cuerpo:IsA("BasePart") and not cuerpo:FindFirstChild("Cartel") then
-				crearCartel(cuerpo, Textos.MUNDO.restaurarEnergia, cuerpo.Size.Y / 2 + 1.4)
-			end
 		end)
 	end
 end
@@ -184,42 +156,10 @@ workspace.ChildAdded:Connect(function(hijo)
 end)
 task.defer(ocultarFigurinas)
 
--- === Radios ===
-type RadioVista = { modelo: Model, carretes: { BasePart }, cartel: BillboardGui?, texto: TextLabel? }
-local radios: { RadioVista } = {}
-
-local function prepararRadio(modelo: Model)
-	-- Los hijos del modelo pueden llegar despues que el modelo: se esperan.
-	local cuerpo = modelo:WaitForChild("Cuerpo", 10)
-	local carretes = {}
-	for i = 1, 2 do
-		local carrete = modelo:WaitForChild("Carrete" .. i, 10)
-		if carrete and carrete:IsA("BasePart") then
-			table.insert(carretes, carrete)
-		end
-	end
-	local vista: RadioVista = { modelo = modelo, carretes = carretes, cartel = nil, texto = nil }
-	if cuerpo and cuerpo:IsA("BasePart") then
-		local bb = crearCartel(cuerpo, "", 3.2)
-		bb.Name = "CartelRadio"
-		bb.Size = UDim2.fromOffset(220, 40)
-		bb.MaxDistance = 40
-		bb.Enabled = false
-		vista.cartel = bb
-		vista.texto = bb:FindFirstChild("Texto") :: TextLabel
-	end
-	table.insert(radios, vista)
-end
-
 -- El Mundo se replica por partes: al aparecer workspace.Mundo sus 1.200
 -- descendientes aun estan llegando. Se escucha DescendantAdded y se hace una
--- pasada inicial; el conjunto evita preparar dos veces la misma radio.
-local preparadas: { [Model]: boolean } = {}
+-- pasada inicial.
 local function considerar(d: Instance)
-	if d:IsA("Model") and d:GetAttribute("Mueble") == "Radio" and not preparadas[d] then
-		preparadas[d] = true
-		task.defer(prepararRadio, d)
-	end
 	considerarCartel(d)
 end
 
@@ -231,56 +171,6 @@ task.defer(function()
 	mundo.DescendantAdded:Connect(considerar)
 	for _, d in mundo:GetDescendants() do
 		considerar(d)
-	end
-end)
-
-local giro = 0
-RunService.RenderStepped:Connect(function(dt)
-	giro += dt * 3
-	for _, r in radios do
-		local cintaId = r.modelo:GetAttribute("CintaId")
-		local activa = typeof(cintaId) == "string"
-		if r.cartel then
-			r.cartel.Enabled = activa
-			if activa and r.texto then
-				local def = DefinicionesColeccionables.CINTA_POR_ID[cintaId]
-				if def then
-					r.texto.Text = "♫ " .. def.nombre .. (if def.sonidoId == 0 then " " .. Textos.BASE.sinAudio else "")
-				end
-			end
-		end
-		if activa then
-			for i, carrete in r.carretes do
-				local base = carrete:GetAttribute("CFrameBase")
-				if typeof(base) ~= "CFrame" then
-					base = carrete.CFrame
-					carrete:SetAttribute("CFrameBase", base)
-				end
-				carrete.CFrame = base * CFrame.Angles(giro * (if i == 1 then 1 else -1), 0, 0)
-			end
-		end
-	end
-end)
-
--- === Mascotas Perfectas exhibidas giran ===
-RunService.RenderStepped:Connect(function(dt)
-	local mundo = workspace:FindFirstChild("Mundo")
-	if not mundo then
-		return
-	end
-	local parcelas = mundo:FindFirstChild("Parcelas")
-	if not parcelas then
-		return
-	end
-	for _, parcela in parcelas:GetChildren() do
-		local contenido = parcela:FindFirstChild("Contenido")
-		if contenido then
-			for _, modelo in contenido:GetChildren() do
-				if modelo:IsA("Model") and modelo:GetAttribute("Estado") == DefinicionesMascotas.ESTADO_MAX and modelo:GetAttribute("MascotaId") then
-					modelo:PivotTo(modelo:GetPivot() * CFrame.Angles(0, dt * 0.8, 0))
-				end
-			end
-		end
 	end
 end)
 

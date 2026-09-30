@@ -5,9 +5,9 @@
 	tabla LAYOUT de abajo, en dos capas:
 
 	  1. El ESQUELETO funcional (lo de siempre): suelo, ranuras de monton,
-	     caseta, contenedor, maquina, plaza, parcelas, limites. Todo lo que el
-	     runtime necesita encontrar lleva TAG de CollectionService o ATRIBUTO,
-	     nunca se busca por nombre.
+	     caseta, contenedor, plaza, barreras de los cuadrantes, limites. Todo
+	     lo que el runtime necesita encontrar lleva TAG de CollectionService o
+	     ATRIBUTO, nunca se busca por nombre.
 	  2. El ARTE (pasada de color, referencia KOTAMON): ArteMundo viste el
 	     esqueleto con piezas `SoloDecorado` sin colision (cabana de madera,
 	     trituradora, vallas, camion, postes con cables...) y pinta con
@@ -27,35 +27,40 @@
 	viven en el place y se usan por nombre; sin ellos el mundo se ve igual de
 	entero, solo con materiales base y props de partes.
 
-	    RanuraMonton      marcador donde Botin instancia un monton (attr Tamano)
-	    FigurinaFija      marcador de figurina escondida (attr FigurinaId)
+	    RanuraMonton      marcador donde Botin instancia un monton (attr
+	                      Tamano, Cuadrante y Zona)
+	    BarreraCuadrante  pared de un cuadrante que se abre con rebirths
+	                      (attr Cuadrante y Rebirth; el servidor le da su
+	                      grupo de colision)
+	    PuntoAparicion    donde aparece todo el mundo (plaza, mirando al patio)
+	    FigurinaFija      marcador de figurina escondida (attr FigurinaId;
+	                      solo con la funcion FIGURINAS, pospuesta)
 	    Contenedor        el contenedor de reciclaje (hijo ZonaAcierto = punteria)
-	    MaquinaRefrescos  la maquina de refrescos
-	    Parcela           cada base (attr IndiceParcela; hijos con attr Mueble,
-	                      marcadores SlotEstanteria y Pedestal con attr Indice)
 	    Limite            muros invisibles del borde del mapa
 	    SoloDecorado      arte que no hace nada
 	    Mundo.Manual      carpeta que el horneado NUNCA borra: lo que el
 	                      usuario edita a mano en Studio va ahi
 
-	Las partes de una parcela que cambian con una skin llevan attr Pintable
-	("losa" | "mueble" | "borde").
+	Plano v4 (diseno v2, 26 sep; N = z negativa, E = x positiva). Sin bases:
+	el mapa se recorto por el oeste, donde estaban las parcelas, y la valla
+	queda a 24 studs del patio por los tres lados. Cada cuadrante es de un
+	material (GameConfig.CUADRANTES); los dos del norte llevan barrera hasta
+	el Rebirth 1 (Metal) y 2 (Organico):
 
-	Plano v3 (N = z negativa, E = x positiva). La valla de madera del
-	vertedero rodea TODO el mapa (antes solo el patio); el patio no tiene
-	muros, es la explanada de cesped claro con los montones. 6 parcelas = 6
-	jugadores por servidor, en columna al oeste:
+	    +------------------------------+  z = -99
+	    |  +------------+------------+ |
+	    |  | METAL  R1  | ORGANICO R2| |  z = -75..-25 (barreras)
+	    |  +------------+------------+ |
+	    |  | PAPEL      | PLASTICO   | |
+	    |  | PAPEL      | PLASTICO   | |  z = 75
+	    |  +------------+------------+ |
+	    |  ===== calle + PLAZA (aparicion) ====   z = 96
+	    |  | RECICLADORA: caseta      | |  z = 115..161
+	    +------------------------------+  z = 177
+	   x = -99  -75     -26,25      22,5  46,5
 
-	    +-----------------------------------------------+  z = -124
-	    | [P1]  |  +---------------------------+         |
-	    | [P2]  |  |     PATIO 200 x 200       |         |
-	    | [P3]  c  |   12 ranuras de monton    |         |
-	    | [P4]  a  +---------------------------+         |  z = 100
-	    | [P5]  l  ====== calle + PLAZA (spawn) ======   |
-	    | [P6]  l  | RECICLADORA: caseta al centro     | |  z = 140..186
-	    |       e  | (mira al norte), maquina, conten. | |
-	    +-----------------------------------------------+  z = 202
-	   x = -196   -132     -100                 100    124
+	Entre el borde del patio y la valla queda una franja de cesped de 24
+	studs: ahi va el decorado (y los escondites de las figurinas).
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -68,53 +73,72 @@ local Paleta = require(Config:WaitForChild("Paleta"))
 local GameConfig = require(Config:WaitForChild("GameConfig"))
 local Textos = require(Config:WaitForChild("Textos"))
 local DefinicionesColeccionables = require(Config:WaitForChild("DefinicionesColeccionables"))
+local Recicladora = require(Config:WaitForChild("Recicladora"))
 local ArteMundo = require(script.Parent:WaitForChild("ArteMundo"))
 
 local M = Paleta.MUNDO
 local V = Paleta.VARIANTES
 
 local ConstructorMundo = {}
-ConstructorMundo.VERSION = 3
+ConstructorMundo.VERSION = 5
 
 -- ===========================================================================
 -- LAYOUT
 -- ===========================================================================
 
 local LAYOUT = {
-	-- El patio es un cuadrado centrado en el origen: Patio.posicionEnPatio lo
-	-- da por hecho (|x|, |z| < PATIO_LADO / 2), asi que el patio no se mueve
-	-- y el resto del mapa se coloca a su alrededor.
-	PATIO_LADO = GameConfig.PATIO_LADO,
-	-- Rejilla 4x3 = 12 ranuras. Los montones son montanas de hasta 14 studs de
-	-- radio: 50 studs entre columnas y 60 entre filas dejan pasillos.
-	RANURA_X = { -75, -25, 25, 75 },
-	RANURA_Z = { -60, 0, 60 },
-	RANURA_JITTER = 5,
+	-- El patio es un rectangulo (GameConfig.PATIO, bordes en x y z): lo lee
+	-- tambien Patio.posicionEnPatio, asi que manda la config.
+	PATIO = GameConfig.PATIO,
+	-- Rejilla de 2 columnas x 3 filas de cuadrantes iguales (~49 x 50),
+	-- separados por caminos en sus bordes interiores. Cada cuadrante lleva
+	-- DOS montones en diagonal (peticion del usuario: se veia vacio) y un
+	-- TERCERO chico en la otra diagonal (peticion del usuario: mas montones).
+	COLUMNAS = GameConfig.COLUMNAS_PATIO,
+	FILAS = GameConfig.FILAS_PATIO,
+	-- Hueco entre las faldas de los dos montones de un cuadrante: la basura
+	-- de uno no debe brotar dentro de las lomas del otro
+	SEPARACION_MONTONES = 6,
+	JITTER_MONTON = 1.5,
+	-- Los 6 pares {mayor, menor}, uno por cuadrante. Diseno v2: todos
+	-- grande + chico, mas el tercero chico = 6 grandes y 12 chicos, lo que
+	-- dice GameConfig.TAMANOS_MONTON.cantidad.
+	PAREJAS_MONTON = {
+		{ "grande", "chico" },
+		{ "grande", "chico" },
+		{ "grande", "chico" },
+		{ "grande", "chico" },
+		{ "grande", "chico" },
+		{ "grande", "chico" },
+	},
 	CAMINO_ANCHO = 10,
 	-- Al sur del patio, la calle con la plaza del spawn (pavimento pegado al
-	-- borde del patio) y detras el lote de tierra de la recicladora, del
-	-- mismo ancho que el patio, con la caseta en el centro mirando al norte
+	-- borde del patio) y detras el lote de tierra de la recicladora, desde el
+	-- borde oeste del patio hasta cerca de la valla este, con la caseta en
+	-- x = 0 mirando al norte
 	PLAZA_ANCHO = 40,
 	PLAZA_FONDO = 38,
-	SPAWN_Z = 121,
-	LOTE_NORTE = 140,
-	LOTE_SUR = 186,
-	CASETA_Z = 158,
-	-- 6 parcelas en columna al oeste, de norte a sur, mirando a la calle y al
-	-- patio; la calle de tierra baja entre ellas y el patio
-	PARCELA_LADO = 36,
-	PARCELA_X = -150,
-	PARCELA_Z = { -87, -37, 13, 63, 113, 163 },
-	CALLE_X = -116,
+	SPAWN_Z = 96,
+	LOTE_NORTE = 115,
+	LOTE_SUR = 161,
+	CASETA_Z = 133,
 	CALLE_ANCHO = 12,
 	-- Limite del mapa: rectangulo con muro invisible alto y la valla de
-	-- madera del vertedero por dentro
-	LIMITE = { oeste = -196, este = 124, norte = -124, sur = 202 },
+	-- madera del vertedero por dentro. Al norte, al este y (desde que no hay
+	-- parcelas) al oeste queda una franja de cesped de 24 entre el patio y la
+	-- valla (el decorado y las figurinas).
+	LIMITE = { oeste = -99, este = 46.5, norte = -99, sur = 177 },
 	LIMITE_ALTURA = 60,
 	-- 10 studs: un personaje salta ~7,5, asi que la valla no se salta aunque
 	-- alguien apague el muro invisible
 	VALLA_ALTURA = 10,
 	VALLA_MARGEN = 1.6,
+	-- Barrera de un cuadrante cerrado: mas alta que un salto (~7,5) y metida
+	-- un poco hacia dentro de su cuadrante, para que las dos del borde comun
+	-- (Metal | Organico) no coincidan
+	BARRERA_ALTURA = 11,
+	BARRERA_GROSOR = 0.6,
+	BARRERA_DENTRO = 0.6,
 }
 
 -- ===========================================================================
@@ -279,6 +303,13 @@ local function centroMapa()
 	return (L.oeste + L.este) / 2, (L.norte + L.sur) / 2
 end
 
+-- El lote de la recicladora (en x del mundo): desde el borde oeste del patio
+-- hasta 3 studs antes de la valla este. Es mas ancho que el patio desde que
+-- este se recorto por el este; la caseta sigue en x = 0.
+local function limitesLote()
+	return LAYOUT.PATIO.oeste, LAYOUT.LIMITE.este - 3
+end
+
 -- ===========================================================================
 -- Limpieza del place
 -- ===========================================================================
@@ -320,6 +351,7 @@ local function limpiarPlace(): Folder?
 		baseplate.Position = Vector3.new(cx, -baseplate.Size.Y / 2, cz)
 		-- Todo lo que no es patio ni parcela es cesped un poco mas oscuro
 		ArteMundo.pintar(baseplate, Enum.Material.SmoothPlastic, M.CESPED_OSCURO, V.cesped)
+		ArteMundo.studsSuelo(baseplate)
 	end
 	return manual
 end
@@ -328,67 +360,186 @@ end
 -- Patio compartido
 -- ===========================================================================
 
--- 12 ranuras: rejilla 4x3 con jitter determinista. Los tamanos se reparten
--- con la misma semilla para que hornear dos veces de el mismo patio.
+-- Los bordes de las columnas y filas de cuadrantes: el rectangulo del patio
+-- partido en partes iguales. Los caminos van en los bordes interiores.
+local function divisiones(desde, hasta, partes)
+	local bordes = {}
+	for i = 0, partes do
+		table.insert(bordes, desde + (hasta - desde) * i / partes)
+	end
+	return bordes
+end
+
+local function bordesCuadrantes()
+	local P = LAYOUT.PATIO
+	return divisiones(P.oeste, P.este, LAYOUT.COLUMNAS), divisiones(P.norte, P.sur, LAYOUT.FILAS)
+end
+
+-- 18 ranuras: tres por cuadrante del 2x3. La pareja va en una diagonal y un
+-- chico en la otra, lo justo para no pisar la falda de ninguno de los dos
+-- (la suya puede rozar el camino del borde). Las parejas de tamanos
+-- se barajan con semilla fija para que hornear dos veces de el mismo patio.
+-- En cada cuadrante el mayor y el menor quedan a D = rMayor + rMenor +
+-- SEPARACION entre centros, repartidos para que el conjunto este centrado
+-- (el borde lejano de cada uno a la misma distancia del centro): con
+-- grande+chico eso ocupa +-21,6 alrededor del centro de un cuadrante de
+-- ~49 x 50 (la falda puede rozar un par de studs el camino).
 local function posicionesRanuras()
-	local rng = Random.new(GameConfig.NUM_PARCELAS * 7 + 3)
-	local posiciones = {}
-	for _, x0 in LAYOUT.RANURA_X do
-		for _, z0 in LAYOUT.RANURA_Z do
-			local x = x0 + rng:NextNumber(-LAYOUT.RANURA_JITTER, LAYOUT.RANURA_JITTER)
-			local z = z0 + rng:NextNumber(-LAYOUT.RANURA_JITTER, LAYOUT.RANURA_JITTER)
-			table.insert(posiciones, Vector3.new(x, 1, z))
-		end
-	end
-	local tamanos = {}
-	for nombre, def in GameConfig.TAMANOS_MONTON do
-		for _ = 1, def.cantidad do
-			table.insert(tamanos, nombre)
-		end
-	end
-	table.sort(tamanos)
-	for i = #tamanos, 2, -1 do
+	-- Semilla fija (la de siempre: 6 parcelas * 7 + 3): mismas posiciones al
+	-- rehornear
+	local rng = Random.new(45)
+	local parejas = table.clone(LAYOUT.PAREJAS_MONTON)
+	for i = #parejas, 2, -1 do
 		local j = rng:NextInteger(1, i)
-		tamanos[i], tamanos[j] = tamanos[j], tamanos[i]
+		parejas[i], parejas[j] = parejas[j], parejas[i]
+	end
+	local function radio(tamano)
+		return GameConfig.TAMANOS_MONTON[tamano].radio
+	end
+	local bx, bz = bordesCuadrantes()
+	assert(#parejas == LAYOUT.COLUMNAS * LAYOUT.FILAS, "PAREJAS_MONTON debe tener una pareja por cuadrante")
+	local posiciones, tamanos = {}, {}
+	local n = 0
+	for fila = 1, LAYOUT.FILAS do
+		local z0 = (bz[fila] + bz[fila + 1]) / 2
+		for columna = 1, LAYOUT.COLUMNAS do
+			local x0 = (bx[columna] + bx[columna + 1]) / 2
+			n += 1
+			local mayor, menor = parejas[n][1], parejas[n][2]
+			local rM, rm = radio(mayor), radio(menor)
+			local d = rM + rm + LAYOUT.SEPARACION_MONTONES
+			local a = (d + rm - rM) / 2
+			-- La diagonal alterna de un cuadrante al siguiente
+			local u = if (fila + columna) % 2 == 0 then Vector3.new(1, 0, 1).Unit else Vector3.new(1, 0, -1).Unit
+			local centro = Vector3.new(x0, 1, z0)
+			local j = LAYOUT.JITTER_MONTON
+			local jitter = Vector3.new(rng:NextNumber(-j, j), 0, rng:NextNumber(-j, j))
+			table.insert(posiciones, centro - u * a + jitter)
+			table.insert(tamanos, mayor)
+			table.insert(posiciones, centro + u * (d - a) + jitter)
+			table.insert(tamanos, menor)
+			-- Tercero: chico en la diagonal perpendicular, lado alterno
+			local v = Vector3.new(-u.Z, 0, u.X) * (if columna % 2 == 0 then 1 else -1)
+			local rc, s = radio("chico"), LAYOUT.SEPARACION_MONTONES
+			local t = math.max(
+				math.sqrt(math.max(0, (rM + rc + s) ^ 2 - a ^ 2)),
+				math.sqrt(math.max(0, (rm + rc + s) ^ 2 - (d - a) ^ 2))
+			)
+			table.insert(posiciones, centro + v * t + jitter)
+			table.insert(tamanos, "chico")
+		end
 	end
 	return posiciones, tamanos
 end
 
+-- Las ranuras salen de tres en tres por cuadrante, en orden de lectura
+-- (posicionesRanuras recorre filas y columnas igual que CUADRANTES)
 local function construirRanuras(patio)
 	local ranuras = carpeta("Ranuras", patio)
 	local posiciones, tamanos = posicionesRanuras()
 	for i, pos in posiciones do
+		local cuadrante = math.ceil(i / 3)
+		local def = GameConfig.CUADRANTES[cuadrante]
 		local m = marcador("Ranura_" .. i, CFrame.new(pos), ranuras)
 		m:SetAttribute("Indice", i)
 		m:SetAttribute("Tamano", tamanos[i] or "chico")
+		m:SetAttribute("Cuadrante", cuadrante)
+		m:SetAttribute("Zona", def.zona)
 		etiquetar(m, "RanuraMonton")
 	end
 	return #posiciones
 end
 
--- Caminos de tierra por los pasillos entre montones (entre las columnas y
--- filas de ranuras); el central llega hasta el borde sur, donde empieza la
--- plaza, y se ensancha en la entrada
+-- Rectangulo (x0, x1, z0, z1) del cuadrante i, en orden de lectura
+local function rectanguloCuadrante(i)
+	local bx, bz = bordesCuadrantes()
+	local fila = math.ceil(i / LAYOUT.COLUMNAS)
+	local columna = (i - 1) % LAYOUT.COLUMNAS + 1
+	return bx[columna], bx[columna + 1], bz[fila], bz[fila + 1]
+end
+
+-- Barreras de los cuadrantes que se abren con rebirths: cuatro paredes por
+-- cuadrante, mas altas que un salto. Las paredes son la colision (tag
+-- BarreraCuadrante; el servidor las pone en el grupo de colision de su
+-- rebirth y cada personaje choca o no segun los suyos) y se ven como un
+-- cristal del color del material (se ve lo que espera detras); ArteMundo
+-- les pone postes y travesanos de obra. Un cartel en la cara que da al patio
+-- abierto dice que rebirth hace falta y que zona hay detras.
+local function construirBarreras(patio)
+	local barreras = carpeta("Barreras", patio)
+	local h, g, dentro = LAYOUT.BARRERA_ALTURA, LAYOUT.BARRERA_GROSOR, LAYOUT.BARRERA_DENTRO
+	local n = 0
+	for i, def in GameConfig.CUADRANTES do
+		if def.rebirth <= 0 then
+			continue
+		end
+		local x0, x1, z0, z1 = rectanguloCuadrante(i)
+		x0, x1, z0, z1 = x0 + dentro, x1 - dentro, z0 + dentro, z1 - dentro
+		local destaca = (GameConfig.ZONAS[def.zona] or {}).destaca
+		local color = if destaca then (Paleta.MATERIAL[destaca] or Paleta.MUEBLE) else Paleta.MUEBLE
+		local grupo = modelo("Barrera_" .. i, barreras)
+		local lados = {
+			Sur = { Vector3.new(x1 - x0, h, g), Vector3.new((x0 + x1) / 2, h / 2, z1) },
+			Norte = { Vector3.new(x1 - x0, h, g), Vector3.new((x0 + x1) / 2, h / 2, z0) },
+			Oeste = { Vector3.new(g, h, z1 - z0), Vector3.new(x0, h / 2, (z0 + z1) / 2) },
+			Este = { Vector3.new(g, h, z1 - z0), Vector3.new(x1, h / 2, (z0 + z1) / 2) },
+		}
+		for lado, s in lados do
+			local pared = parte({
+				Name = "Pared" .. lado,
+				Size = s[1],
+				Position = s[2],
+				Color = color,
+				Material = Enum.Material.Glass,
+				Transparency = 0.6,
+				CanTouch = false,
+				Parent = grupo,
+			})
+			pared.CastShadow = false
+			pared:SetAttribute("Cuadrante", i)
+			pared:SetAttribute("Rebirth", def.rebirth)
+			etiquetar(pared, "BarreraCuadrante")
+			n += 1
+			ArteMundo.postesBarrera(grupo, pared)
+		end
+		-- (sin string.upper: no sabe de tildes, "ORGáNICO")
+		local texto = Textos.formatear(Textos.MUNDO.barrera, { n = def.rebirth, zona = Textos.ZONAS[def.zona] or def.zona })
+		local cartel = cartelFlotante(grupo:FindFirstChild("ParedSur"), texto, 0, 260)
+		-- Adelantado hacia la camara (la Z de StudsOffset va en su espacio): en
+		-- el plano de la pared, el cristal lo tapaba al mirarlo de frente
+		cartel.StudsOffset = Vector3.new(0, 0, 3)
+	end
+	return n
+end
+
+-- Caminos de tierra entre los cuadrantes (en sus bordes interiores), de
+-- borde a borde del patio, y un ensanche en la entrada desde la plaza
+-- (borde sur, en x = 0, donde esta la plaza)
 local function construirCaminos(patio)
 	local caminos = carpeta("Caminos", patio)
-	local lado = LAYOUT.PATIO_LADO
+	local P = LAYOUT.PATIO
 	local ancho = LAYOUT.CAMINO_ANCHO
+	local largoX, largoZ = P.este - P.oeste, P.sur - P.norte
+	local cx, cz = (P.oeste + P.este) / 2, (P.norte + P.sur) / 2
+	local bx, bz = bordesCuadrantes()
 	local semilla = 10
-	for _, x in { -50, 50 } do
+	for i = 2, #bx - 1 do
 		semilla += 1
-		ArteMundo.caminoTierra(caminos, CFrame.new(x, 1, 0), ancho, lado - 4, semilla)
+		ArteMundo.caminoTierra(caminos, CFrame.new(bx[i], 1, cz), ancho, largoZ - 4, semilla)
 	end
-	ArteMundo.caminoTierra(caminos, CFrame.new(0, 1, 1), ancho, lado - 2, 13)
-	for _, z in { -30, 30 } do
+	for i = 2, #bz - 1 do
 		semilla += 1
-		ArteMundo.caminoTierra(caminos, CFrame.new(0, 1, z) * CFrame.Angles(0, math.rad(90), 0), ancho, lado - 4, semilla)
+		ArteMundo.caminoTierra(caminos, CFrame.new(cx, 1, bz[i]) * CFrame.Angles(0, math.rad(90), 0), ancho, largoX - 4, semilla)
 	end
-	ArteMundo.caminoTierra(caminos, CFrame.new(0, 1, lado / 2 - 6), ancho + 8, 12, 99)
+	ArteMundo.caminoTierra(caminos, CFrame.new(0, 1, P.sur - 6), ancho + 8, 12, 99)
 end
 
 -- Seis siluetas estaticas que ademas son los escondites de las figurinas.
 -- Todas a mas de 20 studs de cualquier ranura: la basura que brota dentro
--- de una silueta con colision sale disparada hacia el suelo.
+-- de una silueta con colision sale disparada hacia el suelo. Con dos
+-- montones por cuadrante el patio no deja sitio, asi que van FUERA, en la
+-- franja de cesped entre el patio y la valla (norte y este): alli el suelo
+-- es el baseplate, a y = 0, un stud por debajo del patio.
 -- Devuelve los CFrames de escondite por FigurinaId.
 local function construirDecorado(patio)
 	local decorado = carpeta("Decorado", patio)
@@ -401,56 +552,56 @@ local function construirDecorado(patio)
 
 	-- Lavadora vieja (F5 dentro, a la altura de la puerta)
 	local lavadora = modelo("LavadoraVieja", decorado)
-	silueta({ Name = "Cuerpo", Size = Vector3.new(6, 7, 6), Position = Vector3.new(-95, 4.5, -85), Color = M.PARED, Material = Enum.Material.Plaster }).Parent = lavadora
-	local puerta = silueta({ Name = "Puerta", Size = Vector3.new(0.4, 3.6, 3.6), CFrame = CFrame.new(-95, 4, -81.8) * CFrame.Angles(0, math.rad(90), 0), Shape = Enum.PartType.Cylinder, Color = M.CRISTAL, Material = Enum.Material.Glass })
+	silueta({ Name = "Cuerpo", Size = Vector3.new(6, 7, 6), Position = Vector3.new(-60, 3.5, -86), Color = M.PARED, Material = Enum.Material.Plaster }).Parent = lavadora
+	local puerta = silueta({ Name = "Puerta", Size = Vector3.new(0.4, 3.6, 3.6), CFrame = CFrame.new(-60, 3, -82.8) * CFrame.Angles(0, math.rad(90), 0), Shape = Enum.PartType.Cylinder, Color = M.CRISTAL, Material = Enum.Material.Glass })
 	puerta.Parent = lavadora
-	silueta({ Name = "Marco", Size = Vector3.new(0.5, 4.2, 4.2), CFrame = CFrame.new(-95, 4, -81.9) * CFrame.Angles(0, math.rad(90), 0), Shape = Enum.PartType.Cylinder, Color = M.METAL, Material = Enum.Material.Metal }).Parent = lavadora
-	silueta({ Name = "Oxido", Size = Vector3.new(2, 1.4, 0.1), Position = Vector3.new(-93.5, 2.2, -81.95), Color = M.OXIDO, Material = Enum.Material.CorrodedMetal }).Parent = lavadora
-	escondites.F5 = CFrame.new(-95, 1.8, -81)
+	silueta({ Name = "Marco", Size = Vector3.new(0.5, 4.2, 4.2), CFrame = CFrame.new(-60, 3, -82.9) * CFrame.Angles(0, math.rad(90), 0), Shape = Enum.PartType.Cylinder, Color = M.METAL, Material = Enum.Material.Metal }).Parent = lavadora
+	silueta({ Name = "Oxido", Size = Vector3.new(2, 1.4, 0.1), Position = Vector3.new(-58.5, 1.2, -82.95), Color = M.OXIDO, Material = Enum.Material.CorrodedMetal }).Parent = lavadora
+	escondites.F5 = CFrame.new(-60, 0.8, -82)
 
 	-- Pila de neumaticos (F6 encima)
 	local neumaticos = modelo("PilaNeumaticos", decorado)
 	for i = 0, 2 do
-		local n = silueta({ Name = "Neumatico" .. i, Size = Vector3.new(1.4, 6, 6), CFrame = CFrame.new(92, 1.7 + i * 1.4, -90) * CFrame.Angles(0, 0, math.rad(90)), Shape = Enum.PartType.Cylinder, Color = M.GOMA, Material = Enum.Material.Rubber })
+		local n = silueta({ Name = "Neumatico" .. i, Size = Vector3.new(1.4, 6, 6), CFrame = CFrame.new(34.5, 0.7 + i * 1.4, -86) * CFrame.Angles(0, 0, math.rad(90)), Shape = Enum.PartType.Cylinder, Color = M.GOMA, Material = Enum.Material.Rubber })
 		n.Parent = neumaticos
-		silueta({ Name = "Llanta" .. i, Size = Vector3.new(1.46, 3, 3), CFrame = CFrame.new(92, 1.7 + i * 1.4, -90) * CFrame.Angles(0, 0, math.rad(90)), Shape = Enum.PartType.Cylinder, Color = M.METAL, Material = Enum.Material.Metal }).Parent = neumaticos
+		silueta({ Name = "Llanta" .. i, Size = Vector3.new(1.46, 3, 3), CFrame = CFrame.new(34.5, 0.7 + i * 1.4, -86) * CFrame.Angles(0, 0, math.rad(90)), Shape = Enum.PartType.Cylinder, Color = M.METAL, Material = Enum.Material.Metal }).Parent = neumaticos
 	end
-	escondites.F6 = CFrame.new(92, 5.4, -90)
+	escondites.F6 = CFrame.new(34.5, 4.4, -86)
 
 	-- Tubo tumbado (F2 en la boca)
-	local tubo = silueta({ Name = "TuboTumbado", Size = Vector3.new(14, 5, 5), CFrame = CFrame.new(92, 3.5, 28) * CFrame.Angles(0, math.rad(90), 0), Shape = Enum.PartType.Cylinder, Color = M.OXIDO, Material = Enum.Material.CorrodedMetal })
+	local tubo = silueta({ Name = "TuboTumbado", Size = Vector3.new(14, 5, 5), CFrame = CFrame.new(34.5, 2.5, 0) * CFrame.Angles(0, math.rad(90), 0), Shape = Enum.PartType.Cylinder, Color = M.OXIDO, Material = Enum.Material.CorrodedMetal })
 	tubo.Name = "TuboTumbado"
-	escondites.F2 = CFrame.new(92, 1.6, 36)
+	escondites.F2 = CFrame.new(34.5, 0.6, 8)
 
 	-- Rampa a un puente bajo (F4 debajo del puente)
 	local puente = modelo("Puente", decorado)
 	local madera = Enum.Material.WoodPlanks
-	silueta({ Name = "Tablero", Size = Vector3.new(10, 1, 10), Position = Vector3.new(-90, 6.5, 30), Color = M.MADERA, Material = madera, Variante = V.madera }).Parent = puente
-	for nombre, pos in { PilarA = Vector3.new(-94.5, 3.5, 34.5), PilarB = Vector3.new(-85.5, 3.5, 34.5), PilarC = Vector3.new(-94.5, 3.5, 25.5), PilarD = Vector3.new(-85.5, 3.5, 25.5) } do
+	silueta({ Name = "Tablero", Size = Vector3.new(10, 1, 10), Position = Vector3.new(34.5, 5.5, 45), Color = M.MADERA, Material = madera, Variante = V.madera }).Parent = puente
+	for nombre, pos in { PilarA = Vector3.new(30, 2.5, 49.5), PilarB = Vector3.new(39, 2.5, 49.5), PilarC = Vector3.new(30, 2.5, 40.5), PilarD = Vector3.new(39, 2.5, 40.5) } do
 		silueta({ Name = nombre, Size = Vector3.new(1, 5, 1), Position = pos, Color = M.VIGA, Material = Enum.Material.Wood }).Parent = puente
 	end
-	local rampa = cuna({ Name = "Rampa", Size = Vector3.new(10, 6, 14), CFrame = CFrame.new(-90, 4, 42) * CFrame.Angles(0, math.rad(180), 0), Color = M.MADERA, Material = madera, Variante = V.madera, Parent = puente })
+	local rampa = cuna({ Name = "Rampa", Size = Vector3.new(10, 6, 14), CFrame = CFrame.new(34.5, 3, 57) * CFrame.Angles(0, math.rad(180), 0), Color = M.MADERA, Material = madera, Variante = V.madera, Parent = puente })
 	rampa.CanQuery = false
 	etiquetar(rampa, "SoloDecorado")
-	escondites.F4 = CFrame.new(-90, 1.6, 30)
+	escondites.F4 = CFrame.new(34.5, 0.6, 45)
 
-	-- Contenedor grande al fondo del patio, lejos de la entrada (F3 encima)
-	local contenedor = silueta({ Name = "ContenedorGrande", Size = Vector3.new(10, 6, 5), Position = Vector3.new(0, 4, -85), Color = M.OXIDO, Material = Enum.Material.CorrodedMetal })
+	-- Contenedor grande detras del patio, lejos de la entrada (F3 encima)
+	local contenedor = silueta({ Name = "ContenedorGrande", Size = Vector3.new(10, 6, 5), Position = Vector3.new(0, 3, -87), Color = M.OXIDO, Material = Enum.Material.CorrodedMetal })
 	contenedor.Name = "ContenedorGrande"
-	escondites.F3 = CFrame.new(0, 7.6, -85)
+	escondites.F3 = CFrame.new(0, 6.6, -87)
 
-	-- Esquina de muro caida, en medio del patio
+	-- Esquina de muro caida, al norte del patio
 	local esquina = modelo("EsquinaMuro", decorado)
-	silueta({ Name = "TramoA", Size = Vector3.new(12, 3.5, 1.5), Position = Vector3.new(-14, 2.75, 30), Color = M.HORMIGON, Material = Enum.Material.Concrete }).Parent = esquina
-	silueta({ Name = "TramoB", Size = Vector3.new(1.5, 3.5, 10), Position = Vector3.new(-8.75, 2.75, 35.75), Color = M.HORMIGON, Material = Enum.Material.Concrete }).Parent = esquina
+	silueta({ Name = "TramoA", Size = Vector3.new(12, 3.5, 1.5), Position = Vector3.new(-30, 1.75, -87), Color = M.HORMIGON, Material = Enum.Material.Concrete }).Parent = esquina
+	silueta({ Name = "TramoB", Size = Vector3.new(1.5, 3.5, 10), Position = Vector3.new(-24.75, 1.75, -81.25), Color = M.HORMIGON, Material = Enum.Material.Concrete }).Parent = esquina
 
-	-- Props sueltos por el patio: barriles, bolsas y neumaticos
-	ArteMundo.barril(decorado, CFrame.new(-92, 1, -40), M.AZUL_MAQUINA)
-	ArteMundo.barril(decorado, CFrame.new(-94, 1, -36.5), M.OXIDO)
-	ArteMundo.bolsaBasura(decorado, CFrame.new(90, 1, 20), 21)
-	ArteMundo.bolsaBasura(decorado, CFrame.new(92.5, 1, 22), 22)
-	ArteMundo.pilaNeumaticos(decorado, CFrame.new(-90, 1, 88), 2, 23)
-	ArteMundo.pilaNeumaticos(decorado, CFrame.new(40, 1, 92), 4, 24)
+	-- Props sueltos alrededor del patio: barriles, bolsas y neumaticos
+	ArteMundo.barril(decorado, CFrame.new(-80, 0, -40), M.AZUL_MAQUINA)
+	ArteMundo.barril(decorado, CFrame.new(-82, 0, -36.5), M.OXIDO)
+	ArteMundo.bolsaBasura(decorado, CFrame.new(36.5, 0, 20), 21)
+	ArteMundo.bolsaBasura(decorado, CFrame.new(39, 0, 22), 22)
+	ArteMundo.pilaNeumaticos(decorado, CFrame.new(-55, 0, 83), 2, 23)
+	ArteMundo.pilaNeumaticos(decorado, CFrame.new(32, 0, 84), 4, 24)
 
 	-- F1: detras de la caseta, en el lote de la recicladora
 	escondites.F1 = CFrame.new(0, 1.6, LAYOUT.CASETA_Z + 7.5)
@@ -480,20 +631,47 @@ end
 -- mas alta que el resto, con los caminos y los montones.
 local function construirPatio(mundo)
 	local patio = modelo("Patio", mundo)
-	local lado = LAYOUT.PATIO_LADO
+	local P = LAYOUT.PATIO
 	-- 4 studs de grosor (hundido en el baseplate): con 1 stud, la basura que
 	-- cae desde lo alto de las montanas atravesaba el suelo y acababa sobre
 	-- el baseplate
-	parte({ Name = "Suelo", Size = Vector3.new(lado, 4, lado), Position = Vector3.new(0, -1, 0), Color = M.CESPED, Material = Enum.Material.SmoothPlastic, Variante = V.cesped, Parent = patio })
+	ArteMundo.studsSuelo(parte({ Name = "Suelo", Size = Vector3.new(P.este - P.oeste, 4, P.sur - P.norte), Position = Vector3.new((P.oeste + P.este) / 2, -1, (P.norte + P.sur) / 2), Color = M.CESPED, Material = Enum.Material.SmoothPlastic, Variante = V.cesped, Parent = patio }))
+	-- Borde rojo sobre el canto del suelo: marca el patio frente al cesped de
+	-- alrededor (mismo verde). Solo decorado, no colisiona ni entra en raycasts
+	local ancho, largo, grosor = P.este - P.oeste, P.sur - P.norte, 1.5
+	local cx, cz = (P.oeste + P.este) / 2, (P.norte + P.sur) / 2
+	for _, b in { { ancho, 0, -(largo - grosor) / 2 }, { ancho, 0, (largo - grosor) / 2 }, { grosor, -(ancho - grosor) / 2, 0 }, { grosor, (ancho - grosor) / 2, 0 } } do
+		local sx = b[1]
+		local sz = if sx == grosor then largo else grosor
+		local borde = parte({ Name = "BordePatio", Size = Vector3.new(sx, 0.2, sz), Position = Vector3.new(cx + b[2], 1.1, cz + b[3]), Color = M.BORDE_PATIO, Material = Enum.Material.SmoothPlastic, CanCollide = false, CanQuery = false, CanTouch = false, Parent = patio })
+		etiquetar(borde, "SoloDecorado")
+	end
 	local numRanuras = construirRanuras(patio)
+	-- Cada cuadrante con su suelo, sin tapar los caminos del medio (van en
+	-- los bordes interiores) ni el borde rojo del patio: tierra en el patio
+	-- abierto (basura revuelta) y el color del material que destaca en las
+	-- zonas ricas del norte
+	local colores = carpeta("ColoresCuadrantes", patio)
+	local mitadCamino = LAYOUT.CAMINO_ANCHO / 2
+	for i, def in GameConfig.CUADRANTES do
+		local x0, x1, z0, z1 = rectanguloCuadrante(i)
+		x0 += if x0 > P.oeste then mitadCamino else 1.5
+		x1 -= if x1 < P.este then mitadCamino else 1.5
+		z0 += if z0 > P.norte then mitadCamino else 1.5
+		z1 -= if z1 < P.sur then mitadCamino else 1.5
+		local destaca = (GameConfig.ZONAS[def.zona] or {}).destaca
+		local color = if destaca then (Paleta.MATERIAL[destaca] or M.TIERRA) else M.TIERRA
+		ArteMundo.sueloCuadrante(colores, Vector3.new((x0 + x1) / 2, 1.04, (z0 + z1) / 2), x1 - x0, z1 - z0, color)
+	end
 	construirCaminos(patio)
 	local escondites = construirDecorado(patio)
-	local numFigurinas = construirFigurinasFijas(patio, escondites)
-	return numRanuras, numFigurinas
+	local numFigurinas = if GameConfig.activa("FIGURINAS") then construirFigurinasFijas(patio, escondites) else 0
+	local numBarreras = construirBarreras(patio)
+	return numRanuras, numFigurinas, numBarreras
 end
 
 -- ===========================================================================
--- Recicladora de Dona Chatarra: caseta, contenedor, maquina y el lote
+-- Recicladora de Dona Chatarra: caseta, contenedor y el lote
 -- ===========================================================================
 
 -- cf = suelo bajo el NPC, con +Z local hacia los clientes (la cara y el
@@ -509,18 +687,41 @@ local function construirNPC(caseta, cf)
 	parte({ Name = "BrazoDer", Size = Vector3.new(0.7, 2.2, 0.7), CFrame = cf * CFrame.new(1.5, 4.2, 0), Color = color, Parent = npc })
 	parte({ Name = "Piernas", Size = Vector3.new(2, 2, 1), CFrame = cf * CFrame.new(0, 2, 0), Color = Paleta.gris(150), Parent = npc })
 	npc.PrimaryPart = torso
-	prompt(torso, Textos.PATIO.hablar, "Doña Chatarra", 10)
+	prompt(torso, Textos.PATIO.tienda, "Doña Chatarra", 10)
 	ArteMundo.vestirChatarra(npc)
 	return npc
 end
 
+-- Colision de la recicladora de Blender (la malla no colisiona): cajas y
+-- losas invisibles de Config/Recicladora en el marco del pivote de la malla
+-- (el suelo bajo el volquete, +Z al frente). Con CanQuery: la bolsa lanzada
+-- rebota en ellas y el apuntado las ve (Lanzamiento barre lo consultable).
+local function construirColisionRecicladora(caseta, pivote)
+	local carpeta = Instance.new("Folder")
+	carpeta.Name = "ColisionRecicladora"
+	carpeta.Parent = caseta
+	local function caja(nombre, cf, tamano)
+		parte({ Name = nombre, Size = tamano, CFrame = cf, Color = Paleta.CONTENEDOR, Transparency = 1, Parent = carpeta })
+	end
+	for _, c in Recicladora.COLISION_CAJAS do
+		caja(c.nombre, pivote * CFrame.new(c.centro), c.tamano)
+	end
+	for _, l in Recicladora.COLISION_LOSAS do
+		local largo = (l.hasta - l.desde).Magnitude
+		local cf = CFrame.lookAt((l.desde + l.hasta) / 2, l.hasta) * CFrame.new(0, -l.grosor / 2 + 0.3, 0)
+		caja(l.nombre, pivote * cf, Vector3.new(l.ancho, l.grosor, largo))
+	end
+end
+
 -- cf = suelo bajo el centro del contenedor; la pared del frente (con el
--- prompt) queda en +Z local, hacia la plaza
+-- prompt) queda en +Z local, hacia la plaza. Alto 4,7: el del volquete verde
+-- de la recicladora de Blender (decision del usuario: manda el modelo, asi
+-- los rodillos de la trituradora se ven por encima del borde).
 local function construirContenedor(caseta, cf)
 	local cont = modelo("Contenedor", caseta)
 	etiquetar(cont, "Contenedor")
 	local color = Paleta.CONTENEDOR
-	local ancho, alto, fondo, grosor = 8, 6, 6, 0.5
+	local ancho, alto, fondo, grosor = 8, 4.7, 6, 0.5
 	local y = 1 + alto / 2
 	parte({ Name = "Piso", Size = Vector3.new(ancho, grosor, fondo), CFrame = cf * CFrame.new(0, 1 + grosor / 2, 0), Color = color, Parent = cont })
 	parte({ Name = "ParedFondo", Size = Vector3.new(ancho, alto, grosor), CFrame = cf * CFrame.new(0, y, -fondo / 2), Color = color, Parent = cont })
@@ -541,23 +742,20 @@ local function construirContenedor(caseta, cf)
 	cont.PrimaryPart = frente
 	cartelFlotante(frente, Textos.MUNDO.venderBasura, 4.5, 240)
 	prompt(frente, Textos.PATIO.reciclar, "Contenedor", 10)
-	ArteMundo.contenedorVerde(caseta, cont)
-	-- La trituradora amarilla detras (decorado)
-	ArteMundo.trituradora(caseta, cf * CFrame.new(0, 1, -6.8))
+	-- La recicladora de Blender (volquete verde + trituradora + cinta en L +
+	-- salida) si el place tiene la malla: las paredes whitebox siguen
+	-- colisionando y llevando el prompt, pero no se ven. Sin malla, el
+	-- decorado de partes de siempre.
+	if ArteMundo.recicladora(caseta, cf) then
+		for _, p in cont:GetChildren() do
+			ArteMundo.ocultar(p)
+		end
+		construirColisionRecicladora(caseta, cf * CFrame.new(0, 1, 0))
+	else
+		ArteMundo.contenedorVerde(caseta, cont)
+		ArteMundo.trituradora(caseta, cf * CFrame.new(0, 1, -6.8))
+	end
 	return cont, zona
-end
-
--- cf = suelo bajo la maquina; la ventana y la ranura miran a +Z local
-local function construirMaquinaRefrescos(caseta, cf)
-	local maq = modelo("MaquinaRefrescos", caseta)
-	etiquetar(maq, "MaquinaRefrescos")
-	local cuerpo = parte({ Name = "Cuerpo", Size = Vector3.new(4, 7, 3), CFrame = cf * CFrame.new(0, 4.5, 0), Color = Paleta.MUEBLE, Parent = maq })
-	parte({ Name = "Ventana", Size = Vector3.new(3, 4, 0.3), CFrame = cf * CFrame.new(0, 5.5, 2.0), Color = Paleta.gris(90), Parent = maq })
-	parte({ Name = "Ranura", Size = Vector3.new(2.5, 0.8, 0.4), CFrame = cf * CFrame.new(0, 2.2, 1.6), Color = Paleta.gris(60), Parent = maq })
-	maq.PrimaryPart = cuerpo
-	prompt(cuerpo, Textos.PATIO.comprarRefresco, "Máquina", 8)
-	ArteMundo.maquinaRefrescos(caseta, maq)
-	return maq
 end
 
 local function construirCaseta(mundo)
@@ -572,10 +770,11 @@ local function construirCaseta(mundo)
 	end
 	local tierra = 0.12 -- altura del lote de tierra
 	-- Lote de tierra pisada de toda la recicladora, del ancho del patio
-	ArteMundo.loteTierra(caseta, CFrame.new(0, 0, (LAYOUT.LOTE_NORTE + LAYOUT.LOTE_SUR) / 2), LAYOUT.PATIO_LADO, LAYOUT.LOTE_SUR - LAYOUT.LOTE_NORTE, 50)
-	-- Solera de hormigon bajo la caseta, la maquina, el contenedor y la
-	-- trituradora (ancha para que las patas de la cinta apoyen)
-	parte({ Name = "Solera", Size = Vector3.new(64, 1, 30), CFrame = en(0, 0.5, 1), Color = M.HORMIGON, Material = Enum.Material.Concrete, Parent = caseta })
+	local loteOeste, loteEste = limitesLote()
+	ArteMundo.loteTierra(caseta, CFrame.new((loteOeste + loteEste) / 2, 0, (LAYOUT.LOTE_NORTE + LAYOUT.LOTE_SUR) / 2), loteEste - loteOeste, LAYOUT.LOTE_SUR - LAYOUT.LOTE_NORTE, 50)
+	-- Solera de hormigon bajo la caseta, el contenedor y la
+	-- recicladora (hasta x=38 local: la salida de bloques acaba en x~34)
+	ArteMundo.studsSuelo(parte({ Name = "Solera", Size = Vector3.new(70, 1, 30), CFrame = en(3, 0.5, 1), Color = M.HORMIGON, Material = Enum.Material.Concrete, Parent = caseta }))
 	-- Cabina abierta al frente (+Z local): fondo, dos lados y techo. Son la
 	-- colision; ArteMundo.caseta construye la cabana alrededor.
 	local madera = Enum.Material.WoodPlanks
@@ -590,34 +789,37 @@ local function construirCaseta(mundo)
 	parte({ Name = "Rotulo", Size = Vector3.new(15, 2, 0.6), CFrame = en(0, 10.6, 4.5), Color = M.MADERA_CLARA, Material = madera, Variante = V.madera, Transparency = 1, Parent = caseta })
 	ArteMundo.caseta(caseta, en(0, 1, 0))
 	construirNPC(caseta, en(0, 0, 1.5))
-	local _, zona = construirContenedor(caseta, en(14, 0, 6))
-	construirMaquinaRefrescos(caseta, en(-13, 0, 6))
+	-- x=22,5: la cinta en L y la caja gris de la recicladora llegan 9,5 studs
+	-- a la izquierda del contenedor y la cabana ocupa hasta x=11,3
+	local _, zona = construirContenedor(caseta, en(22.5, 0, 6))
 	-- Chatarra sobre la solera, junto a la cabana
 	ArteMundo.pilaNeumaticos(caseta, en(-29, 1, 4), 3, 31)
 	ArteMundo.barril(caseta, en(-30, 1, 11), M.OXIDO)
 	ArteMundo.bolsaBasura(caseta, en(-27, 1, 10), 32)
 	-- El resto del lote, sobre la tierra: camiones abandonados, neumaticos,
-	-- barriles, cajas y un contenedor viejo en cada extremo
+	-- barriles, cajas y un contenedor viejo. En x local el lote va de -43,5
+	-- (valla este) a 75 (borde oeste del patio, donde empieza la calle).
 	ArteMundo.camion(caseta, en(44, tierra, 6) * CFrame.Angles(0, math.rad(-25), 0))
-	ArteMundo.pilaNeumaticos(caseta, en(66, tierra, 8), 4, 33)
-	ArteMundo.barril(caseta, en(72, tierra, 2), M.AZUL_MAQUINA)
-	ArteMundo.barril(caseta, en(74.6, tierra, 4.4), M.OXIDO)
-	ArteMundo.caja(caseta, en(84, tierra, -2), Vector3.new(3, 2.6, 2.8))
-	ArteMundo.caja(caseta, en(84.3, tierra + 2.6, -1.7) * CFrame.Angles(0, math.rad(20), 0), Vector3.new(2.4, 2, 2.2))
-	ArteMundo.bolsaBasura(caseta, en(90, tierra, 6), 34)
-	ArteMundo.bolsaBasura(caseta, en(92.5, tierra, 3.4), 35)
-	pieza({ Name = "ContenedorViejo", Size = Vector3.new(10, 6, 5), CFrame = en(88, tierra + 3, -9) * CFrame.Angles(0, math.rad(8), 0), Color = M.OXIDO, Material = Enum.Material.CorrodedMetal, Parent = caseta })
-	ArteMundo.barril(caseta, en(-58, tierra, 12), M.OXIDO)
-	ArteMundo.barril(caseta, en(-60.6, tierra, 9.6), M.AZUL_MAQUINA)
-	ArteMundo.barril(caseta, en(-58.4, tierra, 7.3), M.AMARILLO)
-	ArteMundo.pilaNeumaticos(caseta, en(-76, tierra, 4), 5, 36)
-	ArteMundo.caja(caseta, en(-86, tierra, 10), Vector3.new(2.8, 2.4, 2.6))
-	ArteMundo.caja(caseta, en(-89.2, tierra, 8.6) * CFrame.Angles(0, math.rad(-30), 0), Vector3.new(2.2, 1.8, 2))
-	ArteMundo.bolsaBasura(caseta, en(-91, tierra, -3), 37)
-	ArteMundo.camion(caseta, en(-80, tierra, -6) * CFrame.Angles(0, math.rad(150), 0))
+	ArteMundo.pilaNeumaticos(caseta, en(58, tierra, 8), 4, 33)
+	ArteMundo.barril(caseta, en(64, tierra, 2), M.AZUL_MAQUINA)
+	ArteMundo.barril(caseta, en(66.6, tierra, 4.4), M.OXIDO)
+	ArteMundo.caja(caseta, en(70, tierra, -2), Vector3.new(3, 2.6, 2.8))
+	ArteMundo.caja(caseta, en(70.3, tierra + 2.6, -1.7) * CFrame.Angles(0, math.rad(20), 0), Vector3.new(2.4, 2, 2.2))
+	ArteMundo.bolsaBasura(caseta, en(69, tierra, 7), 34)
+	ArteMundo.bolsaBasura(caseta, en(71.5, tierra, 4.4), 35)
+	pieza({ Name = "ContenedorViejo", Size = Vector3.new(10, 6, 5), CFrame = en(62, tierra + 3, -9) * CFrame.Angles(0, math.rad(8), 0), Color = M.OXIDO, Material = Enum.Material.CorrodedMetal, Parent = caseta })
+	-- Lado este (x local negativa): entre la solera (-32) y el borde del lote
+	-- (-43,5) solo queda una franja de 11; el segundo camion ya no cabe
+	ArteMundo.barril(caseta, en(-37, tierra, 12), M.OXIDO)
+	ArteMundo.barril(caseta, en(-39.6, tierra, 9.6), M.AZUL_MAQUINA)
+	ArteMundo.barril(caseta, en(-37.4, tierra, 7.3), M.AMARILLO)
+	ArteMundo.pilaNeumaticos(caseta, en(-38, tierra, -20), 5, 36)
+	ArteMundo.caja(caseta, en(-40, tierra, -4), Vector3.new(2.8, 2.4, 2.6))
+	ArteMundo.caja(caseta, en(-37.5, tierra, -5.4) * CFrame.Angles(0, math.rad(-30), 0), Vector3.new(2.2, 1.8, 2))
+	ArteMundo.bolsaBasura(caseta, en(-38, tierra, -10), 37)
 	-- Postes de luz con cables a lo largo del frente del lote (la calle)
 	local anteriores = nil
-	for _, x in { -90, -54, -18, 18, 54, 90 } do
+	for _, x in { -42, -14, 14, 42, 70 } do
 		local _, puntos = ArteMundo.posteLuz(caseta, en(x, tierra, 17.4))
 		if anteriores then
 			ArteMundo.cables(anteriores, puntos)
@@ -627,225 +829,31 @@ local function construirCaseta(mundo)
 	return zona
 end
 
--- Plaza del spawn: pavimento pegado al borde sur del patio, en la calle que
--- lo separa de la recicladora. Se aparece mirando a la caseta.
+-- Plaza: el cruce de caminos entre el patio y la recicladora. Todos aparecen
+-- aqui (PuntoAparicion), mirando al patio (diseno v2: sin base).
 local function construirPlaza(mundo)
 	local plaza = modelo("Plaza", mundo)
-	local fondo = LAYOUT.PLAZA_FONDO
-	local zCentro = LAYOUT.PATIO_LADO / 2 + fondo / 2
-	parte({ Name = "Pavimento", Size = Vector3.new(LAYOUT.PLAZA_ANCHO, 0.9, fondo), Position = Vector3.new(0, 0.45, zCentro), Color = M.HORMIGON, Material = Enum.Material.Concrete, Parent = plaza })
-	local spawn = Instance.new("SpawnLocation")
-	spawn.Name = "Spawn"
-	spawn.Size = Vector3.new(14, 1, 14)
-	spawn.CFrame = CFrame.new(0, 0.5, LAYOUT.SPAWN_Z) * CFrame.Angles(0, math.pi, 0)
-	spawn.Anchored = true
-	spawn.Color = Paleta.escalar(M.HORMIGON, 1.06)
-	spawn.Material = Enum.Material.Concrete
-	spawn.TopSurface = Enum.SurfaceType.Smooth
-	spawn.Neutral = true
-	spawn.Duration = 0
-	spawn.Parent = plaza
-	local decal = spawn:FindFirstChildOfClass("Decal")
-	if decal then
-		decal:Destroy()
-	end
-	-- Postes indicadores sobre el pavimento: el de las parcelas mira al este
-	-- (se lee desde la plaza, y "arriba" es el oeste); el del patio mira al
-	-- sur y "arriba" es el norte
-	posteSenal(plaza, -17, LAYOUT.SPAWN_Z, "Parcelas ↑", 90, 0.9)
-	posteSenal(plaza, 17, LAYOUT.PATIO_LADO / 2 + 4, "Patio de basura ↑", 0, 0.9)
+	-- Sin pavimento (decision del usuario, 24 sep): la plaza es solo el cruce
+	-- de caminos con el poste indicador. "Arriba" es el norte: el patio
+	posteSenal(plaza, 17, LAYOUT.PATIO.sur + 4, Textos.MUNDO.patio, 0, 0.9)
+	local punto = marcador("PuntoAparicion", CFrame.lookAt(Vector3.new(0, 1, LAYOUT.SPAWN_Z), Vector3.new(0, 1, 0)), plaza)
+	etiquetar(punto, "PuntoAparicion")
 	return plaza
-end
-
--- ===========================================================================
--- Parcelas
--- ===========================================================================
-
--- CFrame del centro de cada parcela, mirando a la calle y al patio (LookVector
--- apunta a +X: local -Z es el frente, +Z el fondo, +X local es el sur).
-local function cframesParcelas()
-	assert(#LAYOUT.PARCELA_Z >= GameConfig.NUM_PARCELAS, "faltan posiciones de parcela en LAYOUT.PARCELA_Z")
-	local cframes = {}
-	for i, z in LAYOUT.PARCELA_Z do
-		local pos = Vector3.new(LAYOUT.PARCELA_X, 0, z)
-		cframes[i] = CFrame.lookAt(pos, Vector3.new(0, 0, z))
-	end
-	return cframes
-end
-
-local function construirParcela(carpetaParcelas, indice, base)
-	local parcela = modelo("Parcela_" .. indice, carpetaParcelas)
-	parcela:SetAttribute("IndiceParcela", indice)
-	etiquetar(parcela, "Parcela")
-
-	local lado = LAYOUT.PARCELA_LADO
-	local mitad = lado / 2
-	local function local_(x, y, z)
-		return base * CFrame.new(x, y, z)
-	end
-	local function pintable(p, tipo)
-		p:SetAttribute("Pintable", tipo)
-		return p
-	end
-	-- Parcelas minimalistas: color liso, sin veta ni textura
-	local madera = Enum.Material.SmoothPlastic
-
-	-- Losa lisa (la skin la tine)
-	local losa = pintable(parte({ Name = "Losa", Size = Vector3.new(lado, 1, lado), CFrame = local_(0, 0.5, 0), Color = Paleta.LOSA_PARCELA, Material = madera, Variante = V.madera, Parent = parcela }), "losa")
-	parcela.PrimaryPart = losa
-
-	-- Borde con entrada al frente (frente = -Z local): cerca baja de madera
-	local bordes = carpeta("Borde", parcela)
-	local grosor, alto = 0.6, 1
-	local yB = 1 + alto / 2
-	local function borde(nombre, size, cf)
-		return pintable(parte({ Name = nombre, Size = size, CFrame = cf, Color = Paleta.MUROS, Material = Enum.Material.SmoothPlastic, Parent = bordes }), "borde")
-	end
-	borde("Fondo", Vector3.new(lado, alto, grosor), local_(0, yB, mitad))
-	borde("Izq", Vector3.new(grosor, alto, lado), local_(-mitad, yB, 0))
-	borde("Der", Vector3.new(grosor, alto, lado), local_(mitad, yB, 0))
-	local entrada = 8
-	local tramo = (lado - entrada) / 2
-	borde("FrenteIzq", Vector3.new(tramo, alto, grosor), local_(-(entrada / 2 + tramo / 2), yB, -mitad))
-	borde("FrenteDer", Vector3.new(tramo, alto, grosor), local_(entrada / 2 + tramo / 2, yB, -mitad))
-	-- Postes de esquina de la cerca (decorado)
-	for _, dx in { -mitad, mitad } do
-		for _, dz in { -mitad, mitad } do
-			local poste = parte({ Name = "PosteCerca", Size = Vector3.new(0.9, 1.8, 0.9), CFrame = local_(dx, 1.9, dz), Color = M.VIGA, Material = Enum.Material.SmoothPlastic, CanQuery = false, Parent = bordes })
-			etiquetar(poste, "SoloDecorado")
-		end
-	end
-
-	-- Cartel del dueno, junto a la entrada
-	local cartel = parte({ Name = "Cartel", Size = Vector3.new(0.6, 6, 0.6), CFrame = local_(-6, 4, -mitad - 1), Color = M.VIGA, Material = Enum.Material.SmoothPlastic, Parent = parcela })
-	local bb = cartelFlotante(cartel, Textos.BASE.parcelaLibre, 3.8, 240)
-	bb.Name = "CartelDueno"
-	prompt(cartel, Textos.PATIO.meGusta, "Base", 10)
-
-	-- Spawn de la parcela (teletransporte a casa)
-	marcador("Spawn", local_(0, 3, -10), parcela)
-
-	-- Estanteria al fondo: tablero + 2 estantes + 12 slots
-	local estanteria = modelo("Estanteria", parcela)
-	estanteria:SetAttribute("Mueble", "Estanteria")
-	pintable(parte({ Name = "Tablero", Size = Vector3.new(13, 8, 0.6), CFrame = local_(0, 5, mitad - 1.3), Color = Paleta.MUEBLE, Material = madera, Variante = V.madera, Parent = estanteria }), "mueble")
-	local slotsEstanteria = 0
-	for fila = 0, 1 do
-		local yEst = 3.2 + fila * 3
-		local estante = pintable(parte({ Name = "Estante" .. (fila + 1), Size = Vector3.new(13, 0.4, 1.8), CFrame = local_(0, yEst, mitad - 2.5), Color = Paleta.MUEBLE, Material = Enum.Material.SmoothPlastic, Parent = estanteria }), "mueble")
-		estante.Name = "Estante" .. (fila + 1)
-		for col = 0, 5 do
-			local xS = -5.5 + col * 2.2
-			local slot = marcador("SlotEstanteria", local_(xS, yEst + 1.1, mitad - 2.5), estanteria)
-			slotsEstanteria += 1
-			slot:SetAttribute("Indice", slotsEstanteria)
-		end
-	end
-	for _, x in { -6.3, 6.3 } do
-		parte({ Name = "Lateral", Size = Vector3.new(0.4, 8, 1.8), CFrame = local_(x, 5, mitad - 2.5), Color = M.VIGA, Material = Enum.Material.SmoothPlastic, CanQuery = false, Parent = estanteria })
-	end
-	prompt(estanteria:FindFirstChild("Tablero"), Textos.BASE.estanteria, "Estantería", 10)
-
-	-- Radio, en la esquina del fondo a la izquierda: radio retro naranja
-	local radio = modelo("Radio", parcela)
-	radio:SetAttribute("Mueble", "Radio")
-	local cuerpoRadio = pintable(parte({ Name = "Cuerpo", Size = Vector3.new(3.4, 2.2, 1.6), CFrame = local_(-12, 2.1, mitad - 4), Color = Paleta.MUEBLE, Material = Enum.Material.SmoothPlastic, Parent = radio }), "mueble")
-	for i, xR in { -0.9, 0.9 } do
-		local carrete = parte({ Name = "Carrete" .. i, Size = Vector3.new(0.3, 1.2, 1.2), CFrame = local_(-12 + xR, 2.4, mitad - 4 - 0.95) * CFrame.Angles(0, math.rad(90), 0), Color = M.METAL_OSCURO, Material = Enum.Material.Metal, Shape = Enum.PartType.Cylinder, Parent = radio })
-		carrete.Name = "Carrete" .. i
-	end
-	parte({ Name = "Antena", Size = Vector3.new(0.15, 2.5, 0.15), CFrame = local_(-10.6, 4.3, mitad - 4.2), Color = M.METAL, Material = Enum.Material.Metal, Parent = radio })
-	parte({ Name = "Dial", Size = Vector3.new(0.5, 0.5, 0.15), CFrame = local_(-12, 1.55, mitad - 4 - 0.85), Color = M.AMARILLO, Material = Enum.Material.SmoothPlastic, CanQuery = false, Parent = radio })
-	parte({ Name = "Pie", Size = Vector3.new(3.6, 0.3, 1.8), CFrame = local_(-12, 1.15, mitad - 4), Color = M.VIGA, Material = Enum.Material.SmoothPlastic, CanQuery = false, Parent = radio })
-	radio.PrimaryPart = cuerpoRadio
-	prompt(cuerpoRadio, Textos.BASE.radio, "Radio", 10)
-
-	-- Mesa de reparacion, a la derecha del fondo: banco de trabajo
-	local mesa = modelo("MesaReparacion", parcela)
-	mesa:SetAttribute("Mueble", "MesaReparacion")
-	local tablero = pintable(parte({ Name = "Tablero", Size = Vector3.new(6, 0.5, 3), CFrame = local_(11, 3, 10), Color = Paleta.MUEBLE, Material = madera, Variante = V.madera, Parent = mesa }), "mueble")
-	for _, dx in { -2.6, 2.6 } do
-		for _, dz in { -1.1, 1.1 } do
-			parte({ Name = "Pata", Size = Vector3.new(0.5, 2.75, 0.5), CFrame = local_(11 + dx, 1.62, 10 + dz), Color = M.VIGA, Material = Enum.Material.SmoothPlastic, Parent = mesa })
-		end
-	end
-	parte({ Name = "Lampara", Size = Vector3.new(0.3, 2, 0.3), CFrame = local_(13.5, 4.2, 11), Color = M.METAL_OSCURO, Material = Enum.Material.Metal, Parent = mesa })
-	parte({ Name = "Pantalla", Size = Vector3.new(1.4, 0.7, 1.4), CFrame = local_(13.2, 5.2, 10.6) * CFrame.Angles(0, 0, math.rad(20)), Color = M.AMARILLO, Material = Enum.Material.SmoothPlastic, Shape = Enum.PartType.Cylinder, CanQuery = false, Parent = mesa })
-	parte({ Name = "Herramienta", Size = Vector3.new(1.4, 0.2, 0.4), CFrame = local_(9.8, 3.35, 9.6) * CFrame.Angles(0, math.rad(25), 0), Color = M.METAL, Material = Enum.Material.Metal, CanQuery = false, Parent = mesa })
-	mesa.PrimaryPart = tablero
-	prompt(tablero, Textos.REPARACION.titulo, "Mesa", 10)
-
-	-- Exhibidor: 6 pedestales a lo largo del lado izquierdo
-	local exhibidor = modelo("Exhibidor", parcela)
-	exhibidor:SetAttribute("Mueble", "Exhibidor")
-	for i = 1, GameConfig.PEDESTALES do
-		local zP = -10 + (i - 1) * 4.2
-		local ped = pintable(parte({ Name = "Pedestal" .. i, Size = Vector3.new(1.8, 2.4, 1.8), CFrame = local_(-14, 2.2, zP) * CFrame.Angles(0, 0, math.rad(90)), Color = Paleta.MUEBLE, Material = Enum.Material.SmoothPlastic, Shape = Enum.PartType.Cylinder, Parent = exhibidor }), "mueble")
-		ped.Name = "Pedestal" .. i
-		parte({ Name = "Remate", Size = Vector3.new(0.25, 2.6, 2.6), CFrame = local_(-14, 3.25, zP) * CFrame.Angles(0, 0, math.rad(90)), Color = M.HORMIGON, Material = Enum.Material.SmoothPlastic, Shape = Enum.PartType.Cylinder, CanQuery = false, Parent = exhibidor })
-		local top = marcador("Pedestal", local_(-14, 3.6, zP), exhibidor)
-		top:SetAttribute("Indice", i)
-		if i == 1 then
-			exhibidor.PrimaryPart = ped
-			prompt(ped, Textos.BASE.exhibidor, "Exhibidor", 10)
-		end
-	end
-
-	-- Telefono para llamar a Dona Chatarra (abre la tienda): cabina azul
-	local telefono = modelo("Telefono", parcela)
-	telefono:SetAttribute("Mueble", "Telefono")
-	parte({ Name = "Poste", Size = Vector3.new(0.6, 5, 0.6), CFrame = local_(14, 3.5, -8), Color = M.VIGA, Material = Enum.Material.SmoothPlastic, Parent = telefono })
-	local auricular = pintable(parte({ Name = "Caja", Size = Vector3.new(1.6, 2.2, 1), CFrame = local_(14, 4.6, -7.3), Color = Paleta.MUEBLE, Material = Enum.Material.SmoothPlastic, Parent = telefono }), "mueble")
-	parte({ Name = "Auricular", Size = Vector3.new(0.4, 1.4, 0.4), CFrame = local_(13.3, 4.6, -6.9), Color = M.NEGRO, Material = Enum.Material.SmoothPlastic, CanQuery = false, Parent = telefono })
-	parte({ Name = "Tejadillo", Size = Vector3.new(2.2, 0.3, 1.6), CFrame = local_(14, 5.85, -7.3), Color = M.LONA, Material = Enum.Material.SmoothPlastic, CanQuery = false, Parent = telefono })
-	telefono.PrimaryPart = auricular
-	prompt(auricular, "Llamar a Doña Chatarra", "Teléfono", 10)
-
-	-- Almacen (cofre): abre el album / inventario. Baul de madera con herrajes
-	local almacen = modelo("Almacen", parcela)
-	almacen:SetAttribute("Mueble", "Almacen")
-	local cofre = pintable(parte({ Name = "Cofre", Size = Vector3.new(4, 2.4, 3), CFrame = local_(14, 2.2, 3), Color = Paleta.MUEBLE, Material = madera, Variante = V.madera, Parent = almacen }), "mueble")
-	parte({ Name = "Tapa", Size = Vector3.new(4.2, 0.5, 3.2), CFrame = local_(14, 3.65, 3), Color = M.VIGA, Material = Enum.Material.SmoothPlastic, Parent = almacen })
-	for _, dx in { -1.3, 1.3 } do
-		parte({ Name = "Herraje", Size = Vector3.new(0.4, 2.7, 3.3), CFrame = local_(14 + dx, 2.4, 3), Color = M.METAL_OSCURO, Material = Enum.Material.Metal, CanQuery = false, Parent = almacen })
-	end
-	parte({ Name = "Cerradura", Size = Vector3.new(0.6, 0.6, 0.2), CFrame = local_(14, 2.6, 1.42), Color = M.AMARILLO, Material = Enum.Material.Metal, CanQuery = false, Parent = almacen })
-	almacen.PrimaryPart = cofre
-	prompt(cofre, "Almacén", "Almacén", 10)
-
-	return parcela
-end
-
-local function construirParcelas(mundo)
-	local carpetaParcelas = carpeta("Parcelas", mundo)
-	local cframes = cframesParcelas()
-	for i = 1, GameConfig.NUM_PARCELAS do
-		construirParcela(carpetaParcelas, i, cframes[i])
-	end
-	return GameConfig.NUM_PARCELAS
 end
 
 -- ===========================================================================
 -- Calles y limites del mapa
 -- ===========================================================================
 
--- Calles de tierra fuera del patio (sobre el baseplate, a y = 0): la que baja
--- entre las parcelas y el patio con un ramal a la entrada de cada parcela, y
--- la de la plaza, que cruza de esa calle al extremo este del lote pasando
--- por debajo del pavimento.
+-- La calle de tierra de la plaza, fuera del patio (sobre el baseplate, a
+-- y = 0): cruza de la valla oeste al extremo este del lote.
 local function construirCalles(mundo)
 	local calles = carpeta("Calles", mundo)
 	local ancho = LAYOUT.CALLE_ANCHO
-	local x = LAYOUT.CALLE_X
-	local zNorte = LAYOUT.PARCELA_Z[1] - LAYOUT.PARCELA_LADO / 2 - 6
-	local zSur = LAYOUT.LOTE_SUR - 6
-	ArteMundo.caminoTierra(calles, CFrame.new(x, 0, (zNorte + zSur) / 2), ancho, zSur - zNorte, 60)
-	local frente = LAYOUT.PARCELA_X + LAYOUT.PARCELA_LADO / 2
-	for i, z in LAYOUT.PARCELA_Z do
-		ArteMundo.caminoTierra(calles, CFrame.new((frente + x) / 2, 0, z) * CFrame.Angles(0, math.rad(90), 0), 8, x - frente + 2, 60 + i)
-	end
-	local xEste = LAYOUT.PATIO_LADO / 2 - 4
-	ArteMundo.caminoTierra(calles, CFrame.new((x + xEste) / 2, 0, LAYOUT.SPAWN_Z) * CFrame.Angles(0, math.rad(90), 0), ancho, xEste - x + ancho, 70)
+	local xOeste = LAYOUT.LIMITE.oeste + LAYOUT.VALLA_MARGEN + 2
+	local _, loteEste = limitesLote()
+	local xEste = loteEste - 4
+	ArteMundo.caminoTierra(calles, CFrame.new((xOeste + xEste) / 2, 0, LAYOUT.SPAWN_Z) * CFrame.Angles(0, math.rad(90), 0), ancho, xEste - xOeste, 70)
 end
 
 -- Borde del mapa: muro invisible alto por cada lado (tag Limite, nadie sale)
@@ -948,22 +956,36 @@ function ConstructorMundo.construir(): Model
 	else
 		carpeta("Manual", mundo)
 	end
-	local numRanuras, numFigurinas = construirPatio(mundo)
+	local numRanuras, numFigurinas, numBarreras = construirPatio(mundo)
 	construirCaseta(mundo)
 	construirPlaza(mundo)
-	local numParcelas = construirParcelas(mundo)
 	construirCalles(mundo)
 	construirLimites(mundo)
 	ConstructorMundo.iluminar()
 	print(string.format(
-		"ConstructorMundo: mundo v%d construido (%d ranuras, %d figurinas fijas, %d parcelas, %d instancias)",
+		"ConstructorMundo: mundo v%d construido (%d ranuras, %d barreras, %d figurinas fijas, %d instancias)",
 		ConstructorMundo.VERSION,
 		numRanuras,
+		numBarreras,
 		numFigurinas,
-		numParcelas,
 		#mundo:GetDescendants()
 	))
 	return mundo
+end
+
+-- Rehace solo la tienda sobre el workspace.Mundo existente, sin hornear todo
+-- (hornear borra Mundo salvo Manual). Sirve tras importar o reexportar la
+-- malla de ServerStorage.Arte.Tienda
+function ConstructorMundo.rehacerTienda(): string
+	local mundo = workspace:FindFirstChild("Mundo")
+	assert(mundo, "no hay workspace.Mundo: hay que hornear primero")
+	local caseta = mundo:FindFirstChild("Caseta")
+	local cabana = caseta and caseta:FindFirstChild("Cabana")
+	if cabana then
+		cabana:Destroy()
+	end
+	local tienda = if caseta then ArteMundo.caseta(caseta, CFrame.new(0, 0, LAYOUT.CASETA_Z) * CFrame.Angles(0, math.pi, 0) * CFrame.new(0, 1, 0)) else nil
+	return "tienda " .. (if tienda then (if tienda:FindFirstChild("Tienda_Coral", true) then "de malla" else "de partes") else "sin caseta")
 end
 
 function ConstructorMundo.previsualizar()
@@ -972,13 +994,14 @@ function ConstructorMundo.previsualizar()
 	for _, t in tamanos do
 		conteo[t] = (conteo[t] or 0) + 1
 	end
-	print(string.format("Patio %dx%d en el origen, %d ranuras de monton:", LAYOUT.PATIO_LADO, LAYOUT.PATIO_LADO, #posiciones))
+	local P = LAYOUT.PATIO
+	print(string.format("Patio x=%.1f..%.1f z=%.1f..%.1f, %d ranuras de monton:", P.oeste, P.este, P.norte, P.sur, #posiciones))
 	for t, n in conteo do
 		print(string.format("  %s: %d", t, n))
 	end
-	print(string.format("%d parcelas de %dx%d en columna en x=%d", GameConfig.NUM_PARCELAS, LAYOUT.PARCELA_LADO, LAYOUT.PARCELA_LADO, LAYOUT.PARCELA_X))
-	for i, cf in cframesParcelas() do
-		print(string.format("  Parcela_%d en (%.0f, %.0f)", i, cf.Position.X, cf.Position.Z))
+	for i, def in GameConfig.CUADRANTES do
+		local x0, x1, z0, z1 = rectanguloCuadrante(i)
+		print(string.format("  Cuadrante %d: %s (rebirth %d) x=%.1f..%.1f z=%.1f..%.1f", i, def.zona, def.rebirth, x0, x1, z0, z1))
 	end
 	local L = LAYOUT.LIMITE
 	print(string.format("Recicladora en z=%d..%d (caseta en z=%d), spawn en z=%d, valla en x=%d..%d z=%d..%d", LAYOUT.LOTE_NORTE, LAYOUT.LOTE_SUR, LAYOUT.CASETA_Z, LAYOUT.SPAWN_Z, L.oeste, L.este, L.norte, L.sur))

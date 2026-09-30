@@ -1,382 +1,529 @@
 --!strict
 --[[
 	HUD
-	Distribucion calcada de KOTAMON (referencia del usuario), en pegatinas de
-	papel y tinta (Componentes):
+	Distribucion del "UI Kit" de simulador (referencia del usuario), en Fusion.
+	Diseno v2: en el patio la pantalla muestra solo lo que se usa al jugar
+	(bolsa, dinero, fuerza, fragmentos de mascota y el feed); el resto va a
+	4 botones.
 
-	  arriba-izq     pildoras: $ dinero | cartas (mascotas distintas) | gemas
-	  izquierda      barra vertical de ENERGIA con el rayo en la base
-	  derecha        barra de FUERZA de lanzamiento (mantener F) y, a su lado,
+	  izquierda      botonera de 4: Tienda (Q), Mascotas, Rebirth y Pedidos.
+	                 Cada boton aparece cuando su panel existe (UI/<Nombre>),
+	                 asi cada lote que trae un panel trae su boton
+	  arriba-dcha    "Contadores": la pildora verde grande del dinero y, debajo,
+	                 la mascota mas cerca de completarse con fragmentos
+	                 ("Latita 3/5"), o una pista para buscarlos
+	  derecha        barra de FUERZA de lanzamiento (mantener F; encima, el bonus
+	                 que daria acertar desde donde estas) y, a su lado,
 	                 la de BOLSA: cuanto llevas, sin numeros (decision del
 	                 usuario: se ve llenarse, y "LLENA" en rojo avisa de que
 	                 toca volver al contenedor)
-	  abajo-izq      retrato (headshot del avatar) + dock con icono, nombre y la
-	                 insignia de la tecla DEBAJO: telefono Q, album J, logros L,
-	                 base B
 	  abajo-dcha     "MANTEN [F] PARA LANZAR" con la bolsa, y encima la pista
 	                 de recoger (se retira sola tras 20 recogidas)
-	  arriba-dcha    Ir a casa / Ir al patio
 
 	Tactil: el thumbstick y el boton de salto de Roblox ocupan las esquinas de
-	abajo, asi que el dock pasa ARRIBA-CENTRO (solo iconos) y el retrato se pone
-	junto a las pildoras; la pista de lanzar la sustituye el boton de
-	ContextActionService que restiliza ControlPatio. Componentes.disposicion()
-	decide, y alCambiarDisposicion recoloca sin reconstruir.
+	abajo, asi que la botonera sube arriba-izquierda y las pistas se apartan; la de lanzar la sustituye el boton de ContextActionService
+	que restiliza ControlPatio. Todo cuelga de Escala.disposicion: cambiar de
+	mando o de pantalla recoloca sin reconstruir.
 
-	Solo presentacion: lee EstadoCliente y manda intencion por RemoteEvent o
-	abre paneles por Menu. Carga Notificaciones y Dialogo para que existan desde
-	el primer frame.
+	Solo presentacion: lee EstadoCliente.reactivo y manda intencion por
+	RemoteEvent o abre paneles por Menu. Los hijos directos del ScreenGui "HUD"
+	son los bloques que mide la prueba ("hud"): no deben solaparse.
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
-local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Paleta = require(Config:WaitForChild("Paleta"))
 local Textos = require(Config:WaitForChild("Textos"))
+local DefinicionesPunteria = require(Config:WaitForChild("DefinicionesPunteria"))
 local DefinicionesMascotas = require(Config:WaitForChild("DefinicionesMascotas"))
 local Utilidades = Shared:WaitForChild("Utilidades")
 local Formato = require(Utilidades:WaitForChild("Formato"))
-local Entrada = require(Utilidades:WaitForChild("Entrada"))
-local Red = require(Utilidades:WaitForChild("Red"))
+local Fusion = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Fusion"))
 
 local Cliente = script.Parent.Parent
 local EstadoCliente = require(Cliente:WaitForChild("EstadoCliente"))
-local Componentes = require(script.Parent:WaitForChild("Componentes"))
+local Kit = require(script.Parent:WaitForChild("Kit"))
+local Tema = require(script.Parent:WaitForChild("Kit"):WaitForChild("Tema"))
+local Escala = require(script.Parent:WaitForChild("Kit"):WaitForChild("Escala"))
 local Menu = require(script.Parent:WaitForChild("Menu"))
 require(script.Parent:WaitForChild("Notificaciones"))
-require(script.Parent:WaitForChild("Dialogo"))
 
-local TeletransporteEvent = Red.evento("TeletransporteEvent")
+local Children = Fusion.Children
+local OnEvent = Fusion.OnEvent
 
 local jugador = Players.LocalPlayer
-local pantalla = Componentes.pantalla("HUD", 1)
+local reactivo = EstadoCliente.reactivo
 
 -- No hay Tools: la mochila de Roblox solo estorba
 pcall(function()
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
 end)
 
+-- En el movil, siempre en horizontal (peticion del usuario, 29 sep: con
+-- Sensor, el valor del place, arrancaba en vertical si el telefono lo
+-- estaba). Tambien va en StarterGui (default.project.json); aqui por si el
+-- place guardado no lo tiene.
+jugador:WaitForChild("PlayerGui").ScreenOrientation = Enum.ScreenOrientation.LandscapeSensor
+
 local MARGEN = 16
 local RECOGIDAS_PARA_APRENDER = 20
 
--- ===========================================================================
--- Arriba-izq: pildoras
--- ===========================================================================
+local scope = Fusion.scoped(Fusion, Kit)
 
-local fila = Componentes.marco({ Parent = pantalla, Size = UDim2.fromOffset(0, 46), Position = UDim2.fromOffset(MARGEN, 12), Transparencia = 1, Nombre = "Pildoras" })
-fila.AutomaticSize = Enum.AutomaticSize.X
-Componentes.lista(fila, 10, true)
+local tactil = scope:Computed(function(use)
+	return use(Escala.disposicion) == "tactil"
+end)
+local sinPanel = scope:Computed(function(use)
+	return use(Menu.abiertoR) == nil
+end)
+local enPatio = scope:Value(jugador:GetAttribute("EnPatio") == true)
+jugador:GetAttributeChangedSignal("EnPatio"):Connect(function()
+	enPatio:set(jugador:GetAttribute("EnPatio") == true)
+end)
 
-local _, textoDinero = Componentes.pildora({ Parent = fila, Nombre = "Dinero", Icono = "billete", Color = Paleta.UI_DINERO, Ancho = 176, Orden = 1 })
-local _, textoCartas = Componentes.pildora({ Parent = fila, Nombre = "Cartas", Icono = "cartas", Color = Paleta.UI_CARTAS, Ancho = 132, Orden = 2 })
-local _, textoGemas = Componentes.pildora({ Parent = fila, Nombre = "Gemas", Icono = "gema", Color = Paleta.UI_GEMAS, Ancho = 132, Orden = 3 })
-
--- ===========================================================================
--- Barras verticales
--- ===========================================================================
-
-local ANCHO_BARRA = 30
-local ALTO_BARRA = 210
-local DIAMETRO_BASE = 46
-local SEPARACION_BARRAS = 26
-
-type BarraVertical = { envoltorio: Frame, cuerpo: Frame, relleno: Frame, etiqueta: TextLabel, borde: UIStroke, base: Frame }
-
--- lado -1 = borde izquierdo, 1 = derecho; columna 0 = pegada al borde, 1 = la
--- siguiente hacia dentro. El icono de la base asoma por debajo de la barra.
-local function barraVertical(nombre: string, lado: number, columna: number, color: Color3, icono: string): BarraVertical
-	local desplazamiento = 22 + columna * (DIAMETRO_BASE + SEPARACION_BARRAS)
-	local env, cuerpo = Componentes.pegatina({
-		Parent = pantalla,
-		Nombre = nombre,
-		Size = UDim2.fromOffset(ANCHO_BARRA, ALTO_BARRA),
-		Position = UDim2.new(if lado < 0 then 0 else 1, -lado * desplazamiento, 0.5, 30),
-		Anchor = Vector2.new(if lado < 0 then 0 else 1, 0.5),
-		Radio = math.floor(ANCHO_BARRA / 2),
-	})
-	local borde = cuerpo:FindFirstChildOfClass("UIStroke") :: UIStroke
-	local relleno = Componentes.marco({ Parent = cuerpo, Size = UDim2.new(1, -8, 0, 0), Position = UDim2.new(0.5, 0, 1, -4), Anchor = Vector2.new(0.5, 1), Color = color, Radio = math.floor(ANCHO_BARRA / 2) - 4, Nombre = "Relleno", ZIndex = 3 })
-	local base = Componentes.circuloIcono({ Parent = env, Nombre = "Base", Clave = icono, Diametro = DIAMETRO_BASE, Position = UDim2.new(0.5, 0, 1, 2), Anchor = Vector2.new(0.5, 0.5), ZIndex = 4 })
-	-- La etiqueta cuelga hacia dentro de la pantalla (pegada al borde de la
-	-- barra que mira al centro), no centrada: centrada se saldria del viewport
-	local etiqueta = Componentes.texto({
-		Parent = env,
-		Size = UDim2.fromOffset(150, 20),
-		Position = UDim2.new(if lado < 0 then 0 else 1, 0, 0, -6),
-		Anchor = Vector2.new(if lado < 0 then 0 else 1, 1),
-		Tamano = 12,
-		Titulo = true,
-		Alinear = if lado < 0 then Enum.TextXAlignment.Left else Enum.TextXAlignment.Right,
-		Color = Paleta.UI_TINTA,
-		Contorno = Paleta.UI_PAPEL,
-		ZIndex = 4,
-	})
-	return { envoltorio = env, cuerpo = cuerpo, relleno = relleno, etiqueta = etiqueta, borde = borde, base = base }
-end
-
-local barraEnergia = barraVertical("Energia", -1, 0, Paleta.UI_ENERGIA, "rayo")
-local barraFuerza = barraVertical("Fuerza", 1, 0, Paleta.UI_FUERZA, "flecha")
-local barraBolsa = barraVertical("Bolsa", 1, 1, Paleta.UI_BOLSA, "bolsa")
-barraFuerza.etiqueta.Text = Textos.HUD.fuerza
-barraBolsa.etiqueta.Text = Textos.HUD.bolsa
-
-local pulsoBolsaLlena = TweenService:Create(barraBolsa.relleno, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { BackgroundTransparency = 0.45 })
-local pulsoEnergia = TweenService:Create(barraEnergia.etiqueta, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { TextTransparency = 0.6 })
+-- Pulso 0..1 para la alarma de bolsa llena. Solo corre mientras suena
+local pulso = scope:Value(0)
+local hayAlarma = false
+RunService.Heartbeat:Connect(function()
+	if hayAlarma then
+		pulso:set((math.sin(os.clock() * 7) + 1) / 2)
+	end
+end)
 
 -- ===========================================================================
--- Retrato y dock
+-- Datos derivados (solo primitivos)
 -- ===========================================================================
 
-local DIAMETRO_RETRATO = 84
-local retrato, cuerpoRetrato = Componentes.pegatina({ Parent = pantalla, Nombre = "Retrato", Size = UDim2.fromOffset(DIAMETRO_RETRATO, DIAMETRO_RETRATO), Radio = DIAMETRO_RETRATO / 2 })
-local iniciales = Componentes.texto({ Parent = cuerpoRetrato, Texto = string.upper(string.sub(jugador.DisplayName, 1, 2)), Size = UDim2.fromScale(1, 1), Alinear = Enum.TextXAlignment.Center, Tamano = 28, Titulo = true, ZIndex = 3 })
-local cara = Instance.new("ImageLabel")
-cara.Name = "Cara"
-cara.Size = UDim2.new(1, -6, 1, -6)
-cara.Position = UDim2.fromScale(0.5, 0.5)
-cara.AnchorPoint = Vector2.new(0.5, 0.5)
-cara.BackgroundTransparency = 1
-cara.ScaleType = Enum.ScaleType.Crop
-cara.ZIndex = 4
-cara.Visible = false
-Componentes.esquinas(cara, DIAMETRO_RETRATO)
-cara.Parent = cuerpoRetrato
-task.spawn(function()
-	local ok, url = pcall(function()
-		return Players:GetUserThumbnailAsync(jugador.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+local dinero = scope:Computed(function(use)
+	local p = use(reactivo.perfil)
+	return Formato.dinero(if p then (p.dinero or 0) else 0)
+end)
+local enBolsa = scope:Computed(function(use)
+	return #(use(reactivo.bolsa) :: any).items
+end)
+local capacidad = scope:Computed(function(use)
+	return (use(reactivo.bolsa) :: any).capacidad :: number
+end)
+local bolsaLlena = scope:Computed(function(use)
+	return use(enBolsa) >= use(capacidad)
+end)
+
+scope:Observer(bolsaLlena):onBind(function()
+	hayAlarma = Fusion.peek(bolsaLlena)
+	if not hayAlarma then
+		pulso:set(0)
+	end
+end)
+
+-- Recogidas de la sesion: la pista de recoger se retira tras aprender
+local recogidas = scope:Value(0)
+do
+	local ultimo = 0
+	scope:Observer(enBolsa):onChange(function()
+		local n = Fusion.peek(enBolsa)
+		if n > ultimo then
+			recogidas:set(Fusion.peek(recogidas) + n - ultimo)
+		end
+		ultimo = n
 	end)
-	if ok and typeof(url) == "string" and url ~= "" then
-		cara.Image = url
-		cara.Visible = true
-		iniciales.Visible = false
-	end
-end)
-
--- Cada pegatina del dock: icono arriba, nombre debajo y la insignia de la
--- tecla montada sobre el borde inferior (como en KOTAMON). 72 px para que el
--- nombre quepa sin pisar la insignia.
-local LADO_DOCK = 72
-local dock = Componentes.marco({ Parent = pantalla, Size = UDim2.fromOffset(4 * LADO_DOCK + 3 * 10, LADO_DOCK + 14), Transparencia = 1, Nombre = "Dock" })
-Componentes.lista(dock, 10, true)
-local escalaDock = Instance.new("UIScale")
-escalaDock.Parent = dock
-
-type ItemDock = { boton: TextButton, nombre: TextLabel, insignia: Frame, icono: GuiObject }
-local itemsDock: { ItemDock } = {}
-
-local function iconoDock(nombre: string, icono: string, tecla: string, orden: number, alPulsar: () -> ())
-	local b = Componentes.boton({ Parent = dock, Nombre = "Dock_" .. icono, Texto = "", Size = UDim2.fromOffset(LADO_DOCK, LADO_DOCK), Radio = 16, Orden = orden, alPulsar = alPulsar })
-	local ic = Componentes.icono({ Parent = b, Clave = icono, Tamano = 34, Position = UDim2.new(0.5, 0, 0, 5), Anchor = Vector2.new(0.5, 0), ZIndex = 3 })
-	local t = Componentes.texto({ Parent = b, Texto = nombre, Size = UDim2.new(1, -4, 0, 14), Position = UDim2.new(0, 2, 0, 42), Tamano = 11, Titulo = true, Alinear = Enum.TextXAlignment.Center, Color = Paleta.UI_TINTA_SUAVE, ZIndex = 3, Escalar = true })
-	local limite = Instance.new("UITextSizeConstraint")
-	limite.MaxTextSize = 11
-	limite.MinTextSize = 8
-	limite.Parent = t
-	local k = Componentes.insignia({ Parent = Componentes.envoltorioDe(b), Teclado = tecla, Tamano = 22, Position = UDim2.new(0.5, 0, 1, -4), Anchor = Vector2.new(0.5, 0.5), ZIndex = 5 })
-	table.insert(itemsDock, { boton = b, nombre = t, insignia = k, icono = ic })
-end
-
-iconoDock(Textos.HUD.telefono, "telefono", "Q", 1, function()
-	Menu.alternar("Tienda")
-end)
-iconoDock(Textos.HUD.album, "libreta", "J", 2, function()
-	Menu.alternar("Album")
-end)
-iconoDock(Textos.HUD.logros, "trofeo", "L", 3, function()
-	Menu.alternar("Logros")
-end)
-iconoDock(Textos.HUD.base, "casa", "B", 4, function()
-	Menu.alternar("Base")
-end)
-
--- ===========================================================================
--- Arriba-dcha: teletransporte. Abajo-dcha: pistas
--- ===========================================================================
-
-local esquina = Componentes.marco({ Parent = pantalla, Size = UDim2.fromOffset(320, 40), Position = UDim2.new(1, -MARGEN, 0, 12), Anchor = Vector2.new(1, 0), Transparencia = 1, Nombre = "Teletransporte" })
-Componentes.lista(esquina, 8, true, Enum.HorizontalAlignment.Right)
-Componentes.boton({ Parent = esquina, Nombre = "IrCasa", Texto = Textos.HUD.irCasa, Icono = "casa", Size = UDim2.fromOffset(148, 40), Orden = 1, Tamano = 13, Radio = 14, alPulsar = function()
-	TeletransporteEvent:FireServer("casa")
-end })
-Componentes.boton({ Parent = esquina, Nombre = "IrPatio", Texto = Textos.HUD.irPatio, Icono = "montana", Size = UDim2.fromOffset(148, 40), Orden = 2, Tamano = 13, Radio = 14, alPulsar = function()
-	TeletransporteEvent:FireServer("patio")
-end })
-
-type Pista = { envoltorio: Frame, texto: TextLabel, insignia: Frame }
-
--- Pegatina horizontal [insignia] TEXTO [icono]; el ancho sigue al contenido
-local function pista(nombre: string, alto: number, teclado: string, gamepad: Enum.KeyCode, icono: string?, orden: number): Pista
-	local env, cuerpo = Componentes.pegatina({ Parent = pantalla, Nombre = nombre, Size = UDim2.fromOffset(200, alto), Anchor = Vector2.new(1, 1), Radio = math.floor(alto * 0.36), Orden = orden })
-	local lista = Componentes.lista(cuerpo, 8, true)
-	lista.VerticalAlignment = Enum.VerticalAlignment.Center
-	Componentes.padding(cuerpo, 12, 0)
-	local insignia = Componentes.insignia({ Parent = cuerpo, Teclado = teclado, Gamepad = gamepad, Tamano = alto - 16, Orden = 1, ZIndex = 3 })
-	local t = Componentes.texto({ Parent = cuerpo, Size = UDim2.new(0, 0, 1, 0), Tamano = math.floor(alto * 0.4), Titulo = true, Ajustar = false, Orden = 2, ZIndex = 3 })
-	t.AutomaticSize = Enum.AutomaticSize.X
-	if icono then
-		Componentes.icono({ Parent = cuerpo, Clave = icono, Tamano = alto - 12, Orden = 3, ZIndex = 3 })
-	end
-	local function ajustar()
-		env.Size = UDim2.fromOffset(math.ceil(lista.AbsoluteContentSize.X / Componentes.escala()) + 24, alto)
-	end
-	lista:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(ajustar)
-	task.defer(ajustar)
-	env.Visible = false
-	return { envoltorio = env, texto = t, insignia = insignia }
-end
-
-local pistaLanzar = pista("PistaLanzar", 44, "F", Enum.KeyCode.ButtonY, "lanzar", 1)
-local pistaRecoger = pista("PistaRecoger", 36, Textos.HUD.clic, Enum.KeyCode.ButtonX, "mano", 2)
-
--- ===========================================================================
--- Disposicion (escritorio / tactil)
--- ===========================================================================
-
-local function aplicarDisposicion()
-	local tactil = Componentes.disposicion() == "tactil"
-	if tactil then
-		-- Esquinas de abajo para el thumbstick y el salto de Roblox
-		retrato.Size = UDim2.fromOffset(52, 52)
-		retrato.Position = UDim2.fromOffset(MARGEN, 10)
-		retrato.AnchorPoint = Vector2.zero
-		fila.Position = UDim2.fromOffset(MARGEN + 52 + 10, 12)
-		dock.Position = UDim2.new(0.5, 0, 0, 8)
-		dock.AnchorPoint = Vector2.new(0.5, 0)
-		escalaDock.Scale = 0.82
-		pistaLanzar.envoltorio.Position = UDim2.new(1, -MARGEN, 1, -130)
-		pistaRecoger.envoltorio.Position = UDim2.new(1, -MARGEN, 1, -182)
-	else
-		retrato.Size = UDim2.fromOffset(DIAMETRO_RETRATO, DIAMETRO_RETRATO)
-		retrato.Position = UDim2.new(0, MARGEN, 1, -MARGEN)
-		retrato.AnchorPoint = Vector2.new(0, 1)
-		fila.Position = UDim2.fromOffset(MARGEN, 12)
-		dock.Position = UDim2.new(0, MARGEN + DIAMETRO_RETRATO + 12, 1, -MARGEN + 2)
-		dock.AnchorPoint = Vector2.new(0, 1)
-		escalaDock.Scale = 1
-		pistaLanzar.envoltorio.Position = UDim2.new(1, -MARGEN, 1, -MARGEN)
-		pistaRecoger.envoltorio.Position = UDim2.new(1, -MARGEN, 1, -MARGEN - 52)
-	end
-	for _, item in itemsDock do
-		item.nombre.Visible = not tactil
-		item.icono.Position = if tactil then UDim2.fromScale(0.5, 0.5) else UDim2.new(0.5, 0, 0, 6)
-		item.icono.AnchorPoint = if tactil then Vector2.new(0.5, 0.5) else Vector2.new(0.5, 0)
-	end
 end
 
 -- ===========================================================================
--- Refrescos
+-- Izquierda: botonera de 4
 -- ===========================================================================
 
-local recogidasSesion = 0
-local ultimoConteoBolsa = 0
+-- 88 (era 76: el usuario los queria un poco mas grandes, 29 sep)
+local LADO_ICONO = 88
 
-local function enPatio(): boolean
-	return jugador:GetAttribute("EnPatio") == true
+local function botonIcono(nombre: string, texto: string, icono: string, tecla: string?, orden: number, alPulsar: () -> (), extra: any?)
+	local encima = scope:Value(false)
+	local escala = scope:Spring(
+		scope:Computed(function(use)
+			return if use(encima) then 1.1 else 1
+		end),
+		40,
+		0.55
+	)
+	local insignia = nil
+	if tecla then
+		insignia = scope:Insignia({
+			Teclado = tecla,
+			Tamano = 22,
+			Position = UDim2.new(1, -2, 0, 2),
+			AnchorPoint = Vector2.new(1, 0),
+			ZIndex = 5,
+		})
+	end
+	return scope:New("TextButton")({
+		Name = nombre,
+		Text = "",
+		Size = UDim2.fromOffset(LADO_ICONO, LADO_ICONO),
+		LayoutOrder = orden,
+		BackgroundTransparency = 1,
+		SelectionImageObject = Tema.SELECCION_INVISIBLE,
+		[OnEvent("MouseEnter")] = function()
+			encima:set(true)
+		end,
+		[OnEvent("MouseLeave")] = function()
+			encima:set(false)
+		end,
+		[OnEvent("Activated")] = alPulsar,
+		[Children] = {
+			scope:New("UIScale")({ Scale = escala }),
+			scope:Icono({
+				Clave = icono,
+				Tamano = LADO_ICONO - 18,
+				Position = UDim2.new(0.5, 0, 0, 0),
+				AnchorPoint = Vector2.new(0.5, 0),
+				ZIndex = 2,
+			}),
+			scope:Texto({
+				Texto = texto,
+				Size = UDim2.new(1, 8, 0, 18),
+				Position = UDim2.new(0.5, 0, 1, 0),
+				AnchorPoint = Vector2.new(0.5, 1),
+				Tamano = 14,
+				Fuente = "titulo",
+				Color = Paleta.UI_PAPEL,
+				Contorno = Paleta.UI_TINTA,
+				Alinear = Enum.TextXAlignment.Center,
+				Ajustar = false,
+				ZIndex = 3,
+			}),
+			insignia,
+			extra,
+		},
+	})
 end
 
-local function refrescarPistas()
-	local plataforma = Entrada.plataforma()
-	local sinPanel = not Menu.hayAbierto()
-	-- Lanzar: solo con algo en la bolsa; en tactil lo dice el boton de ControlPatio
-	local hayCarga = #EstadoCliente.bolsa.items > 0
-	pistaLanzar.texto.Text = Textos.HUD.mantenerLanzar
-	pistaLanzar.envoltorio.Visible = hayCarga and sinPanel and plataforma ~= "tactil"
-	-- Recoger: solo en el patio y mientras se aprende
-	pistaRecoger.texto.Text = if plataforma == "tactil" then Textos.HUD.tocarRecoger else Textos.HUD.mantenerRecoger
-	pistaRecoger.envoltorio.Visible = enPatio() and sinPanel and recogidasSesion < RECOGIDAS_PARA_APRENDER
-	barraFuerza.envoltorio.Visible = enPatio()
+-- Barrita bajo el icono de Rebirth: lo que falta para el siguiente (dinero
+-- y mejoras a partes iguales), verde cuando ya se puede renacer
+local function barraRebirth()
+	local modulo = script.Parent:FindFirstChild("Rebirth")
+	if not modulo then
+		return nil
+	end
+	local Rebirth = require(modulo) :: any
+	return scope:Barra({
+		Nombre = "Progreso",
+		Fraccion = Rebirth.progreso,
+		Color = scope:Computed(function(use)
+			return if use(Rebirth.puede) then Paleta.UI_EXITO else Paleta.CABECERA_PANEL.Rebirth
+		end),
+		Size = UDim2.new(1, -8, 0, 10),
+		Position = UDim2.new(0.5, 0, 1, -20),
+		AnchorPoint = Vector2.new(0.5, 1),
+		Radio = 5,
+	})
 end
 
-local function refrescarBolsa()
-	local b = EstadoCliente.bolsa
-	local n = #b.items
-	if n > ultimoConteoBolsa then
-		recogidasSesion += n - ultimoConteoBolsa
-	end
-	ultimoConteoBolsa = n
-	local llena = n >= b.capacidad
-	local fraccion = if b.capacidad > 0 then math.clamp(n / b.capacidad, 0, 1) else 0
-	TweenService:Create(barraBolsa.relleno, TweenInfo.new(0.2), { Size = UDim2.new(1, -8, fraccion, if fraccion > 0 then -8 else 0) }):Play()
-	if llena then
-		barraBolsa.etiqueta.Text = Textos.HUD.bolsaLlenaBarra
-		barraBolsa.etiqueta.TextColor3 = Paleta.UI_PELIGRO
-		barraBolsa.relleno.BackgroundColor3 = Paleta.UI_PELIGRO
-		barraBolsa.borde.Color = Paleta.UI_PELIGRO
-		pulsoBolsaLlena:Play()
-	else
-		barraBolsa.etiqueta.Text = Textos.HUD.bolsa
-		barraBolsa.etiqueta.TextColor3 = Paleta.UI_TINTA
-		barraBolsa.relleno.BackgroundColor3 = Paleta.UI_BOLSA
-		barraBolsa.borde.Color = Paleta.UI_TINTA
-		pulsoBolsaLlena:Cancel()
-		barraBolsa.relleno.BackgroundTransparency = 0
-	end
-	refrescarPistas()
-end
+-- Panel, texto, icono y atajo de cada boton. Solo sale si su panel existe.
+local BOTONES = {
+	{ panel = "Tienda", texto = Textos.HUD.tienda, icono = "telefono", tecla = "Q" },
+	{ panel = "Mascotas", texto = Textos.HUD.mascotas, icono = "libreta", tecla = "J" },
+	{ panel = "Rebirth", texto = Textos.HUD.rebirth, icono = "estrella", tecla = "R" },
+	{ panel = "Pedidos", texto = Textos.HUD.pedidos, icono = "nota", tecla = "P" },
+}
 
-local function refrescarPerfil()
-	local p = EstadoCliente.perfil
-	if not p then
-		return
-	end
-	textoDinero.Text = Formato.dinero(p.dinero or 0)
-	textoGemas.Text = Formato.miles(p.gemas or 0)
-	local distintas = {}
-	for _, copia in p.mascotas or {} do
-		distintas[copia.id] = true
-	end
-	local n = 0
-	for _ in distintas do
-		n += 1
-	end
-	textoCartas.Text = string.format("%d/%d", n, #DefinicionesMascotas.LISTA)
-end
-
-local function refrescarEnergia(actual: number, max: number)
-	local fraccion = if max > 0 then math.clamp(actual / max, 0, 1) else 0
-	TweenService:Create(barraEnergia.relleno, TweenInfo.new(0.2), { Size = UDim2.new(1, -8, fraccion, if fraccion > 0 then -8 else 0) }):Play()
-	if actual < 10 then
-		barraEnergia.etiqueta.Text = Textos.HUD.restaurarEnergia
-		barraEnergia.etiqueta.TextColor3 = Paleta.UI_PELIGRO
-		barraEnergia.borde.Color = Paleta.UI_PELIGRO
-		pulsoEnergia:Play()
-	else
-		barraEnergia.etiqueta.Text = string.format("%d/%d", actual, max)
-		barraEnergia.etiqueta.TextColor3 = Paleta.UI_TINTA
-		barraEnergia.borde.Color = Paleta.UI_TINTA
-		pulsoEnergia:Cancel()
-		barraEnergia.etiqueta.TextTransparency = 0
+local hijosBotonera: { any } = {
+	scope:New("UIScale")({
+		Scale = scope:Computed(function(use)
+			return if use(tactil) then 0.8 else 1
+		end),
+	}),
+	scope:Rejilla({ Celda = UDim2.fromOffset(LADO_ICONO, LADO_ICONO), Espacio = 10 }),
+}
+for orden, b in BOTONES do
+	if script.Parent:FindFirstChild(b.panel) then
+		local extra = if b.panel == "Rebirth" then barraRebirth() else nil
+		table.insert(hijosBotonera, botonIcono(b.panel, b.texto, b.icono, b.tecla, orden, function()
+			Menu.alternar(b.panel)
+		end, extra))
 	end
 end
 
-local function refrescarCarga(fraccion: number)
-	barraFuerza.relleno.Size = UDim2.new(1, -8, fraccion, if fraccion > 0 then -8 else 0)
-	barraFuerza.relleno.BackgroundColor3 = if fraccion >= 0.99 then Paleta.UI_PRIMARIO else Paleta.UI_FUERZA
-end
+local botonera = scope:New("Frame")({
+	Name = "Botonera",
+	Size = UDim2.fromOffset(LADO_ICONO * 2 + 10, LADO_ICONO * 2 + 10),
+	Position = scope:Computed(function(use)
+		return if use(tactil) then UDim2.fromOffset(MARGEN, 16) else UDim2.new(0, MARGEN, 0.46, 0)
+	end),
+	AnchorPoint = scope:Computed(function(use)
+		return if use(tactil) then Vector2.zero else Vector2.new(0, 0.5)
+	end),
+	Visible = sinPanel,
+	BackgroundTransparency = 1,
+	[Children] = hijosBotonera,
+})
 
-EstadoCliente.alCambiarPerfil:Connect(refrescarPerfil)
-EstadoCliente.alCambiarBolsa:Connect(refrescarBolsa)
-EstadoCliente.alCambiarEnergia:Connect(refrescarEnergia)
-EstadoCliente.alCambiarCarga:Connect(refrescarCarga)
-refrescarPerfil()
-refrescarBolsa()
-refrescarEnergia(EstadoCliente.energia.actual, EstadoCliente.energia.max)
-refrescarCarga(0)
+-- ===========================================================================
+-- Arriba-dcha: contadores
+-- ===========================================================================
 
--- Menos ruido con un panel abierto
-Menu.alCambiar:Connect(function(nombre)
-	dock.Visible = nombre == nil
-	esquina.Visible = nombre == nil
-	refrescarPistas()
+local ANCHO_CENTRO = 330
+-- De las barras verticales de la derecha; aqui porque Contadores se aparta de ellas
+local DIAMETRO_BASE = 48
+local SEPARACION_BARRAS = 28
+
+-- La mascota que se esta montando mas cerca de completarse, como texto
+-- "set|id|n|total" (un primitivo: el perfil llega como tablas nuevas) o ""
+local montajeHud = scope:Computed(function(use)
+	local p = use(reactivo.perfil)
+	local mejor, fraccion = "", -1
+	for _, set in DefinicionesMascotas.SETS do
+		local m = p and p.fragmentos and p.fragmentos[set.id]
+		if m and m.total > 0 and m.n / m.total > fraccion then
+			mejor, fraccion = string.format("%s|%s|%d|%d", set.id, m.id, m.n, m.total), m.n / m.total
+		end
+	end
+	return mejor
 end)
-jugador:GetAttributeChangedSignal("EnPatio"):Connect(refrescarPistas)
-Componentes.alCambiarDisposicion:Connect(function()
-	aplicarDisposicion()
-	refrescarPistas()
+local function partesMontaje(texto: string): (DefinicionesMascotas.Set?, DefinicionesMascotas.Mascota?, number, number)
+	local p = string.split(texto, "|")
+	if #p < 4 then
+		return nil, nil, 0, 0
+	end
+	return DefinicionesMascotas.SET_POR_ID[p[1]], DefinicionesMascotas.obtener(p[2]), tonumber(p[3]) or 0, tonumber(p[4]) or 0
+end
+local ICONO_SET = { Papel = "setPapel", Plastico = "setPlastico", Metal = "setMetal", Organico = "setOrganico" }
+
+local contadores = scope:New("Frame")({
+	Name = "Contadores",
+	Size = UDim2.fromOffset(ANCHO_CENTRO, 58 + 8 + 30),
+	-- Arriba-dcha (decision del usuario). En tactil la pantalla es baja y las
+	-- barras verticales llegan hasta arriba: se aparta a su izquierda y encoge
+	Position = scope:Computed(function(use)
+		return if use(tactil) then UDim2.new(1, -(MARGEN + 2 * (DIAMETRO_BASE + SEPARACION_BARRAS)), 0, MARGEN) else UDim2.new(1, -MARGEN, 0, MARGEN)
+	end),
+	AnchorPoint = Vector2.new(1, 0),
+	BackgroundTransparency = 1,
+	[Children] = {
+		scope:New("UIScale")({
+			Scale = scope:Computed(function(use)
+				return if use(tactil) then 0.75 else 1
+			end),
+		}),
+		scope:Pildora({
+			Nombre = "Dinero",
+			Icono = "billete",
+			Texto = dinero,
+			Color = Paleta.UI_DINERO,
+			Ancho = 250,
+			Alto = 58,
+			TamanoTexto = 34,
+			Position = UDim2.new(1, 0, 0, 0),
+			AnchorPoint = Vector2.new(1, 0),
+		}),
+		-- Fragmentos de la mascota mas cerca de completarse
+		scope:Icono({
+			Clave = scope:Computed(function(use)
+				local set = partesMontaje(use(montajeHud))
+				return if set then (ICONO_SET[set.material] or "estrella") else "estrella"
+			end),
+			Tamano = 34,
+			Position = UDim2.new(1, -250, 0, 66),
+			ZIndex = 3,
+		}),
+		scope:Barra({
+			Nombre = "Fragmentos",
+			Fraccion = scope:Computed(function(use)
+				local _, _, n, total = partesMontaje(use(montajeHud))
+				return if total > 0 then math.clamp(n / total, 0, 1) else 0
+			end),
+			Texto = scope:Computed(function(use)
+				local _, def, n, total = partesMontaje(use(montajeHud))
+				if not def then
+					return Textos.MASCOTAS.sinFragmentosHud
+				end
+				return Textos.formatear(Textos.MASCOTAS.fragmentosHud, { nombre = def.nombre, n = n, total = total })
+			end),
+			Color = scope:Computed(function(use)
+				local set = partesMontaje(use(montajeHud))
+				return if set then (Paleta.MATERIAL[set.material] or Paleta.UI_DINERO) else Paleta.UI_DINERO
+			end),
+			Size = UDim2.fromOffset(214, 26),
+			Position = UDim2.new(1, 0, 0, 68),
+			AnchorPoint = Vector2.new(1, 0),
+			Radio = 13,
+			TamanoTexto = 14,
+		}),
+	},
+})
+
+-- ===========================================================================
+-- Derecha: barras verticales de fuerza y bolsa
+-- ===========================================================================
+
+local ANCHO_BARRA = 32
+local ALTO_BARRA = 210
+
+-- columna 0 = pegada al borde derecho, 1 = la siguiente hacia dentro
+local function barraVertical(nombre: string, columna: number, props: { Fraccion: any, Color: any, Texto: any, ColorTexto: any?, Visible: any?, Icono: string })
+	local desplazamiento = 22 + columna * (DIAMETRO_BASE + SEPARACION_BARRAS)
+	return scope:New("Frame")({
+		Name = nombre,
+		Size = UDim2.fromOffset(ANCHO_BARRA, ALTO_BARRA),
+		-- En tactil suben: debajo va la pista de recoger (sobre el boton de salto)
+		Position = scope:Computed(function(use)
+			return UDim2.new(1, -desplazamiento, 0.5, if use(tactil) then -20 else 30)
+		end),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Visible = props.Visible,
+		BackgroundTransparency = 1,
+		[Children] = {
+			scope:Barra({
+				Fraccion = props.Fraccion,
+				Color = props.Color,
+				Vertical = true,
+				Size = UDim2.fromScale(1, 1),
+				Radio = math.floor(ANCHO_BARRA / 2),
+			}),
+			-- Base: circulo con icono que asoma por debajo
+			scope:New("Frame")({
+				Name = "Base",
+				Size = UDim2.fromOffset(DIAMETRO_BASE, DIAMETRO_BASE),
+				Position = UDim2.new(0.5, 0, 1, 4),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = Paleta.UI_PAPEL,
+				ZIndex = 4,
+				[Children] = {
+					scope:New("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+					scope:New("UIStroke")({ Color = Paleta.UI_TINTA, Thickness = Tema.GROSOR }),
+					scope:Icono({ Clave = props.Icono, Tamano = math.floor(DIAMETRO_BASE * 0.66), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 5 }),
+				},
+			}),
+			-- La etiqueta cuelga hacia dentro de la pantalla: centrada se saldria
+			scope:Texto({
+				Texto = props.Texto,
+				Size = UDim2.fromOffset(160, 22),
+				Position = UDim2.new(1, 0, 0, -6),
+				AnchorPoint = Vector2.new(1, 1),
+				Tamano = 15,
+				Fuente = "titulo",
+				Alinear = Enum.TextXAlignment.Right,
+				Color = props.ColorTexto or Paleta.UI_PAPEL,
+				Contorno = Paleta.UI_TINTA,
+				ZIndex = 4,
+			}),
+		},
+	})
+end
+
+-- Bonus por distancia si acertara desde aqui (5 veces por segundo: la
+-- distancia al contenedor cambia al andar, no cada frame)
+local bonusAqui = scope:Value(0)
+task.spawn(function()
+	local CollectionService = game:GetService("CollectionService")
+	while true do
+		task.wait(0.2)
+		local root = jugador.Character and jugador.Character:FindFirstChild("HumanoidRootPart")
+		local contenedor = CollectionService:GetTagged("Contenedor")[1]
+		local zona = contenedor and contenedor:FindFirstChild("ZonaAcierto")
+		if root and root:IsA("BasePart") and zona and zona:IsA("BasePart") then
+			local d = Vector3.new(zona.Position.X - root.Position.X, 0, zona.Position.Z - root.Position.Z).Magnitude
+			bonusAqui:set(DefinicionesPunteria.bonusDistancia(d))
+		end
+	end
 end)
-aplicarDisposicion()
-refrescarPistas()
+
+local barraFuerza = barraVertical("Fuerza", 0, {
+	Fraccion = reactivo.carga,
+	Color = scope:Computed(function(use)
+		return if use(reactivo.carga) >= 0.99 then Paleta.UI_PRIMARIO else Paleta.UI_FUERZA
+	end),
+	Texto = scope:Computed(function(use)
+		local b = use(bonusAqui)
+		return if b > 0 then Textos.formatear(Textos.HUD.bonusAqui, { pct = math.floor(b * 100 + 0.5) }) else Textos.HUD.fuerza
+	end),
+	Visible = enPatio,
+	Icono = "flecha",
+})
+
+local barraBolsa = barraVertical("Bolsa", 1, {
+	Fraccion = scope:Computed(function(use)
+		local c = use(capacidad)
+		return if c > 0 then use(enBolsa) / c else 0
+	end),
+	Color = scope:Computed(function(use)
+		return if use(bolsaLlena) then Paleta.UI_PELIGRO:Lerp(Paleta.UI_PAPEL, use(pulso) * 0.4) else Paleta.UI_BOLSA
+	end),
+	Texto = scope:Computed(function(use)
+		return if use(bolsaLlena) then Textos.HUD.bolsaLlenaBarra else Textos.HUD.bolsa
+	end),
+	ColorTexto = scope:Computed(function(use)
+		return if use(bolsaLlena) then Paleta.UI_PELIGRO else Paleta.UI_PAPEL
+	end),
+	Icono = "bolsa",
+})
+
+-- ===========================================================================
+-- Abajo-dcha: pistas
+-- ===========================================================================
+
+-- Pastilla [insignia] TEXTO [icono]; el ancho sigue al contenido
+local function pista(nombre: string, alto: number, teclado: string, gamepad: Enum.KeyCode, texto: any, icono: string, posicion: any, visible: any)
+	return scope:New("Frame")({
+		Name = nombre,
+		Size = UDim2.fromOffset(0, alto),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Position = posicion,
+		AnchorPoint = Vector2.new(1, 1),
+		Visible = visible,
+		BackgroundColor3 = Paleta.UI_PAPEL,
+		[Children] = {
+			scope:New("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+			scope:New("UIStroke")({ Color = Paleta.UI_TINTA, Thickness = Tema.GROSOR }),
+			scope:Relleno({ X = 12, Y = 0 }),
+			scope:Lista({ Espacio = 8, Horizontal = true, AlinearV = Enum.VerticalAlignment.Center }),
+			scope:Insignia({ Teclado = teclado, Gamepad = gamepad, Tamano = alto - 16, Orden = 1 }),
+			scope:Texto({ Texto = texto, Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, Tamano = math.floor(alto * 0.42), Fuente = "titulo", Ajustar = false, Orden = 2 }),
+			scope:Icono({ Clave = icono, Tamano = alto - 10, Orden = 3 }),
+		},
+	})
+end
+
+local pistaLanzar = pista(
+	"PistaLanzar",
+	46,
+	"F",
+	Enum.KeyCode.ButtonY,
+	Textos.HUD.mantenerLanzar,
+	"lanzar",
+	scope:Computed(function(use)
+		return if use(tactil) then UDim2.new(1, -MARGEN, 1, -130) else UDim2.new(1, -MARGEN, 1, -MARGEN)
+	end),
+	-- Solo con la bolsa llena (solo entonces se lanza, ControlPatio); en
+	-- tactil lo dice el boton de ControlPatio
+	scope:Computed(function(use)
+		return use(enBolsa) > 0 and use(bolsaLlena) and use(sinPanel) and use(Escala.plataforma) ~= "tactil"
+	end)
+)
+
+local pistaRecoger = pista(
+	"PistaRecoger",
+	38,
+	Textos.HUD.clic,
+	Enum.KeyCode.ButtonX,
+	scope:Computed(function(use)
+		return if use(Escala.plataforma) == "tactil" then Textos.HUD.tocarRecoger else Textos.HUD.mantenerRecoger
+	end),
+	"mano",
+	scope:Computed(function(use)
+		return if use(tactil) then UDim2.new(1, -MARGEN, 1, -184) else UDim2.new(1, -MARGEN, 1, -MARGEN - 56)
+	end),
+	-- Solo en el patio y mientras se aprende
+	scope:Computed(function(use)
+		return use(enPatio) and use(sinPanel) and use(recogidas) < RECOGIDAS_PARA_APRENDER
+	end)
+)
+
+scope:Pantalla({
+	Nombre = "HUD",
+	Orden = 1,
+	Hijos = { botonera, contadores, barraFuerza, barraBolsa, pistaLanzar, pistaRecoger },
+})

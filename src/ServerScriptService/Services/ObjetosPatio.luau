@@ -21,6 +21,18 @@
 	arrastrado hasta la bolsa. Al reclamar, el modelo vuela 0,25 s al torso
 	del jugador (feedback) y se destruye.
 
+	Recoger no cuesta nada (diseno v2: sin energia); el unico limite es la
+	bolsa.
+
+	Una bolsa caida (tipo "bolsa") solo la reclama su dueno (duenoId):
+	auditoria 26 sep. retirar() la saca sin reclamo cuando se recicla sola.
+
+	Diseno v2, dos reglas mas sobre las piezas de un monton (puedeReclamar,
+	que tambien usa el Iman para no arrastrar lo que no se puede llevar):
+	  - de un cuadrante que el jugador no tiene abierto, nunca ("bloqueado");
+	  - durante PRIORIDAD_EXCAVADOR s solo las recoge quien excavo el monton
+	    ("prioridad"): que un veterano rapido no vacie la montana de un nuevo.
+
 	Los demas modulos se enteran de que un objeto se fue por alRetirar
 	(Montones lleva la cuenta y agota, FisicaBasura despierta a los vecinos):
 	asi este modulo no depende de ellos.
@@ -32,12 +44,12 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
+local GameConfig = require(Config:WaitForChild("GameConfig"))
 local Textos = require(Config:WaitForChild("Textos"))
-local DefinicionesMascotas = require(Config:WaitForChild("DefinicionesMascotas"))
 local DefinicionesColeccionables = require(Config:WaitForChild("DefinicionesColeccionables"))
 local Utilidades = Shared:WaitForChild("Utilidades")
-local ModelosMascota = require(Utilidades:WaitForChild("ModelosMascota"))
 local ModelosObjetos = require(Utilidades:WaitForChild("ModelosObjetos"))
+local Cuadrantes = require(Utilidades:WaitForChild("Cuadrantes"))
 local Geometria = require(Utilidades:WaitForChild("Geometria"))
 local Senal = require(Utilidades:WaitForChild("Senal"))
 local Red = require(Utilidades:WaitForChild("Red"))
@@ -62,7 +74,7 @@ ObjetosPatio.alRetirar = Senal.nueva() :: Senal.Senal<Objeto>
 ObjetosPatio.carpeta = nil :: Folder?
 
 local DURACION_VUELO = 0.25 -- vuelo del objeto reclamado hasta la bolsa
-local TIPOS_CON_AVISO = { mascota = true, fragmento = true, figurina = true, cinta = true, traje = true }
+local TIPOS_CON_AVISO = { figurina = true, cinta = true, traje = true }
 
 local objetos: { [string]: Objeto } = {}
 local contador = 0
@@ -82,11 +94,7 @@ function ObjetosPatio.modeloPara(item: Item): Model
 	elseif item.tipo == "tesoro" then
 		return ModelosObjetos.tesoro()
 	elseif item.tipo == "fragmento" then
-		local def = DefinicionesMascotas.obtener(item.id or "")
-		return if def then ModelosMascota.fragmento(def, 1) else ModelosObjetos.tesoro()
-	elseif item.tipo == "mascota" then
-		local def = DefinicionesMascotas.obtener(item.id or "")
-		return if def then ModelosMascota.mascota(def, item.estado or 2, item.sucia) else ModelosObjetos.tesoro()
+		return ModelosObjetos.fragmento(item.material or "Papel")
 	elseif item.tipo == "figurina" then
 		local def = DefinicionesColeccionables.FIGURINA_POR_ID[item.id or ""]
 		return if def then ModelosObjetos.figurina(def) else ModelosObjetos.tesoro()
@@ -184,13 +192,14 @@ end
 -- Reclamo atomico
 -- ===========================================================================
 
-local avisoBolsaLlena: { [Player]: number } = {}
+local ultimoAviso: { [Player]: number } = {}
 
-local function avisarBolsaLlena(jugador: Player)
+-- Un aviso cada 2 s como mucho: el Iman y los clics repiten el rechazo
+local function avisar(jugador: Player, texto: string)
 	local ahora = os.clock()
-	if ahora - (avisoBolsaLlena[jugador] or 0) > 2 then
-		avisoBolsaLlena[jugador] = ahora
-		NotificacionEvent:FireClient(jugador, Textos.PATIO.bolsaLlena, "aviso")
+	if ahora - (ultimoAviso[jugador] or 0) > 2 then
+		ultimoAviso[jugador] = ahora
+		NotificacionEvent:FireClient(jugador, texto, "aviso")
 	end
 end
 
@@ -211,7 +220,7 @@ local function entregar(jugador: Player, item: Item): boolean
 			return false
 		end
 		Perfiles.estadistica(jugador, "bolsasRecogidas", 1)
-		NotificacionEvent:FireClient(jugador, Textos.formatear(Textos.PATIO.bolsaRecogida, { n = #(item.contenido or {}), dueno = item.dueno or "?" }), "objeto")
+		NotificacionEvent:FireClient(jugador, Textos.formatear(Textos.PATIO.bolsaRecogida, { n = #(item.contenido or {}) }), "objeto")
 		return true
 	end
 	if not Bolsa.meter(jugador, item) then
@@ -219,15 +228,53 @@ local function entregar(jugador: Player, item: Item): boolean
 	end
 	if item.tipo == "billete" then
 		Perfiles.estadistica(jugador, "billetesEncontrados", 1)
-		NotificacionEvent:FireClient(jugador, Textos.formatear(Textos.PATIO.billete, { cantidad = item.valor or 0 }), "objeto")
+	elseif item.tipo == "fragmento" then
+		-- Solo cuenta al reciclarlo: que no se quede olvidado en la bolsa
+		NotificacionEvent:FireClient(jugador, Textos.formatear(Textos.NOTIFICACIONES.fragmentoRecogido, { nombre = item.nombre }), "objeto")
 	elseif TIPOS_CON_AVISO[item.tipo] then
 		NotificacionEvent:FireClient(jugador, item.nombre, "objeto")
 	end
 	return true
 end
 
--- origen: "clic" (valida distancia), "iman" (ya arrastrado hasta la bolsa) o
--- "toque" (pruebas). Devuelve (ok, motivo).
+-- Si el jugador puede llevarse ese objeto ahora (sin mirar distancia ni
+-- bolsa): (ok, motivo). Lo usan reclamar y el Iman.
+function ObjetosPatio.puedeReclamar(jugador: Player, obj: Objeto): (boolean, string)
+	if obj.item.tipo == "bolsa" and obj.item.duenoId and obj.item.duenoId ~= jugador.UserId then
+		return false, "ajena"
+	end
+	local monton = obj.monton
+	if monton then
+		local perfil = Perfiles.obtener(jugador)
+		if not Cuadrantes.abierto(monton.cuadrante, if perfil then perfil.rebirths else 0) then
+			return false, "bloqueado"
+		end
+		local excavador = monton.excavador
+		if excavador and excavador ~= jugador and excavador.Parent and os.clock() < monton.activadoEn + GameConfig.PRIORIDAD_EXCAVADOR then
+			return false, "prioridad"
+		end
+	end
+	return true, ""
+end
+
+-- Aviso de por que no se pudo (un aviso cada 2 s como mucho)
+local function avisarRechazo(jugador: Player, obj: Objeto, motivo: string)
+	if motivo == "ajena" then
+		avisar(jugador, Textos.formatear(Textos.PATIO.bolsaAjena, { dueno = obj.item.dueno or "?" }))
+	elseif motivo == "bloqueado" and obj.monton then
+		local def = Cuadrantes.definicion(obj.monton.cuadrante)
+		avisar(jugador, Textos.formatear(Textos.PATIO.cuadranteBloqueado, { n = if def then def.rebirth else 1 }))
+	elseif motivo == "prioridad" and obj.monton then
+		local monton = obj.monton
+		local faltan = math.max(1, math.ceil(monton.activadoEn + GameConfig.PRIORIDAD_EXCAVADOR - os.clock()))
+		avisar(jugador, Textos.formatear(Textos.PATIO.prioridad, { s = faltan, dueno = if monton.excavador then monton.excavador.DisplayName else "?" }))
+	end
+end
+
+-- origen: "clic" (valida distancia), "mira" (como clic pero sin avisos: la
+-- recogida automatica de la mira en el movil, que apunta sin querer a lo
+-- que no puede llevarse), "iman" (ya arrastrado hasta la bolsa) o "toque"
+-- (pruebas, sin distancia). Devuelve (ok, motivo).
 function ObjetosPatio.reclamar(jugador: Player, objetoId: string, origen: string): (boolean, string)
 	local obj = objetos[objetoId]
 	if not obj then
@@ -236,15 +283,24 @@ function ObjetosPatio.reclamar(jugador: Player, objetoId: string, origen: string
 	if obj.reclamadoPor then
 		return false, "yaReclamado"
 	end
-	if origen == "clic" and not alAlcance(jugador, obj) then
+	if (origen == "clic" or origen == "mira") and not alAlcance(jugador, obj) then
 		return false, "lejos"
+	end
+	local puede, motivo = ObjetosPatio.puedeReclamar(jugador, obj)
+	if not puede then
+		if origen == "clic" then
+			avisarRechazo(jugador, obj, motivo)
+		end
+		return false, motivo
 	end
 	-- Bloqueo: se marca ANTES de cualquier otra cosa. Si luego no cabe en la
 	-- bolsa se libera; entre medias no hay ningun yield.
 	obj.reclamadoPor = jugador
 	if not entregar(jugador, obj.item) then
 		obj.reclamadoPor = nil
-		avisarBolsaLlena(jugador)
+		if origen ~= "mira" then
+			avisar(jugador, Textos.PATIO.bolsaLlena)
+		end
 		return false, "bolsaLlena"
 	end
 	Perfiles.estadistica(jugador, "objetosRecogidos", 1)
@@ -254,13 +310,38 @@ function ObjetosPatio.reclamar(jugador: Player, objetoId: string, origen: string
 	return true, "reclamado"
 end
 
+-- Saca un objeto del registro sin que nadie lo reclame (una bolsa perdida que
+-- se recicla sola). Mismo cerrojo que reclamar: si ya lo tiene alguien, false.
+function ObjetosPatio.retirar(objetoId: string, porQuien: Player?): boolean
+	local obj = objetos[objetoId]
+	if not obj or obj.reclamadoPor then
+		return false
+	end
+	obj.reclamadoPor = porQuien
+	objetos[obj.id] = nil
+	obj.modelo:Destroy()
+	ObjetosPatio.alRetirar:Fire(obj)
+	return true
+end
+
+-- Bolsas caidas de un jugador (para reciclarlas al salir)
+function ObjetosPatio.bolsasDe(jugador: Player): { Objeto }
+	local lista = {}
+	for _, obj in objetos do
+		if obj.item.tipo == "bolsa" and obj.item.duenoId == jugador.UserId and not obj.reclamadoPor then
+			table.insert(lista, obj)
+		end
+	end
+	return lista
+end
+
 function ObjetosPatio.iniciar()
 	carpeta = Instance.new("Folder")
 	carpeta.Name = "Objetos"
 	carpeta.Parent = workspace
 	ObjetosPatio.carpeta = carpeta
 	game:GetService("Players").PlayerRemoving:Connect(function(jugador)
-		avisoBolsaLlena[jugador] = nil
+		ultimoAviso[jugador] = nil
 	end)
 end
 

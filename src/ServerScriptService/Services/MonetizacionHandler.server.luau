@@ -2,7 +2,7 @@
 --[[
 	MonetizacionHandler
 	Cablea MarketplaceService con el modulo Monetizacion:
-	  - ProcessReceipt (Developer Products: packs de Gemas), idempotente;
+	  - ProcessReceipt (Developer Products), idempotente;
 	  - PromptGamePassPurchaseFinished (pases): marca la cache y avisa;
 	  - al cargar el perfil, consulta los pases reales.
 
@@ -43,7 +43,7 @@ end)
 Monetizacion.alComprarProducto:Connect(function(jugador, idProducto)
 	local producto = Productos.PRODUCTO_POR_ID[idProducto]
 	if producto then
-		NotificacionEvent:FireClient(jugador, Textos.formatear(Textos.NOTIFICACIONES.gemasRecibidas, { n = producto.gemas }), "exito")
+		NotificacionEvent:FireClient(jugador, Textos.formatear(Textos.NOTIFICACIONES.compraRobux, { nombre = producto.nombre }), "exito")
 	end
 end)
 

@@ -14,12 +14,18 @@
 	  sucio      hubo cambios desde la ultima publicacion al cliente. Se vacia en
 	             el siguiente Heartbeat (maximo 4 envios/s por jugador).
 
-	Se envia el perfil ENTERO cada vez (PerfilEvent). Con ~120 copias de mascota
-	son unos pocos KB; a cambio el cliente nunca puede quedarse desincronizado
-	por un parche perdido.
+	Se envia el perfil ENTERO cada vez (PerfilEvent): son unos pocos KB y el
+	cliente nunca puede quedarse desincronizado por un parche perdido.
 
-	Lo que NO esta en el perfil porque no persiste: la bolsa, la energia actual,
-	la parcela asignada, los minijuegos en curso.
+	Lo que NO esta en el perfil porque no persiste: la bolsa y lo que vuela.
+
+	=== Version 3 (diseno v2, 26 sep) ===
+	El esquema entero de la v2 esta aqui desde el primer lote (rebirths,
+	mascotas por nivel y sus fragmentos, pedidos, cosmeticos), aunque
+	cada sistema llegue en su lote: asi no hace falta migrar entre lotes.
+	No hay migracion desde la v2: el juego nunca se publico, no existen
+	perfiles reales, y el DataStore cambia de nombre (GameConfig).
+	`completar` solo rellena las claves que falten.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -27,39 +33,57 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared:WaitForChild("Config"):WaitForChild("GameConfig"))
+local DefinicionesMejoras = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesMejoras"))
 local Senal = require(Shared:WaitForChild("Utilidades"):WaitForChild("Senal"))
 local Red = require(Shared:WaitForChild("Utilidades"):WaitForChild("Red"))
 
-export type Copia = {
+-- Pedidos de Dona Chatarra del dia (Services/Pedidos)
+export type Pedido = {
+	id: string, -- plantilla (Config/DefinicionesPedidos)
+	objetivo: number,
+	progreso: number,
+	parametro: any?, -- material, distancia...
+	cobrado: boolean,
+}
+
+-- La mascota que un set esta montando con fragmentos
+export type Montaje = {
 	id: string,
-	estado: number, -- 1 Danada .. 5 Perfecta
-	sucia: boolean,
+	n: number, -- fragmentos que lleva
+	total: number, -- los que pide (DefinicionesMascotas.FRAGMENTOS_RAREZA)
 }
 
 export type Perfil = {
 	version: number,
 	dinero: number,
-	gemas: number,
 	mejoras: { [string]: number },
-	mascotas: { [string]: Copia },
-	fragmentos: { [string]: number },
-	exhibidas: { [string]: string }, -- indice pedestal (como string) -> uid
+	rebirths: number,
+	-- Mascotas: id -> nivel (1..5). Solo las que tienes.
+	mascotas: { [string]: number },
+	equipadas: { string }, -- ids, en orden de hueco
+	-- Fragmentos (29 sep, sustituyen a las capsulas): la mascota que monta
+	-- cada set y cuantos lleva, y el pity de cada set (Services/Fragmentos)
+	fragmentos: { [string]: Montaje },
+	pityMascotas: { [string]: { sinRara: number, sinEpica: number } },
+	fragmentosLibres: number, -- premio de los pedidos: el jugador elige el set
+	pedidos: { dia: number, lista: { Pedido }, premioCobrado: boolean },
+	racha: number, -- aciertos seguidos al contenedor
+	-- Cosmeticos (los de pago se validan contra el pase)
+	trajes: { [string]: boolean },
+	trajePuesto: string?,
+	estela: string?,
+	disenoBolsa: string?,
+	turboHasta: number, -- os.time() hasta el que dura el Turbo de dinero
+	-- Pospuesto (GameConfig.FUNCIONES): se guarda para no migrar al volver
 	figurinas: { [string]: boolean },
 	cintas: { [string]: boolean },
-	trajes: { [string]: boolean },
-	skins: { [string]: boolean },
-	trajePuesto: string?,
-	cintaPuesta: string?,
-	skinBase: string?,
 	logros: { [string]: boolean },
 	estadisticas: { [string]: number },
-	pity: number,
 	recibos: { string },
 	pasesCache: { [string]: boolean },
-	meGusta: number,
 	tiempoJugado: number,
 	ultimaSesion: number,
-	siguienteUid: number,
+	tutorial: number, -- pasos completados (DefinicionesTutorial)
 }
 
 local Perfiles = {}
@@ -81,39 +105,41 @@ local PerfilEvent = Red.evento("PerfilEvent")
 
 function Perfiles.porDefecto(): Perfil
 	local mejoras = {}
-	for _, id in { "Mochila", "Energia", "Chispa", "Almacen", "Velocidad", "Alcance", "Iman" } do
-		mejoras[id] = 0
+	for _, def in DefinicionesMejoras.LISTA do
+		mejoras[def.id] = 0
 	end
 	return {
 		version = GameConfig.VERSION_PERFIL,
 		dinero = 0,
-		gemas = 0,
 		mejoras = mejoras,
+		rebirths = 0,
 		mascotas = {},
+		equipadas = {},
 		fragmentos = {},
-		exhibidas = {},
+		pityMascotas = {},
+		fragmentosLibres = 0,
+		pedidos = { dia = 0, lista = {}, premioCobrado = false },
+		racha = 0,
+		trajes = {},
+		trajePuesto = nil,
+		estela = nil,
+		disenoBolsa = nil,
+		turboHasta = 0,
 		figurinas = {},
 		cintas = {},
-		trajes = {},
-		skins = {},
-		trajePuesto = nil,
-		cintaPuesta = nil,
-		skinBase = nil,
 		logros = {},
 		estadisticas = {},
-		pity = 0,
 		recibos = {},
 		pasesCache = {},
-		meGusta = 0,
 		tiempoJugado = 0,
 		ultimaSesion = 0,
-		siguienteUid = 1,
+		tutorial = 0,
 	}
 end
 
--- Rellena lo que falte con el perfil por defecto (campos nuevos de versiones
--- posteriores) sin tocar lo que ya hay. Nunca borra datos.
-function Perfiles.migrar(datos: any): Perfil
+-- Rellena lo que falte con el perfil por defecto (campos nuevos) sin tocar lo
+-- que ya hay. Las mejoras se completan por id por si se anade una.
+function Perfiles.completar(datos: any): Perfil
 	local base = Perfiles.porDefecto()
 	if typeof(datos) ~= "table" then
 		return base
@@ -122,7 +148,7 @@ function Perfiles.migrar(datos: any): Perfil
 		local v = datos[clave]
 		if v == nil then
 			(datos :: any)[clave] = valorDefecto
-		elseif typeof(valorDefecto) == "table" and typeof(v) == "table" and clave == "mejoras" then
+		elseif clave == "mejoras" and typeof(v) == "table" then
 			for id, nivel in pairs(valorDefecto) do
 				if v[id] == nil then
 					v[id] = nivel
@@ -180,12 +206,6 @@ function Perfiles.marcarSucio(jugador: Player)
 	if perfiles[jugador] then
 		sucios[jugador] = true
 	end
-end
-
-function Perfiles.nuevoUid(perfil: Perfil): string
-	local uid = tostring(perfil.siguienteUid)
-	perfil.siguienteUid += 1
-	return uid
 end
 
 -- Suma delta a una estadistica y devuelve el valor nuevo.
@@ -251,7 +271,7 @@ end)
 task.spawn(function()
 	while true do
 		task.wait(60)
-		for jugador, perfil in perfiles do
+		for _, perfil in perfiles do
 			perfil.tiempoJugado += 60
 		end
 	end

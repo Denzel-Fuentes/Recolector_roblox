@@ -2,8 +2,8 @@
 --[[
 	ArteMundo
 	Las piezas de ARTE low-poly del mundo (pasada de color, referencia
-	KOTAMON): cabana de madera de Dona Chatarra, maquina de refrescos azul,
-	trituradora amarilla, contenedor verde, vallas, postes con cables,
+	KOTAMON): cabana de madera de Dona Chatarra, trituradora amarilla,
+	contenedor verde, vallas, barreras de los cuadrantes, postes con cables,
 	camion abandonado, neumaticos, barriles, caminos de tierra y la propia
 	Dona Chatarra. ConstructorMundo las coloca sobre el esqueleto whitebox.
 
@@ -13,9 +13,9 @@
 	cajas invisibles que ya hacen de pared, suelo y prompt. Por eso ninguna
 	prueba ni servicio se entera de que el mundo tiene arte.
 
-	Mallas generadas por IA (generate_mesh del MCP): si existe
-	ServerStorage.Arte.<Nombre> (Camion; Arbol ya no se usa) se clona en vez de construir
-	la version de partes. Viven en el place, no en git; sin ellas, el respaldo
+	Mallas del place (IA del MCP o importadas de Blender): si existe
+	ServerStorage.Arte.<Nombre> (Camion, Recicladora; Arbol ya no se usa) se
+	clona en vez de construir la version de partes. Viven en el place, no en git; sin ellas, el respaldo
 	de partes se ve bien igualmente. Lo mismo con las variantes de material
 	(Paleta.VARIANTES): se asignan por nombre y si no existen no pasa nada.
 
@@ -30,6 +30,8 @@ local ServerStorage = game:GetService("ServerStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Paleta = require(Shared:WaitForChild("Config"):WaitForChild("Paleta"))
+local Iconos = require(Shared:WaitForChild("Config"):WaitForChild("Iconos"))
+local Textos = require(Shared:WaitForChild("Config"):WaitForChild("Textos"))
 local M = Paleta.MUNDO
 local V = Paleta.VARIANTES
 
@@ -132,9 +134,35 @@ function ArteMundo.pintar(p, material, color, variante)
 	if color then
 		p.Color = color
 	end
-	if variante then
-		p.MaterialVariant = variante
+	-- nil limpia la variante: si no, el Baseplate conservaba una textura IA
+	-- vieja del place y se veia gris en vez de cesped
+	p.MaterialVariant = variante or ""
+	return p
+end
+
+-- Studs en la cara de arriba de un suelo (decision del usuario, 23 sep: el
+-- estilo stud del Kit tambien en el suelo). Es una Texture con la imagen
+-- "studs" de Config/Iconos (una baldosa de 4x4 relieves semitransparentes,
+-- con su luz y su sombra), asi que se ve sobre el color y el material que
+-- ya tenga la parte: no toca tamano, color, material ni tags. Una baldosa
+-- cada STUDS_BALDOSA_SUELO studs = un relieve por stud, como el Roblox
+-- clasico (a 8 salian grandes; el usuario los pidio mas pequenos).
+-- Idempotente (reutiliza la suya). Devuelve la parte.
+ArteMundo.STUDS_BALDOSA_SUELO = 4
+ArteMundo.STUDS_TRANSPARENCIA_SUELO = 0.15
+function ArteMundo.studsSuelo(p)
+	local id = Iconos.id("studs")
+	if not id or not p or not p:IsA("BasePart") then
+		return p
 	end
+	local t = p:FindFirstChild("StudsSuelo") or Instance.new("Texture")
+	t.Name = "StudsSuelo"
+	t.Texture = id
+	t.Face = Enum.NormalId.Top
+	t.StudsPerTileU = ArteMundo.STUDS_BALDOSA_SUELO
+	t.StudsPerTileV = ArteMundo.STUDS_BALDOSA_SUELO
+	t.Transparency = ArteMundo.STUDS_TRANSPARENCIA_SUELO
+	t.Parent = p
 	return p
 end
 
@@ -315,6 +343,48 @@ function ArteMundo.valla(padre, desde, hasta, alto, semilla)
 	return m
 end
 
+-- Postes y travesanos de una barrera de cuadrante (la pared es la colision,
+-- un cristal del color del material): un poste cada 8 studs y en los
+-- extremos, con franjas negras, y dos travesanos amarillos arriba y a media
+-- altura, para que se lea como valla de obra ("cerrado").
+function ArteMundo.postesBarrera(padre, pared)
+	local m = modelo("PostesBarrera", padre)
+	local s = pared.Size
+	local largo = math.max(s.X, s.Z)
+	local eje = if s.X >= s.Z then Vector3.xAxis else Vector3.zAxis
+	local base = pared.Position - Vector3.new(0, s.Y / 2, 0)
+	local n = math.max(1, math.floor(largo / 8 + 0.5))
+	for i = 0, n do
+		local d = -largo / 2 + largo * i / n
+		local pie = base + eje * d
+		parte({ Name = "Poste", Size = Vector3.new(0.7, s.Y + 0.4, 0.7), CFrame = CFrame.new(pie + Vector3.new(0, (s.Y + 0.4) / 2, 0)), Color = M.AMARILLO, Material = Enum.Material.SmoothPlastic, Parent = m })
+		for k = 1, 3 do
+			parte({ Name = "Franja", Size = Vector3.new(0.75, 0.6, 0.75), CFrame = CFrame.new(pie + Vector3.new(0, s.Y * k / 4, 0)), Color = M.GOMA, Material = Enum.Material.SmoothPlastic, Parent = m })
+		end
+	end
+	local tamanoTravesano = if s.X >= s.Z then Vector3.new(largo, 0.5, 0.35) else Vector3.new(0.35, 0.5, largo)
+	for _, f in { 0.55, 0.97 } do
+		parte({ Name = "Travesano", Size = tamanoTravesano, CFrame = CFrame.new(base + Vector3.new(0, s.Y * f, 0)), Color = M.AMARILLO, Material = Enum.Material.SmoothPlastic, Parent = m })
+	end
+	return m
+end
+
+-- Capa de color de un cuadrante del patio (diseno v2: cada cuadrante es de
+-- un material y tiene que leerse desde lejos). Una losa fina sobre el suelo
+-- del patio, del color del material mezclado con el cesped y con los studs:
+-- decorado sin colision ni raycast, el suelo funcional sigue debajo.
+function ArteMundo.sueloCuadrante(padre, centro, ancho, largo, colorMaterial)
+	local p = parte({
+		Name = "SueloCuadrante",
+		Size = Vector3.new(ancho, 0.1, largo),
+		CFrame = CFrame.new(centro),
+		Color = M.CESPED:Lerp(colorMaterial, 0.55),
+		Material = Enum.Material.SmoothPlastic,
+		Parent = padre,
+	})
+	return ArteMundo.studsSuelo(p)
+end
+
 -- Muro alto de tablas para el limite del mapa: barato (una tabla gigante
 -- por lado con material de tablas y una viga encima)
 function ArteMundo.muroTablas(padre, cf, largo, alto)
@@ -329,11 +399,11 @@ end
 function ArteMundo.caminoTierra(padre, cf, ancho, largo, semilla)
 	local rng = Random.new(semilla or 1)
 	local m = modelo("Camino", padre)
-	parte({ Name = "Tierra", Size = Vector3.new(ancho, 0.12, largo), CFrame = cf * CFrame.new(0, 0.06, 0), Color = M.TIERRA, Material = Enum.Material.Ground, Variante = V.tierra, Parent = m })
+	ArteMundo.studsSuelo(parte({ Name = "Tierra", Size = Vector3.new(ancho, 0.12, largo), CFrame = cf * CFrame.new(0, 0.06, 0), Color = M.TIERRA, Material = Enum.Material.Ground, Variante = V.tierra, Parent = m }))
 	-- Manchas mas oscuras (rodadas)
 	for _ = 1, math.max(1, math.floor(largo / 30)) do
 		local z = rng:NextNumber(-largo / 2 + 5, largo / 2 - 5)
-		parte({ Name = "Rodada", Size = Vector3.new(ancho * 0.5, 0.14, rng:NextNumber(6, 12)), CFrame = cf * CFrame.new(rng:NextNumber(-ancho * 0.2, ancho * 0.2), 0.07, z) * CFrame.Angles(0, math.rad(rng:NextNumber(-8, 8)), 0), Color = M.TIERRA_OSCURA, Material = Enum.Material.Ground, Variante = V.tierra, Parent = m })
+		ArteMundo.studsSuelo(parte({ Name = "Rodada", Size = Vector3.new(ancho * 0.5, 0.14, rng:NextNumber(6, 12)), CFrame = cf * CFrame.new(rng:NextNumber(-ancho * 0.2, ancho * 0.2), 0.07, z) * CFrame.Angles(0, math.rad(rng:NextNumber(-8, 8)), 0), Color = M.TIERRA_OSCURA, Material = Enum.Material.Ground, Variante = V.tierra, Parent = m }))
 	end
 	return m
 end
@@ -343,12 +413,12 @@ end
 function ArteMundo.loteTierra(padre, cf, ancho, largo, semilla)
 	local rng = Random.new(semilla or 1)
 	local m = modelo("Lote", padre)
-	parte({ Name = "Tierra", Size = Vector3.new(ancho, 0.12, largo), CFrame = cf * CFrame.new(0, 0.06, 0), Color = M.TIERRA, Material = Enum.Material.Ground, Variante = V.tierra, Parent = m })
+	ArteMundo.studsSuelo(parte({ Name = "Tierra", Size = Vector3.new(ancho, 0.12, largo), CFrame = cf * CFrame.new(0, 0.06, 0), Color = M.TIERRA, Material = Enum.Material.Ground, Variante = V.tierra, Parent = m }))
 	for _ = 1, math.max(2, math.floor(ancho * largo / 900)) do
 		local sx, sz = rng:NextNumber(6, 16), rng:NextNumber(4, 10)
 		local x = rng:NextNumber(-ancho / 2 + sx, ancho / 2 - sx)
 		local z = rng:NextNumber(-largo / 2 + sz, largo / 2 - sz)
-		parte({ Name = "Mancha", Size = Vector3.new(sx, 0.14, sz), CFrame = cf * CFrame.new(x, 0.07, z) * CFrame.Angles(0, math.rad(rng:NextNumber(-15, 15)), 0), Color = M.TIERRA_OSCURA, Material = Enum.Material.Ground, Variante = V.tierra, Parent = m })
+		ArteMundo.studsSuelo(parte({ Name = "Mancha", Size = Vector3.new(sx, 0.14, sz), CFrame = cf * CFrame.new(x, 0.07, z) * CFrame.Angles(0, math.rad(rng:NextNumber(-15, 15)), 0), Color = M.TIERRA_OSCURA, Material = Enum.Material.Ground, Variante = V.tierra, Parent = m }))
 	end
 	return m
 end
@@ -478,7 +548,7 @@ end
 -- cabina whitebox (Fondo, Lados, Techo, Mostrador, Rotulo) sigue debajo
 -- haciendo de colision; aqui se viste por fuera y se sube una segunda
 -- planta con balcon, tejado de lona azul, ventanas, antena y el rotulo grande.
-function ArteMundo.caseta(padre, cf)
+local function cabanaDePartes(padre, cf)
 	local m = modelo("Cabana", padre)
 	local rng = Random.new(7)
 	local madera = Enum.Material.WoodPlanks
@@ -591,8 +661,8 @@ function ArteMundo.caseta(padre, cf)
 	end
 	local rotulo = tabla("RotuloGrande", Vector3.new(18, 4.2, 0.6), CFrame.new(0, rotuloY, 0.5), 1)
 	rotulo.Color = M.MADERA_CLARA
-	ArteMundo.letreroPegatina(rotulo, "DOÑA CHATARRA", Enum.NormalId.Front, { contorno = nil })
-	ArteMundo.letreroPegatina(rotulo, "DOÑA CHATARRA", Enum.NormalId.Back, {})
+	ArteMundo.letreroPegatina(rotulo, Textos.MUNDO.tienda, Enum.NormalId.Front, { contorno = nil })
+	ArteMundo.letreroPegatina(rotulo, Textos.MUNDO.tienda, Enum.NormalId.Back, {})
 
 	-- Antena de television en el tejado
 	local antenaBase = CFrame.new(5.5, techoY + caida + 0.2, -2)
@@ -610,56 +680,102 @@ function ArteMundo.caseta(padre, cf)
 end
 
 -- ===========================================================================
--- Maquina de refrescos (viste las partes del whitebox: Cuerpo, Ventana, Ranura)
+-- Modelos importados de Blender (Tienda, Base)
 -- ===========================================================================
 
-function ArteMundo.maquinaRefrescos(padre, maq)
-	local cuerpo = maq:FindFirstChild("Cuerpo")
-	local ventana = maq:FindFirstChild("Ventana")
-	local ranura = maq:FindFirstChild("Ranura")
-	if not cuerpo then
-		return nil
-	end
-	local m = modelo("ArteMaquina", padre)
-	ArteMundo.pintar(cuerpo, Enum.Material.SmoothPlastic, M.AZUL_MAQUINA)
-	ArteMundo.pintar(ventana, Enum.Material.Glass, M.CRISTAL)
-	if ventana then
-		ventana.Transparency = 0.45
-	end
-	ArteMundo.pintar(ranura, Enum.Material.Metal, M.METAL_OSCURO)
-	local cf = cuerpo.CFrame -- frente = +Z (la ventana esta en z + 1.55)
-	local s = cuerpo.Size
-	-- Zocalo y remate
-	parte({ Name = "Zocalo", Size = Vector3.new(s.X + 0.4, 0.8, s.Z + 0.4), CFrame = cf * CFrame.new(0, -s.Y / 2 + 0.4, 0), Color = M.METAL_OSCURO, Material = Enum.Material.Metal, Parent = m })
-	parte({ Name = "Remate", Size = Vector3.new(s.X + 0.3, 0.5, s.Z + 0.3), CFrame = cf * CFrame.new(0, s.Y / 2 + 0.25, 0), Color = Paleta.escalar(M.AZUL_MAQUINA, 0.8), Parent = m })
-	-- Franja luminosa arriba con el letrero
-	local franja = parte({ Name = "Franja", Size = Vector3.new(s.X - 0.4, 1.1, 0.25), CFrame = cf * CFrame.new(0, s.Y / 2 - 0.9, s.Z / 2 + 0.12), Color = Paleta.UI_PAPEL, Material = Enum.Material.Neon, Parent = m })
-	ArteMundo.letreroPegatina(franja, "REFRESCOS", CARA_PATIO, { sinPapel = true, color = M.AZUL_MAQUINA })
-	-- Latas tras el cristal: 3 baldas x 4 latas
-	if ventana then
-		local vcf, vs = ventana.CFrame, ventana.Size
-		for fila = 0, 2 do
-			local y = vs.Y / 2 - 0.7 - fila * 1.25
-			parte({ Name = "Balda", Size = Vector3.new(vs.X - 0.2, 0.08, 0.9), CFrame = vcf * CFrame.new(0, y - 0.55, -0.3), Color = M.METAL, Material = Enum.Material.Metal, Parent = m })
-			for col = 0, 3 do
-				local x = -vs.X / 2 + 0.55 + col * ((vs.X - 1.1) / 3)
-				local colores = Paleta.BASURA.Metal
-				cilindroVertical({ Name = "Lata", Diametro = 0.5, Alto = 0.95, CFrame = vcf * CFrame.new(x, y, -0.3), Color = colores[(fila + col) % #colores + 1], Material = Enum.Material.Metal, Parent = m })
+-- Se modelan en Blender en studs, con el origen en el suelo y el frente
+-- hacia -Y. El importador de Roblox pierde los colores (cada malla se llama
+-- <Modelo>_<Color> y se pinta aqui) y puede dejar el modelo girado, asi que
+-- el frente no se supone: se deduce de dos mallas conocidas (de `trasera`
+-- hacia `delantera`), redondeado al eje mas cercano. `centro` es el centro
+-- de la caja envolvente en coordenadas del .blend (x, y): con el, el alto y
+-- el frente se reconstruye donde estaba el origen del diseno. Queda con el
+-- pivote en ese origen y LookVector = frente, y se coloca en `destino`.
+local function colocarImportada(m: Model, alto: number, centro: Vector2, trasera: string, delantera: string, destino: CFrame)
+	m.PrimaryPart = nil
+	-- Caja envolvente alineada con los ejes del mundo (GetBoundingBox usa la
+	-- orientacion del pivote)
+	m.WorldPivot = CFrame.new(m.WorldPivot.Position)
+	local _, bs = m:GetBoundingBox()
+	m:ScaleTo(m:GetScale() * alto / bs.Y)
+	local bcf, bs2 = m:GetBoundingBox()
+	local a, b = m:FindFirstChild(trasera, true), m:FindFirstChild(delantera, true)
+	local d = if a and b and a:IsA("BasePart") and b:IsA("BasePart") then b.Position - a.Position else Vector3.zAxis
+	local frente = if math.abs(d.X) > math.abs(d.Z) then Vector3.new(math.sign(d.X), 0, 0) else Vector3.new(0, 0, math.sign(d.Z))
+	-- El eje X del diseno en el mundo: arriba x frente (el -Y del .blend es el frente)
+	local xDiseno = Vector3.yAxis:Cross(frente)
+	local origen = bcf.Position - Vector3.new(0, bs2.Y / 2, 0) - xDiseno * centro.X + frente * centro.Y
+	m.WorldPivot = CFrame.lookAt(origen, origen + frente)
+	m:PivotTo(destino)
+end
+
+-- Deja decorativas todas las partes del clon y las pinta por el sufijo del
+-- nombre con la tabla de pintura { Color, Material, Transparencia }
+local function vestirImportada(m: Model, pintura)
+	for _, p in m:GetDescendants() do
+		if p:IsA("BasePart") then
+			p.Anchored = true
+			p.CanCollide = false
+			p.CanQuery = false
+			p.CanTouch = false
+			decorar(p)
+			if p:IsA("MeshPart") then
+				p.RenderFidelity = Enum.RenderFidelity.Automatic
+				p.CollisionFidelity = Enum.CollisionFidelity.Box
 			end
+			local tono = pintura[p.Name:match("_(%w+)$") or ""]
+			if tono then
+				p.Color, p.Material, p.Transparency = tono[1], tono[2], tono[3]
+			end
+			p.CastShadow = p.Transparency == 0
 		end
 	end
-	-- Panel de botones a la derecha de la ventana y la ranura de monedas
-	local panelX = s.X / 2 - 0.55
-	parte({ Name = "Panel", Size = Vector3.new(0.7, 3.2, 0.2), CFrame = cf * CFrame.new(panelX, 0.6, s.Z / 2 + 0.1), Color = Paleta.escalar(M.AZUL_MAQUINA, 0.7), Parent = m })
-	for i = 0, 3 do
-		parte({ Name = "Boton", Size = Vector3.new(0.4, 0.3, 0.1), CFrame = cf * CFrame.new(panelX, 1.7 - i * 0.6, s.Z / 2 + 0.24), Color = Paleta.BASURA.Metal[i % 4 + 1], Material = Enum.Material.Neon, Parent = m })
+	decorar(m)
+end
+
+-- Tienda "SHOP" (assets/3d/Tienda.fbx, ServerStorage.Arte.Tienda): dos
+-- contenedores apilados, menta abajo con el mostrador y coral arriba con
+-- ventanas, y el rotulo amarillo con las letras en 3D. Sin toldo ni
+-- lamparas (decision del usuario)
+local PINTURA_TIENDA = {
+	Menta = { Color3.fromRGB(62, 170, 150), Enum.Material.SmoothPlastic, 0 },
+	Coral = { Color3.fromRGB(240, 115, 100), Enum.Material.SmoothPlastic, 0 },
+	Crema = { Color3.fromRGB(248, 236, 205), Enum.Material.SmoothPlastic, 0 },
+	Amarillo = { Color3.fromRGB(255, 205, 45), Enum.Material.SmoothPlastic, 0 },
+	Marino = { Color3.fromRGB(35, 46, 82), Enum.Material.SmoothPlastic, 0 },
+	Madera = { Color3.fromRGB(160, 108, 64), Enum.Material.SmoothPlastic, 0 },
+	Blanco = { Color3.fromRGB(255, 255, 255), Enum.Material.SmoothPlastic, 0 },
+	Vidrio = { Color3.fromRGB(180, 235, 255), Enum.Material.Glass, 0.4 },
+}
+-- Medidas del .blend: alto hasta la moneda y centro de la caja envolvente
+-- (x -8,97..10,9; y -5,9 la encimera..5,3 detras). Si se reexporta con otras
+-- medidas hay que actualizarlas
+local TIENDA_ALTO = 24.2
+local TIENDA_CENTRO = Vector2.new(0.965, -0.3)
+
+local function tiendaDeMalla(padre, cf)
+	local original = mallaArte("Tienda")
+	if not original or not original:IsA("Model") then
+		return nil
 	end
-	parte({ Name = "Monedero", Size = Vector3.new(0.5, 0.5, 0.15), CFrame = cf * CFrame.new(panelX, -1.1, s.Z / 2 + 0.24), Color = M.METAL, Material = Enum.Material.Metal, Parent = m })
-	-- Pegatina lateral "OPEN HERE"-style: flecha en la ranura
-	if ranura then
-		ArteMundo.letreroPegatina(ranura, "↑ AQUÍ", CARA_PATIO, {})
-	end
+	local m = original:Clone()
+	vestirImportada(m, PINTURA_TIENDA)
+	m.Name = "Cabana"
+	m.Parent = padre
+	-- El frente de la caseta es +Z local de cf; las ventanas estan en el frente
+	-- del contenedor de arriba
+	colocarImportada(m, TIENDA_ALTO, TIENDA_CENTRO, "Tienda_Coral", "Tienda_Vidrio", cf * CFrame.Angles(0, math.pi, 0))
+	-- Cajas y una bolsa a los lados (la maquina de refrescos queda a x=-13)
+	ArteMundo.caja(m, cf * CFrame.new(11, 1, 1.5), Vector3.new(2.6, 2.2, 2.4))
+	ArteMundo.caja(m, cf * CFrame.new(10.8, 3.2, 1.7) * CFrame.Angles(0, math.rad(15), 0), Vector3.new(2.0, 1.6, 1.9))
+	ArteMundo.bolsaBasura(m, cf * CFrame.new(-10, 1, -3), 3)
 	return m
+end
+
+-- La caseta: la tienda de malla si el place la tiene; si no, la cabana de
+-- partes de siempre (con el mismo rotulo)
+function ArteMundo.caseta(padre, cf)
+	return tiendaDeMalla(padre, cf) or cabanaDePartes(padre, cf)
 end
 
 -- ===========================================================================
@@ -756,11 +872,142 @@ function ArteMundo.trituradora(padre, cf)
 end
 
 -- ===========================================================================
+-- Recicladora de Blender (contenedor + trituradora + cinta en L + salida)
+-- ===========================================================================
+
+-- El importador 3D de Roblox pierde los colores de Blender: cada malla lleva
+-- el color en el nombre (Trituradora_Amarillo, Contenedor_Verde...) y se
+-- pinta aqui con la paleta del mundo
+local PINTURA_RECICLADORA = {
+	Amarillo = { M.AMARILLO, Enum.Material.Metal },
+	GrisOscuro = { M.METAL_OSCURO, Enum.Material.Metal },
+	GrisClaro = { M.METAL, Enum.Material.Metal },
+	Acero = { Paleta.escalar(M.METAL, 1.1), Enum.Material.Metal },
+	Negro = { M.NEGRO, Enum.Material.SmoothPlastic },
+	Cavidad = { Paleta.escalar(M.NEGRO, 0.6), Enum.Material.SmoothPlastic },
+	Cinta = { M.GOMA, Enum.Material.Rubber },
+	Verde = { M.VERDE_CONTENEDOR, Enum.Material.Metal },
+	VerdeOscuro = { Paleta.escalar(M.VERDE_CONTENEDOR, 0.75), Enum.Material.Metal },
+	Naranja = { M.NARANJA, Enum.Material.SmoothPlastic },
+	Blanco = { Paleta.UI_PAPEL, Enum.Material.SmoothPlastic },
+	Pantalla = { Color3.fromRGB(88, 224, 90), Enum.Material.Neon },
+}
+-- Las piezas moviles (Trituradora.Moviles) se nombran por su funcion
+local PINTURA_MOVILES = {
+	Rodillo = "Acero",
+	RodilloCinta = "Acero",
+	RodilloRampa = "GrisClaro",
+	Banda = "Cinta",
+	Listones = "Negro",
+	Pantalla = "Pantalla",
+}
+
+local function pintarPiezaRecicladora(p)
+	local nombre = p.Name
+	local luz = nombre:match("^Luz%a+_(%a+)$")
+	if luz then
+		-- Apagadas: el cliente enciende la verde con la cinta en marcha y la
+		-- roja en reposo (Recicladora.client)
+		p.Color = if luz == "Roja" then Paleta.UI_PELIGRO else PINTURA_RECICLADORA.Pantalla[1]
+		p.Material = Enum.Material.SmoothPlastic
+		return
+	end
+	if nombre == "Bloque_Bloque" then
+		-- Basura prensada: la misma variante que la montana del patio
+		local variante = V.basura and game:GetService("MaterialService"):FindFirstChild(V.basura, true)
+		p.Color = M.TIERRA
+		if variante and variante:IsA("MaterialVariant") then
+			p.Material = variante.BaseMaterial
+			p.MaterialVariant = variante.Name
+		else
+			p.Material = Enum.Material.Pebble
+		end
+		return
+	end
+	local clave = nombre:match("_(%a+)$")
+	local prefijo = nombre:match("^(%a+)")
+	local pintura = PINTURA_RECICLADORA[PINTURA_MOVILES[prefijo] or clave or nombre]
+	if pintura then
+		p.Color = pintura[1]
+		p.Material = pintura[2]
+	end
+end
+
+-- Malla importada de assets/3d/Recicladora.fbx como ServerStorage.Arte.
+-- Recicladora, con tres hijos: Contenedor (el volquete verde), Trituradora
+-- (fija, con Moviles: rodillos, bandas, listones y luces que anima
+-- Recicladora.client) y Bloque (molde del bloque prensado que sale por la
+-- rampa; aqui se deja invisible y el cliente lo clona). Sustituye a
+-- contenedorVerde + trituradora; si el place no tiene la malla devuelve nil
+-- y ConstructorMundo usa esas dos.
+-- cf = suelo bajo el centro del contenedor funcional, frente a +Z local. El
+-- pivote queda en el suelo bajo el centro del volquete verde con +Z al frente:
+-- es el marco en que Config/Recicladora da la ruta de la basura.
+function ArteMundo.recicladora(padre, cf)
+	local original = mallaArte("Recicladora")
+	if not original or not original:IsA("Model") then
+		return nil
+	end
+	local m = original:Clone()
+	local cont = m:FindFirstChild("Contenedor")
+	local trit = m:FindFirstChild("Trituradora")
+	local verde = cont and cont:FindFirstChild("Contenedor_Verde")
+	if not (trit and verde and verde:IsA("BasePart")) then
+		m:Destroy()
+		warn("[ArteMundo] Arte.Recicladora sin Contenedor/Contenedor_Verde/Trituradora: se usa el decorado de partes")
+		return nil
+	end
+	-- El frente es hacia donde queda el volquete respecto a la trituradora,
+	-- redondeado al eje del mundo mas cercano: asi da igual como lo haya
+	-- girado el importador (el FBX sale de Blender alineado a los ejes)
+	local ccf, csize = cont:GetBoundingBox()
+	local tcf = trit:GetBoundingBox()
+	local d = ccf.Position - tcf.Position
+	local frente = if math.abs(d.X) > math.abs(d.Z) then Vector3.new(math.sign(d.X), 0, 0) else Vector3.new(0, 0, math.sign(d.Z))
+	local suelo = Vector3.new(verde.Position.X, ccf.Position.Y - csize.Y / 2, verde.Position.Z)
+	m.WorldPivot = CFrame.lookAt(suelo, suelo - frente)
+	m.PrimaryPart = nil
+
+	local moviles = trit:FindFirstChild("Moviles")
+	local molde = m:FindFirstChild("Bloque")
+	for _, p in m:GetDescendants() do
+		if p:IsA("BasePart") then
+			p.Anchored = true
+			p.CanCollide = false
+			p.CanQuery = false
+			p.CanTouch = false
+			decorar(p)
+			if p:IsA("MeshPart") then
+				p.RenderFidelity = Enum.RenderFidelity.Automatic
+				p.CollisionFidelity = Enum.CollisionFidelity.Box
+			end
+			pintarPiezaRecicladora(p)
+			local esMovil = moviles ~= nil and p:IsDescendantOf(moviles)
+			local esMolde = molde ~= nil and p:IsDescendantOf(molde)
+			-- Solo las mallas grandes y fijas proyectan sombra
+			p.CastShadow = not esMovil and not esMolde
+			if esMolde then
+				p.Transparency = 1
+			end
+		end
+	end
+	if molde then
+		molde.Name = "BloqueMolde"
+	end
+	decorar(m)
+	CollectionService:AddTag(m, "RecicladoraArte")
+	m.Name = "Recicladora"
+	m.Parent = padre
+	m:PivotTo(cf * CFrame.new(0, 1, 0))
+	return m
+end
+
+-- ===========================================================================
 -- Dona Chatarra
 -- ===========================================================================
 
 -- Viste al NPC whitebox (Torso, Cabeza, Mono, BrazoIzq/Der, Piernas siguen
--- con sus nombres y tamanos: prompt y retrato del dialogo dependen de ellos)
+-- con sus nombres y tamanos: el prompt de la tienda depende de ellos)
 function ArteMundo.vestirChatarra(npc)
 	local torso = npc:FindFirstChild("Torso")
 	local cabeza = npc:FindFirstChild("Cabeza")

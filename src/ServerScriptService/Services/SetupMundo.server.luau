@@ -6,37 +6,64 @@
 	un resumen en consola para poder verificar el place de un vistazo.
 
 	ESTE SCRIPT NO CONSTRUYE NADA en el flujo normal: ver Services/Mundo.luau.
+
+	Mientras el place guardado sea anterior al mundo v2 (lote 2), aun tiene
+	parcelas y la maquina de refrescos: sus prompts se apagan aqui para que
+	no ofrezcan nada que ya no existe. Y el de Dona Chatarra horneado antes
+	del 29 sep aun dice "Hablar": ya no tiene dialogos (decision del
+	usuario), solo abre la tienda.
 ]]
 
+local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Servicios = ServerScriptService:WaitForChild("Services")
-local GameConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("GameConfig"))
+local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("GameConfig"))
+local Textos = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("Textos"))
 local Mundo = require(Servicios:WaitForChild("Mundo"))
 
 Mundo.asegurar()
 
 local ranuras = #Mundo.ranuras()
-local parcelas = #Mundo.parcelas()
 local figurinas = #Mundo.figurinasFijas()
 local contenedor = Mundo.contenedor() ~= nil
 local zona = Mundo.zonaAcierto() ~= nil
-local maquina = Mundo.maquinaRefrescos() ~= nil
 
 print(string.format(
-	"SetupMundo: %d ranuras, %d parcelas, %d figurinas fijas, contenedor=%s, zonaAcierto=%s, maquina=%s",
+	"SetupMundo: %d ranuras, %d figurinas fijas, contenedor=%s, zonaAcierto=%s",
 	ranuras,
-	parcelas,
 	figurinas,
 	tostring(contenedor),
-	tostring(zona),
-	tostring(maquina)
+	tostring(zona)
 ))
 
 local ranurasEsperadas = 0
 for _, def in GameConfig.TAMANOS_MONTON do
 	ranurasEsperadas += def.cantidad
 end
-if ranuras ~= ranurasEsperadas or parcelas ~= GameConfig.NUM_PARCELAS or figurinas ~= 6 or not contenedor or not zona or not maquina then
-	warn(string.format("SetupMundo: el mundo no coincide con lo esperado (%d ranuras / %d parcelas / 6 figurinas + contenedor + zona + maquina). Rehornea con herramientas/construir-mundo.luau", ranurasEsperadas, GameConfig.NUM_PARCELAS))
+local figurinasBien = figurinas == 6 or not GameConfig.activa("FIGURINAS")
+if ranuras ~= ranurasEsperadas or not figurinasBien or not contenedor or not zona then
+	warn(string.format("SetupMundo: el mundo no coincide con lo esperado (%d ranuras + contenedor + zona). Rehornea con herramientas/construir-mundo.luau", ranurasEsperadas))
+end
+
+-- Restos de un place anterior al mundo v2: sin prompts
+for _, tag in { "Parcela", "MaquinaRefrescos" } do
+	for _, inst in CollectionService:GetTagged(tag) do
+		for _, d in inst:GetDescendants() do
+			if d:IsA("ProximityPrompt") then
+				d.Enabled = false
+			end
+		end
+	end
+end
+
+-- El prompt de Dona Chatarra de un place horneado antes del 29 sep
+local chatarra = Mundo.npc("DonaChatarra")
+if chatarra then
+	for _, d in chatarra:GetDescendants() do
+		if d:IsA("ProximityPrompt") then
+			d.ActionText = Textos.PATIO.tienda
+		end
+	end
 end

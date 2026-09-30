@@ -6,7 +6,13 @@
 	de los modales.
 
 	  EnPatio = true   -> CameraMode LockFirstPerson, flecha oculta, punto visible
-	  EnPatio = false  -> CameraMode Classic, flecha normal
+	  EnPatio = false  -> CameraMode Classic, flecha normal, y el zoom que
+	                      tenia al entrar (peticion del usuario: si entro en
+	                      primera persona sale en primera; si entro a 20
+	                      studs, vuelve a 20). Roblox, al pasar de
+	                      LockFirstPerson a Classic, pone el zoom a su
+	                      gusto; se fuerza fijando min = max = esa distancia
+	                      un par de frames y devolviendo los limites.
 
 	=== El bug ===
 	En primera persona el script de camara de Roblox bloquea el raton en el
@@ -24,11 +30,14 @@
 
 	=== La reticula ===
 	Con el raton bloqueado en el centro, Roblox sigue pintando la flecha ahi,
-	que no parece una mira. En el patio (sin panel abierto y sin tactil) se
-	oculta la flecha (MouseIconEnabled) y se dibuja un punto en el centro de
-	la pantalla: es donde sale el rayo de recoger y de lanzar. Un anillo fino
+	que no parece una mira. En el patio (sin panel abierto) se oculta la
+	flecha (MouseIconEnabled) y se dibuja un punto en el centro de la
+	pantalla: es donde sale el rayo de recoger y de lanzar. Un anillo fino
 	alrededor crece cuando hay un objeto al alcance bajo la mira (el Highlight
 	de ControlPatio), para que "se puede recoger" se vea sin mirar la basura.
+	Tambien en tactil (29 sep: antes se ocultaba porque en el movil se recoge
+	tocando la basura, y el usuario echaba de menos la mira para apuntar;
+	ahora lanzar apunta a ella y recoge lo que tiene debajo, ver ControlPatio).
 ]]
 
 local Players = game:GetService("Players")
@@ -39,7 +48,6 @@ local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Paleta = require(Shared:WaitForChild("Config"):WaitForChild("Paleta"))
-local Entrada = require(Shared:WaitForChild("Utilidades"):WaitForChild("Entrada"))
 
 local UI = script.Parent:WaitForChild("UI")
 local Menu = require(UI:WaitForChild("Menu"))
@@ -112,7 +120,7 @@ local function enPatio(): boolean
 end
 
 local function actualizarReticula()
-	local mostrar = enPatio() and not Menu.hayAbierto() and not Entrada.esTactil()
+	local mostrar = enPatio() and not Menu.hayAbierto()
 	pantalla.Enabled = mostrar
 	if not liberando then
 		UserInputService.MouseIconEnabled = not mostrar
@@ -135,12 +143,51 @@ local function liberarRaton(activo: boolean)
 	actualizarReticula()
 end
 
+-- Los limites de zoom del juego (StarterPlayer): se restauran siempre a
+-- estos, aunque se cambie de estado a mitad de un forzado
+local ZOOM_MIN, ZOOM_MAX = jugador.CameraMinZoomDistance, jugador.CameraMaxZoomDistance
+local zoomAlEntrar: number? = nil
+local estabaDentro = false
+local forzado = 0
+
+local function distanciaZoom(): number
+	local camara = workspace.CurrentCamera
+	return (camara.CFrame.Position - camara.Focus.Position).Magnitude
+end
+
+local function fijarZoom(distancia: number)
+	local d = math.clamp(distancia, ZOOM_MIN, ZOOM_MAX)
+	forzado += 1
+	local este = forzado
+	jugador.CameraMinZoomDistance = d
+	jugador.CameraMaxZoomDistance = d
+	-- El script de camara aplica los limites en su paso de render: se le
+	-- dejan dos frames y se devuelven (si no llego otro forzado entretanto)
+	task.spawn(function()
+		RunService.RenderStepped:Wait()
+		RunService.RenderStepped:Wait()
+		if forzado == este then
+			jugador.CameraMinZoomDistance = ZOOM_MIN
+			jugador.CameraMaxZoomDistance = ZOOM_MAX
+		end
+	end)
+end
+
 local function aplicarCamara()
-	if enPatio() then
+	local dentro = enPatio()
+	if dentro then
+		if not estabaDentro then
+			zoomAlEntrar = distanciaZoom()
+		end
 		jugador.CameraMode = Enum.CameraMode.LockFirstPerson
 	else
 		jugador.CameraMode = Enum.CameraMode.Classic
+		if estabaDentro and zoomAlEntrar then
+			fijarZoom(zoomAlEntrar)
+		end
+		zoomAlEntrar = nil
 	end
+	estabaDentro = dentro
 	actualizarReticula()
 end
 

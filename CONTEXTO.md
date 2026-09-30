@@ -5,7 +5,22 @@ capas sobre un esqueleto whitebox (ver §3 "Arte del mundo"). El diseño
 completo está en `docs/GDD.md`; este documento es lo que NO se deduce del
 código: qué hay, cómo se trabaja y por qué se decidió lo no obvio.
 
-Última pasada: 16 sep 2026 (rendimiento móvil: sin árboles, valla ligera,
+**26 sep 2026: Diseño v2 "recoger y lanzar"** (documento de @FND, ver §3
+"Diseño v2"). Sustituye al recorte por la auditoría del mismo día: lo que
+la v2 quita se BORRÓ del código (base, energía, reparación, fusión, venta,
+gemas, Sobre, Contenedor Dorado, Montón extra, logros con dinero) y lo que
+solo pospone (figuritas, cintas, trajes del botín) queda tras
+`GameConfig.FUNCIONES`. Se implementa por lotes verificados (L1–L10, plan en
+§3); **hechos: L1** (retirada y perfil v3), **L2** (mundo v4), **L3**
+(patio por zonas), **L4** (rebirths), **L5** (lanzamiento y pago) y
+**L6** (mascotas). **29 sep, cambios del usuario sobre el documento:** los
+montones traen basura **revuelta** (ya no un material por cuadrante; el
+norte es más rico) y las mascotas se consiguen con **fragmentos** que salen
+en los montones (fuera las cápsulas y sus medidores); ver §3 "Cambios del
+29 sep". Lo que sigue en este documento sobre sistemas borrados queda como
+historia de por qué se hicieron así.
+
+Última pasada anterior: 16 sep 2026 (rendimiento móvil: sin árboles, valla ligera,
 sombras y física de la basura recortadas; plano v3 del mapa: parcelas en columna al oeste,
 recicladora al sur, valla alrededor de todo; antes, el mismo día, arte del
 mundo por MCP: cabaña, máquinas, vallas,
@@ -19,25 +34,24 @@ mundo vestido; pendientes los paneles (lotes 12–13 de la UI), la prueba con
 
 | Sistema | Dónde | Estado |
 |---|---|---|
-| Patio compartido: 12 **colinas** de basura; al activar, la colina se sustituye por una **montaña de basura real con física** (30–200 objetos: latas, llantas, cajas, botellas…, sin etiquetas; caen, se asientan y se anclan; nada flota); **solo se recoge con clic** (o Imán), reclamo atómico, **sin caducidad**, repoblación | `Services/Botin.luau` (fachada) → `GeneradorBotin`, `ObjetosPatio`, `FisicaBasura`, `Montones`, `Iman`, `Lanzamiento` + `BotinHandler` | verificado (`montonPiezas`, `reacomodo`, `sinRecogidaAutomatica`, `variedadBasura`) |
-| Puntería: **mantener F carga y lanza la bolsa entera**; si falla queda en el suelo y cualquiera la recoge | `Services/Lanzamiento.luau` | verificado (`lanzarBolsa`, `lanzarBolsaFallo`) |
+| Cuadrantes: los 4 del sur abiertos (zona "patio"); la **zona de metal con el Rebirth 1 y la de orgánico con el 2**, tras barreras de cristal que son **por jugador** (grupos de colisión por nivel de rebirth) y que el servidor respalda (no se excava ni se recoge en un cuadrante cerrado) | `GameConfig.CUADRANTES`, `Utilidades/Cuadrantes`, `Services/Colisiones`, `ObjetosPatio.puedeReclamar` | verificado (`cuadrantes`, `bloqueoRebirth`, `barreraColision`, `caminarBarrera`) |
+| Patio compartido: 18 **colinas** de basura (2x3 cuadrantes, 2 chicas de 20 piezas + 1 grande de 60 por cuadrante); al activar, la colina se sustituye por una **montaña de basura real con física**, **revuelta** según la zona (`TablasProbabilidad.MEZCLA`: el patio 45/40/10/5 papel/plástico/metal/orgánico; la zona de metal 55 % metal; la de orgánico 55 % orgánico); billetes 5 %, tesoros 1 %, **fragmentos de mascota 2,5 %**; la grande trae un tesoro y un fragmento seguros; **solo se recoge con clic** (o el imán de las mascotas, lote 6), reclamo atómico, **prioridad del excavador 10 s**, un montón terminado **vuelve a los 45 s** | `Services/Botin.luau` (fachada) → `GeneradorBotin`, `ObjetosPatio`, `FisicaBasura`, `Montones`, `Iman`, `Lanzamiento` + `BotinHandler` | verificado (`montonPiezas`, `reacomodo`, `sinRecogidaAutomatica`, `variedadBasura`, `mezclaZonas`, `variedadPiezas`) |
+| Puntería: **mantener F carga y lanza la bolsa entera**, el alcance lo da la mejora **Brazo** (25 → 70 studs); al entrar paga el **bonus por distancia** (+20 % desde 10 studs … +150 % desde 60) más la **racha** (+10 % por acierto seguido, tope +50 %); el **primer lanzamiento siempre entra**; los 5 primeros llevan **línea de trayectoria**; récord personal y del servidor en el feed; si falla, racha a 0 y la bolsa queda en el suelo para **su dueño** hasta que vuelva a por ella (no se recicla sola desde el 29 sep; si cae en alto se baja junto al contenedor); **solo se lanza con la bolsa llena** (29 sep: el botón táctil y la pista "MANTÉN F" solo salen entonces) | `Services/Lanzamiento.luau`, `Config/DefinicionesPunteria`, `Utilidades/Trayectoria`, `Client/LineaTrayectoria` | verificado (`bonusDistancia`, `racha`, `primeroEntra`, `pagoFormula`, `lanzarBolsa`, `lanzarBolsaFallo`, `bolsaProtegida`, `brazoLimita`, `("trayectoria")`) |
 | Primera persona automática en el patio con retícula (punto), manos+bolsa en 2D (Frames), brazos extendidos (cliente y servidor) sujetando una bolsa abierta soldada entre las manos | `Services/Patio.luau`, `Utilidades/PoseBrazos`, `Client/Camara.client`, `Client/UI/Manos.client`, `Escena.client` | verificado (`enPatio`, capturas) |
-| HUD estilo KOTAMON en **papel y tinta**: píldoras con icono ($, cartas, gemas), barras verticales con icono en la base (energía, fuerza, **bolsa** sin números; "¡LLENA!" en rojo), retrato (headshot), dock con insignia de tecla (Q/J/L/B), "[F] MANTÉN PARA LANZAR"; disposición táctil (dock arriba-centro, botón de lanzar sobre el salto) | `Client/UI/HUD.client.luau`, `UI/Componentes.luau` | verificado (capturas PC y táctil forzada) |
-| Sistema de diseño: pegatinas con sombra, iconos por registro (`Config/Iconos`, id 0 = glifo dibujado en `Utilidades/Glifos`), insignias de tecla/mando, modales que se encogen al viewport, pestañas de libreta; diálogo de Doña Chatarra con retrato; carteles del mundo y prompts personalizados desde el cliente | `Client/UI/Componentes.luau`, `UI/Dialogo.luau`, `Escena.client`, `Prompts.client` | verificado (capturas) |
-| **Arte del mundo**: cabaña de dos plantas, máquina azul, trituradora + contenedor verde, vallas, postes con cables, camión (malla IA), parcelas de madera, Doña Chatarra vestida, césped/tierra/basura con materiales, iluminación cartoon | `ServerStorage/Herramientas/ArteMundo.luau` + `ConstructorMundo` v3 | verificado (capturas, pruebas de servidor intactas) |
-| Bolsa: todo lo recogido ocupa hueco (billetes incluidos) y **sólo el contenedor paga**, bonus +25% por bolsa llena | `Services/Bolsa.luau` | verificado (`billeteEnBolsa`, `sinDineroAlRecoger`, `bonusBolsaLlena`) |
-| Energía, refrescos (máquina), regen lenta | `Services/Energia.luau` | verificado |
-| 41 mascotas, 5 estados, fusión 3→1, venta, exhibición, pasivas, Rey Reciclón | `Config/DefinicionesMascotas`, `Services/Mascotas.luau` | verificado |
-| Reparación: limpieza (frotar manchas) y ensamblaje (girar 5 piezas), Auto-Ensamblaje | `Services/Reparacion.luau`, `Client/UI/Reparacion.luau` | verificado por UI simulada |
-| 7 mejoras × 10 niveles, coste ×1.6 | `Config/DefinicionesMejoras`, `Services/Mejoras.luau` | verificado (232.430 $ para maxear) |
-| Tienda: Sobre Premium, Contenedor Dorado, trajes, skins, gemas, pases; modal de probabilidades | `Services/Tienda.luau`, `Client/UI/Tienda.luau`, `UI/Probabilidades.luau` | verificado |
-| 6 parcelas (6 jugadores por servidor): estantería, radio, exhibidor, mesa, teléfono, almacén, me gusta, skins | `Services/Parcelas.luau`, `Client/UI/Base.luau` | verificado |
-| 12 figurinas (6 fijas en escondites), 7 cintas, 3 trajes gratis + 2 premium | `Config/DefinicionesColeccionables`, `Services/Coleccionables.luau` | verificado |
-| 40 logros en 11 categorías, progreso compartido servidor/cliente | `Config/DefinicionesLogros`, `Utilidades/ProgresoLogros`, `Services/Logros.luau` | verificado |
-| Persistencia DataStore (pcall, `cargado`, UpdateAsync, autosave, BindToClose) | `Services/DataService.server.luau` | sin probar: exige publicar |
-| Monetización: pases, ProcessReceipt idempotente, modo dev | `Services/Monetizacion.luau` | verificado (recibo duplicado no paga dos veces) |
-| HUD, álbum, notificaciones, feed social, gamepad/táctil | `Client/UI/*` | verificado |
-| Admin por chat (`/dar`, `/maxmejoras`, `/pases`, `/reset`…) | `Services/AdminHandler.server.luau` | escrito |
+| HUD v2: botonera de 4 (Tienda; Mascotas, Rebirth y Pedidos aparecen con su lote), píldora del dinero arriba-dcha, barras de fuerza y **bolsa** (sin números, "¡LLENA!" en rojo), pistas de lanzar/recoger | `Client/UI/HUD.client.luau` | verificado (`("hud")` sin avisos en PC y táctil forzada) |
+| Sistema de diseño en **Fusion 0.3** (`Client/UI/Kit`): Ventana, Boton, Tarjeta, Pestanas, Pildora, Barra, Insignia, Icono, Escala; prompts y carteles del mundo (el prompt de Doña Chatarra abre la tienda; sus diálogos se quitaron el 29 sep) | `Client/UI/Kit/*`, `Prompts.client`, `Escena.client` | verificado |
+| **Mundo v5** (29 sep; v4 el 26): sin parcelas ni máquina de refrescos, valla a 24 studs del patio por los tres lados, suelo de tierra en el patio abierto y del color de su material en las zonas del norte, barreras "Rebirth 1 · Zona de metal" / "Rebirth 2 · Zona de orgánico", punto de aparición en la plaza; tienda SHOP y recicladora de Blender, vallas, postes, camión, Doña Chatarra vestida, iluminación cartoon | `ServerStorage/Herramientas/ArteMundo.luau` + `ConstructorMundo` v5 | verificado (horneado v5 el 29 sep: 1.004 instancias, 18 ranuras con `Zona`, 8 barreras; capturas); **guardar el place** |
+| Bolsa: todo lo recogido ocupa hueco (billetes incluidos), **sólo el contenedor paga**; entregar a mano no da bonus, lanzar sí | `Services/Bolsa.luau` | verificado (`billeteEnBolsa`, `sinDineroAlRecoger`, `salirRecicla`) |
+| **Rebirths**: con las 4 mejoras al máximo y el dinero del requisito en mano ($50k, 200k, 800k, 3,2M, 12,8M; luego ×4) se reinician dinero y mejoras y el dinero pasa a ×1,5 / 2 / 2,5 / 3 / 3,5 (luego +0,5); el 1 abre la zona de metal y el set Chatarrín, el 2 la de orgánico y Mostrenco, el 3 la segunda mascota. Panel con requisito, barra y lo que abre; barrita de progreso bajo el botón del HUD | `Config/DefinicionesRebirths`, `Services/Rebirths` + `RebirthsHandler`, `Client/UI/Rebirth.luau` | verificado (`rebirthTabla`, `renacerRequisitos`, `renacer`, capturas) |
+| **4 mejoras × 10 niveles** (Bolsa 10→40, Alcance 6→16, Velocidad 16→28, Brazo 25→70), coste base × 1,6^nivel, total $118.030 | `Config/DefinicionesMejoras`, `Services/Mejoras.luau` | verificado (`mejorasV2`) |
+| **Perfil v3** con el esquema entero de la v2 (rebirths, mascotas por nivel y sus fragmentos, pedidos, cosméticos); DataStore nuevo `ReciclatasPerfiles_v3`, sin migración | `Services/Perfiles.luau`, `DataService` | verificado (`perfilV3`); guardar sin probar: exige publicar |
+| **Aparición** en la plaza mirando al patio (sin base), también al morir | `Services/AparicionHandler.server.luau`, `Mundo.cframeAparicion` | verificado (`aparicion`) |
+| **Mascotas por fragmentos** (29 sep): los fragmentos salen entre la basura (2,5 %, uno seguro en el montón grande), son del set de su material (solo de los sets que quien excava tiene abiertos) y **cuentan al reciclarlos**. Cada set **monta una mascota a la vez**: el primer fragmento decide cuál (67/28/5 con pity por set: Rara+ a la 5.ª, Épica a la 20.ª; "siempre nueva" dentro de la rareza) y pide **5/8/12 fragmentos** según su rareza; **la primera mascota del jugador es Común y pide 3**. Repetidas suben de nivel (1–5) y después dan dinero; 41 mascotas (4 sets × 4/3/3 + **Rey Reciclón** con las 40, +50 % a todo); **1 equipada** (2 desde el Rebirth 3) que te sigue, da +20…+160 % a su material y, si es Rara o Épica, **imán** de su material (6/10 studs). Álbum con la mascota que monta cada set y las probabilidades, ventana de revelación al completarla, progreso en el HUD ("Latita 3/5") | `Services/Mascotas`, `Fragmentos`, `Seguidores` + `MascotasHandler`, `Config/DefinicionesMascotas`, `Client/UI/Mascotas`, `UI/Revelacion` | verificado (`rarezaOdds`, `siempreNueva`, `primeraMascota`, `montaje`, `fragmentoCerrado`, `fragmentoAlDepositar`, `fragmentosMonton`, `repetidaNivel`, `huecos`, `bonusMascota`, `imanMaterial`, `reyReciclon`, `simularSet`, revelación y HUD en el cliente) |
+| Tutorial jugable (5 pasos: patio, excavar, llenar, lanzar, mejora); flecha (Beam) y tarjeta abajo-centro | `Config/DefinicionesTutorial`, `Services/Tutorial.luau`, `Client/UI/Tutorial.client` | verificado (`tutorial`); la versión "primeros 15 minutos" llega en el lote 9 |
+| Tienda: Mejoras y Trajes de pago (Robux) | `Client/UI/Tienda.luau`, `TiendaHandler`, `ColeccionablesHandler` (trajes) | verificado (`("panel","Tienda")`) |
+| Figuritas (6 fijas), cintas y trajes del botín: **pospuestos** (`FUNCIONES`) | `Config/DefinicionesColeccionables`, `Services/Coleccionables.luau` | apagados |
+| Monetización: pases (hoy solo los 2 trajes), ProcessReceipt idempotente con otorgadores registrados por producto, modo dev | `Services/Monetizacion.luau`, `Config/Productos` | escrito; catálogo v2 en el lote 8 |
+| Admin por chat (`/dar dinero`, `/maxmejoras`, `/pases`, `/rebirths n`, `/tutorial n`, `/repoblar`, `/reset`) | `Services/AdminHandler.server.luau` | escrito |
 
 ## 2. Cómo se trabaja
 
@@ -61,10 +75,11 @@ cambió; cuando el plugin de Rojo se conecte no verá diferencias.
 `ServerStorage/Herramientas/ConstructorMundo`, y este viste el esqueleto con
 `ArteMundo`). **Tras construir hay que guardar el place.** `SetupMundo` sólo
 lo adopta; si falta, lo construye en runtime como fallback y avisa. Todo se
-localiza por tags/atributos, nunca por nombre: `RanuraMonton` (12), `Parcela`
-(6), `FigurinaFija`, `Contenedor`, `MaquinaRefrescos`, `Limite`,
-`SoloDecorado`; atributos `Mueble`, `Pintable`, `NPC`, `IndiceParcela`.
-Con arte, `workspace.Mundo` son ~1.600 instancias (504 el whitebox).
+localiza por tags/atributos, nunca por nombre: `RanuraMonton` (18, con
+`Tamano`, `Cuadrante` y `Material`), `BarreraCuadrante` (8, con `Cuadrante`
+y `Rebirth`), `PuntoAparicion`, `Contenedor`, `Limite`, `SoloDecorado`,
+`FigurinaFija` (solo con `FIGURINAS`); atributo `NPC`. Mundo v4 (26 sep):
+~1.050 instancias.
 
 Lo generado por IA vive **en el place**, no en git: las variantes de
 material de `MaterialService` (`MontanaBasura` es la única en uso; `CespedCartoon` y
@@ -120,6 +135,191 @@ BindableFunctions/RemoteEvents (le faltan capacidades: "LoadUnownedAsset",
   `README-pruebas.md`.
 
 ## 3. Decisiones no obvias (y por qué)
+
+### Diseño v2: recoger y lanzar (26 sep)
+
+El documento de diseño v2 (@FND, 26 sep; en `docs/GDD.md` a partir del lote
+10) centra el juego en recoger y lanzar: elegir cuadrante → excavar y
+escalar → recoger → lanzar (bonus por distancia y racha) → cobrar → mejorar
+y renacer. Sin base, sin limpieza y sin gestión de mascotas; rebirths que
+abren zonas nuevas; pases que no hacen el trabajo por el jugador. (El
+documento separaba los cuadrantes por material y daba las mascotas en
+cápsulas; el usuario lo cambió el 29 sep, ver abajo.)
+
+**Decisiones del usuario:** lo marcado "Se quita" se **borra** (git guarda la
+historia; la regla anterior de "apagar con banderas y no borrar" era del
+recorte de la auditoría); lo "Se pospone" queda tras `GameConfig.FUNCIONES`
+(`FIGURINAS`, `CINTAS`, `TRAJES_BOTIN`); al quitar las parcelas el mapa se
+recorta por el oeste; entrega por lotes verificados en Studio.
+
+**Plan por lotes** (cada uno termina con consola limpia, pruebas en verde y
+este documento al día):
+
+| Lote | Qué | Estado |
+|---|---|---|
+| L1 | Retirada de lo quitado, perfil v3, aparición en la plaza, 4 mejoras, Brazo limita el tiro | hecho |
+| L2 | Mundo v4: sin parcelas ni máquina, mapa recortado al oeste, 3 ranuras por cuadrante con `Cuadrante`/`Material`, barreras "Rebirth 1/2", suelo por material (v5 el 29 sep: `Zona` en vez de `Material`, sin carteles por fila, horneado) | hecho |
+| L3 | Patio por material: generador por material (billete 5 % ×6, tesoro 1 % ×40), prioridad del excavador 10 s, reposición 45 s por montón, bloqueo por rebirth (grupos de colisión por nivel). El 29 sep, zonas revueltas | hecho |
+| L4 | Rebirths: requisitos, multiplicador, panel | hecho |
+| L5 | Lanzamiento y pago: bonus por distancia, racha, "el primero siempre entra", línea de trayectoria (5 primeros), récords, fórmula de pago | hecho |
+| L6 | Mascotas y cápsulas: medidores por material, pity por set, niveles, huecos, imán, Rey, panel Mascotas y ventana de cápsula. El 29 sep, fragmentos en vez de cápsulas | hecho |
+| L7 | Pedidos diarios y 16 insignias | pendiente |
+| L8 | Tienda, pases y cosméticos (Dinero x2, Tercera mascota, Bolsa XL, estelas, diseños de bolsa, Turbo) | pendiente |
+| L9 | Tutorial "primeros 15 minutos" y cámara primera/tercera | pendiente |
+| L10 | Medición (viaje y acierto) y documentación (GDD v2, Juego.md) | pendiente |
+
+**Qué se borró en el L1 y por qué:** energía y refrescos (peaje sin
+decisiones), gemas, Sobre, Contenedor Dorado, Pase de la Suerte y Montón extra
+(riesgo con la política de objetos aleatorios de pago), limpieza, ensamblaje,
+fragmentos, estados, fusión, venta, almacén (seis capas de gestión sin uso
+jugable), parcelas, podios, vitrina, radio, "Me gusta" y teletransportes (sin
+base), el panel de logros y su dinero (vuelven como 16 insignias), mejoras
+Energía, Chispa, Almacén e Imán (el imán pasa a las mascotas), pases de
+Velocidad e Imán (servirían para quitarle piezas a los demás en el patio
+compartido), el bonus +25 % por bolsa llena (el riesgo y el premio están en
+la distancia del tiro) y la mascota garantizada / el pity de los montones (las
+mascotas salen de cápsulas). Servicios borrados: `Parcelas`, `Mascotas`,
+`Acompanante`, `Reparacion`, `Energia`, `Logros`, `Tienda` (y sus Handlers);
+17 RemoteEvents; `DefinicionesLogros`, `ProgresoLogros`; los paneles Álbum,
+Base, Logros, Reparación, Montón extra y Probabilidades. Prueba `sinRestos`.
+
+**Cambios del 29 sep (el usuario, tras jugarlo: "no me siento a gusto con
+el juego"):**
+- *"No me gusta que los montones ya estén separados por tipo de basura."*
+  Todos los montones traen los cuatro materiales revueltos
+  (`TablasProbabilidad.MEZCLA`). Elegido por el usuario entre tres
+  opciones: las zonas del norte siguen tras las barreras de Rebirth 1 y 2
+  pero son **más ricas** (55 % metal u orgánico, que pagan 3–5 veces más que
+  el papel). El patio abierto (45/40/10/5) deja la bolsa inicial en ~$125,
+  como antes con plástico. `GameConfig.CUADRANTES` pasa de `material` a
+  `zona`; los sets de mascotas se abren por su propio `rebirth`
+  (`DefinicionesMascotas.SETS`), ya no por el cuadrante.
+- *"La mascota se obtiene demasiado rápido"* y *"las mascotas deberían
+  recolectarse por fragmentos que se encuentren en los montones de
+  basura".* Fuera las cápsulas, sus medidores y su pity por cápsula
+  (`Services/Capsulas`, `CapsulaEvent`, `AbrirCapsulaEvent`, `UI/Capsula`);
+  entra `Services/Fragmentos`. Decisiones mías (revisables): **una mascota
+  a la vez por set**, decidida por el primer fragmento (así cada fragmento
+  cuenta y se ve a quién montas, en vez de fragmentos sueltos de 10
+  mascotas); **5/8/12 fragmentos** por rareza; **la primera, Común con 3**
+  (llega hacia el minuto 6–8, el gancho de los primeros 15 minutos);
+  **2,5 %** de fragmentos por pieza y uno seguro en el montón grande; el
+  fragmento **cuenta al reciclarlo** (ocupa hueco, como todo: "el contenedor
+  es el único camino"); uno de un set cerrado para quien lo recicla se paga
+  como un billete; el premio de los pedidos pasa a **2 fragmentos libres**
+  del set que elijas y se abren con la primera mascota.
+  **Calibración:** `simularSet` da una mediana de 240 fragmentos (37
+  mascotas empezadas: la cola la ponen las 3 Épicas) para completar un set;
+  a 2,5 % son ~9.600 piezas de ese set. Es un recorrido largo a propósito
+  (el usuario lo quería más lento), pero hay que medirlo con jugadores.
+- *"Quita los diálogos de Doña Chatarra."* Fuera la caja de diálogo con
+  retrato (`UI/Dialogo`), sus tres consejos (`Textos.NPC`) y `DialogoEvent`.
+  Su prompt pasa de "Hablar" a "Tienda" y abre el panel directamente desde
+  el cliente (`Prompts.client`); `SetupMundo` cambia el texto del prompt en
+  un place horneado antes. El tutorial del L9 no usará diálogos.
+- Tras probarlo en el emulador de teléfono: fuera la **tarjeta del
+  tutorial** de abajo ("Primeros pasos 3/5 · Recoge basura…", con "Abrir
+  Tienda"); el tutorial sigue avanzando en el servidor y la flecha guía,
+  y el L9 decidirá cómo se explica cada paso. Los **avisos (toasts) van
+  arriba en el centro** (a 122 px caían a media pantalla en el móvil, que
+  mide ~490 px de diseño); en táctil se centran en el hueco entre la
+  botonera y los contadores, medido en pantalla, y el **feed** se pone
+  bajo los contadores (pegado al borde tapaba las barras). Las **manos y
+  la bolsa en táctil** van a 0,6 de tamaño y más abajo
+  (`Manos.client`, `AJUSTES.tactil*`). Pendiente visto en la prueba: la
+  pista "Toca la basura para recoger" se solapa con las barras de bolsa y
+  fuerza (`("hud")` lo avisa), en táctil y en escritorio.
+- Más cambios del usuario tras la prueba en el móvil: la **retícula también
+  en táctil** (antes se ocultaba porque en el móvil se recoge tocando la
+  basura), y en táctil **elige la mira, no el dedo**: mientras un dedo
+  arrastra la pantalla para mover la mira se recoge lo que pasa por ella y
+  está al alcance; sin dedo no se recoge nada (una versión intermedia
+  recogía sola solo con apuntar y el usuario la rechazó: "quiero poder mover
+  el puntero"). El reclamo va con origen "mira" (reglas del clic, sin avisos
+  de rechazo, que al barrer un montón ajeno saldrían sin parar). Lanzar apunta a la mira (antes, por el último toque, que era el
+  del botón). El juego va **siempre en horizontal** en el móvil
+  (`ScreenOrientation = LandscapeSensor` en StarterGui y en el PlayerGui;
+  el place tenía `Sensor` y arrancaba en vertical); **solo se lanza con la bolsa llena** (regla del cliente: el botón
+  y la pista solo salen entonces; el servidor sigue aceptando una a medias,
+  que no da ventaja); la **bolsa fallada ya no se recicla sola**; y los
+  **iconos de la botonera** pasan de 76 a 88 px.
+
+**Decisiones mías donde el documento no concreta** (revisables):
+- Perfil v3 con DataStore nuevo y **sin migración**: el juego nunca se
+  publicó, no hay perfiles reales.
+- Las 40 mascotas son las del juego original (commit `fd601a9`, 4 C / 3 R /
+  3 É por set) sin Resistencia ni Poder; el modelo cambia por nivel (4 brilla,
+  5 luce como la antigua "Perfecta"). Siluetas propias: pendiente de arte.
+- Aparición: `AparicionHandler` con `CharacterAutoLoads = false` (también en
+  `default.project.json` e `instalar-desde-http`): el personaje no existe
+  antes que su perfil.
+- Productos de Robux: `Monetizacion.registrarProducto(id, otorgar)`; cada
+  servicio registra el efecto de lo suyo (así Monetización no depende de
+  todo lo que se vende).
+- `SetupMundo` apaga los prompts de parcelas y máquina de refrescos si un
+  place anterior al mundo v4 aún los tiene.
+- Mundo v4 (L2): las barreras son paredes de cristal (60 % transparente) del
+  color del material que destaca en su zona, con postes y travesaños de obra; se probó un campo de
+  fuerza (`ForceField`) y de día casi no se veía. Las colinas usan la malla
+  IA `ServerStorage.Arte.Monton`, que no admite tinte: la zona se lee por
+  el **suelo de cada cuadrante** (losa decorativa `SueloCuadrante`: tierra en
+  el patio abierto, el color del material en las zonas del norte; en el v4,
+  cada cuadrante con su material y un poste por fila, quitados en el v5).
+  El cartel de cada barrera va adelantado 3 studs hacia la cámara
+  (`StudsOffset` Z): en el plano de la pared, el cristal lo tapaba al
+  mirarlo de frente (en el v4 solo se veía en diagonal).
+- Patio por zonas (L3): el tamaño de cada montón sale del atributo de su
+  ranura y la zona de `GameConfig.CUADRANTES` por su cuadrante; en un place anterior al v4 el cuadrante se
+  deduce de la posición (`Cuadrantes.en`). `ObjetosPatio.puedeReclamar` es la
+  única regla de "¿me lo puedo llevar?" (bolsa ajena, cuadrante cerrado,
+  prioridad del excavador) y la comparten el clic y el imán.
+- Lanzamiento (L5): el arco se calcula en `Utilidades/Trayectoria`, el mismo
+  módulo para el servidor (que decide) y la línea del cliente. El HUD
+  muestra sobre la barra de fuerza el bonus que daría acertar desde donde
+  estás. El récord del servidor es de la sesión (en memoria); el personal
+  (`mejorDistanciaAcierto`) persiste. `Comunes.yaLanzo` da por hechos los
+  primeros lanzamientos en las pruebas que necesitan fallar.
+- Bloqueo por rebirth (L3): grupos de colisión por nivel de rebirth en el
+  servidor (`PersonajeR0/R1/R2` contra `BarreraR1/R2`), no un script de
+  cliente: funciona con streaming y lo decide el servidor. La autoridad sigue
+  en excavar/reclamar/imán.
+- Montón terminado (L3): al bajar del 25 %, a los 45 s se retiran sus restos
+  y vuelve la colina (hoy no se repone mientras quede una pieza).
+- Racha (L5): +10 % por acierto contando el primero, tope +50 % desde el
+  quinto; un tiro desde menos de 10 studs ni da bonus ni toca la racha;
+  entregar a mano no la toca; fallar la pone a 0. "El primero siempre
+  entra": el primer lanzamiento del perfil apunta solo al contenedor.
+- Fragmentos (29 sep): tirar la rareza, elegir la mascota y empezar un
+  montaje son funciones puras sobre el perfil (las pruebas las tiran miles de
+  veces con uno de mentira). Medido (`rarezaOdds`, 20.000 tiradas): con los
+  dos pity las tasas reales son ~61/31/8 (la garantía de "Rara o mejor"
+  también puede dar Épica). Los avisos (cada fragmento reciclado, la
+  revelación al completar, el feed de Raras y Épicas) los manda
+  `MascotasHandler` escuchando `Fragmentos.alAgregar`.
+- La ventana de revelación es un panel de `Menu` ("Revelacion"): así el ratón
+  se libera en primera persona; varias a la vez van en cola.
+- Seguidores (L6): los modelos los mueve el servidor en cada Heartbeat
+  (anclados, sin colisión ni raycast), con etiqueta del nombre; se rehacen
+  al cambiar las equipadas o su nivel.
+- Pedidos (L7): se abren con la primera mascota completada; retos
+  adaptados al brazo y a los sets abiertos; recompensa provisional
+  250/500/900 × multiplicador; los tres del día dan 2 fragmentos libres.
+- Pases en Studio (L8): `PASES_DEV_EN_STUDIO = false` por defecto, para que
+  las pruebas midan el ritmo sin Dinero x2 (`/pases on` para probarlos).
+
+### Recorte por la auditoría (26 sep, sustituido por el Diseño v2)
+
+Una auditoría externa de diseño concluyó que el juego repartía el esfuerzo
+entre muchos sistemas que no se refuerzan entre sí: lo que lo distingue es
+la montaña física y el lanzamiento; las mascotas no pintaban nada en el
+bucle; la energía era un peaje sin decisión; el montón chico rendía ~40 %
+más por pieza que el grande; no había onboarding; y el Sobre, las Gemas, el
+Pase de la Suerte y el Montón extra chocan con la política de "paid random
+items" de Roblox. Se apagó todo eso con banderas, la colección bajó a 10 con
+acompañante y se añadió el tutorial. El Diseño v2 del mismo día recoge esas
+conclusiones y va más lejos (arriba): las banderas de lo quitado y su código
+se borraron. Sigue vigente de aquí: la bolsa fallida es solo de su dueño y
+al salir la bolsa se recicla sin bonus.
 
 ### Arquitectura del patio (lote 7: limpieza)
 
@@ -227,18 +427,20 @@ tabla de precios. Consecuencias:
 - Siguen dando $ sin pasar por el contenedor: vender mascotas/duplicados a
   Doña Chatarra (en la caseta) y la recompensa de cada logro. No son botín.
 
-### La bolsa no persiste, y lo que vale dinero se pierde al salir
+### La bolsa no persiste, y al salir se recicla sin bonus
 
-Al desconectar, las mascotas, fragmentos y coleccionables van al perfil si
-caben (`Bolsa.vaciarAlSalir`); basura, billetes y tesoros se pierden. Antes se
-reciclaban sin bonus, pero con la regla de arriba eso sería un atajo (salir y
-volver en vez de caminar al contenedor). Perder una Épica por una caída de
-conexión sería cruel; perder una bolsa de latas, no.
+Al desconectar (`Bolsa.reciclarSinBonus`): lo que vale dinero se paga SIN el
++25 % ni el +50 %, y mascotas, fragmentos y coleccionables van al perfil si
+caben. Las bolsas propias que estén en el suelo, igual. Hasta el 26 sep el
+dinero se perdía (se temía un atajo: salir y volver en vez de caminar al
+contenedor); la auditoría lo revirtió porque castigaba las caídas de
+conexión, y sin bonus y con la vuelta a entrar el atajo no compensa.
 
-### Las pasivas sólo actúan exhibidas
+### Las pasivas sólo actúan exhibidas (apagadas desde el 26 sep)
 
-Las 6 mascotas del exhibidor dan +2/4/6% al reciclar su material (Rey: +10% a
-todo). Exhibir tiene así un motivo además de presumir.
+Las 6 mascotas del exhibidor daban +2/4/6% al reciclar su material. Con
+`FUNCIONES.EXHIBIR_PASIVAS` apagada exhibir es solo para presumir; el efecto
+jugable de una mascota es llevarla de acompañante.
 
 ### Modo dev de pases
 
@@ -301,6 +503,57 @@ el mundo vestido del desnudo (verificado: `estado`, `excavar`, `reclamarTodo`,
 - Fuera de alcance de esta pasada: las 41 mascotas (siguen siendo primitivas
   por set/rareza, y el álbum depende de ese vocabulario), el avatar, sonidos.
 
+### Recicladora de Blender (22 sep)
+
+El contenedor verde y la trituradora de partes se sustituyen por un modelo
+hecho en Blender (referencia: capturas de KOTAMON): volquete verde,
+trituradora amarilla con rodillos dentados, cinta en L que sale de una caja
+gris junto al volquete, y salida con rampa por la que caen bloques prensados.
+
+- Fuente: `assets/3d/Recicladora.fbx` (el `.blend` es del usuario, fuera del
+  repo). Se exporta con escala de unidades 0,01 y «FBX All»: el importador de
+  Roblox lee centímetros como studs, y con la escala por defecto el modelo
+  salía 100 veces más grande. Piezas fijas unidas en una malla por color;
+  las móviles, sueltas en `Trituradora.Moviles` con el pivote en su eje.
+- En el place: `ServerStorage.Arte.Recicladora` (hijos `Contenedor`,
+  `Trituradora`, `Bloque`). El importador pierde los colores de Blender, así
+  que `ArteMundo.recicladora` pinta cada malla por el sufijo del nombre
+  (`Trituradora_Amarillo`…). Sin la malla, `ConstructorMundo` usa el decorado
+  de partes de antes (`contenedorVerde` + `trituradora`).
+- Decisiones del usuario: la recicladora entera, con el contenedor funcional,
+  pasa de x=14 a x=22,5 local (la cinta y la caja chocaban con la cabaña) y
+  la solera se ensancha hasta x=38. **Manda el modelo**: las paredes del
+  contenedor funcional bajan de 6 a 4,7 de alto (la del volquete), para que
+  los rodillos se vean por encima del borde; la bolsa se encesta un poco más
+  fácil. Las paredes whitebox siguen colisionando y llevando el prompt, pero
+  quedan invisibles.
+- Animación (`Client/Recicladora.client`, datos en `Config/Recicladora`): los
+  rodillos de la trituradora giran siempre; la cinta solo se mueve cuando
+  alguien deposita. `Bolsa.alDepositar` → `BotinHandler` →
+  `RecicladoraEvent:FireAllClients(materiales)`: salen hasta 10 objetos de
+  `ModelosObjetos.basura` de la caja gris, recorren la L, caen en la tolva y
+  después baja un bloque (clon de `BloqueMolde`) por la rampa. La ruta está en
+  el marco del pivote del modelo (el suelo bajo el volquete, +Z al frente),
+  sacada de las medidas del `.blend`: si se reexporta con otras medidas hay
+  que recalcularla. Prueba: servidor `recicladora` + cliente `recicladora`.
+- Colisión (petición del usuario): la malla sigue sin colisionar; la
+  bloquean 19 cajas y losas invisibles (`Caseta.ColisionRecicladora`, datos
+  en `Config/Recicladora.COLISION_*`, mismo marco que la ruta) que
+  ConstructorMundo crea solo si hay malla. No se usó la colisión de las
+  mallas porque cada una junta piezas sueltas del mismo color y su casco
+  cerraría los huecos. Tienen `CanQuery`: la bolsa lanzada choca con ellas y
+  el apuntado las ve. Las cintas y la rampa son losas inclinadas: se puede
+  subir andando por la cinta hasta el techo.
+- Bolsa lanzada con colisión (petición del usuario, atravesaba la máquina):
+  `Lanzamiento` barre en cada paso una esfera de radio 0,7 (`Spherecast`)
+  contra todo lo consultable salvo el contenedor y los `Limite`, que siguen
+  con su rebote propio. Normal casi vertical = se posa y bota ahí; si no,
+  rebota como en una pared. El decorado sin `CanQuery` (camión, cabaña de
+  arte) sigue atravesándose, igual que lo atraviesa el jugador. La bolsa puede
+  quedarse en el techo de la trituradora (se sube por la cinta).
+  `lanzarBolsa` ahora lanza desde el frente del contenedor: desde detrás la
+  máquina tapa el tiro.
+
 ### Plano v3 del mapa (16 sep)
 
 El usuario pidió el plano de su boceto: las 6 bases en columna a la
@@ -333,6 +586,40 @@ todo el mapa**. `ConstructorMundo` v3 (`LAYOUT`):
   constructor, `default.project.json` e `instalar-desde-http`.
 - El contenedor grande (escondite F3) pasa al fondo norte del patio para no
   tapar la entrada desde la plaza; F1 queda detrás de la caseta.
+
+### Patio rectangular 97,5×150, 2x3 cuadrantes con 2 montones (22 sep)
+
+Dos peticiones seguidas del usuario. Primero "recorta el mapa… solo 9
+cuadrantes de 3x3… más montañas de basura, se ve muy vacío" (patio de 150,
+montones **excavables**, no decorado). Después "reduce el patio un 35 % del
+lado opuesto de las bases": el ancho oeste-este pasa de 150 a 97,5 (el
+borde este de x = 75 a 22,5) y el patio queda rectangular. Eligió 2
+columnas × 3 filas con una pareja por cuadrante y acercar la valla este.
+
+- `GameConfig.PATIO = { oeste = −75, este = 22,5, norte = −75, sur = 75 }`
+  sustituye a `PATIO_LADO`: el patio ya no es un cuadrado centrado en el
+  origen. Lo leen `Patio.posicionEnPatio` y `ConstructorMundo`.
+- Cuadrantes: el rectángulo partido en 2×3 iguales (~49×50; centros x
+  −50,6 / −1,9, z −50 / 0 / 50), caminos en sus bordes interiores (x
+  −26,25; z ±25). Cada cuadrante lleva una PAREJA en diagonal
+  (`LAYOUT.PAREJAS_MONTON`: 3 grande+chico, 2 mediano+chico, 1
+  mediano+mediano, barajadas con la semilla de siempre), con
+  `SEPARACION_MONTONES` = 6 entre faldas y la pareja centrada.
+- Montones más pequeños para que quepan dos: radios 7/10/13 (antes
+  9/12/17), 12 en total (5 chicos, 4 medianos, 3 grandes). Con todo activo
+  hay ~700 objetos y ~200 tiradas de premio. **Cada excavación rinde menos
+  por la misma energía** (`COSTE_EXCAVAR` sigue en 10): vigilar.
+- Mapa: límite x −171..46,5, z −99..177 (baseplate 217,5×276 centrado en
+  −62,25, 39); plaza z 75–113 (spawn 96); lote de la recicladora z 115–161
+  (caseta 133), en x desde el borde oeste del patio hasta 3 antes de la
+  valla este: por el este solo quedan 11 studs entre la solera y el borde,
+  así que el segundo camión se quitó. Parcelas en x −125, z {−78, −32, 14,
+  60, 106, 152} (cada 46), calle en x −91.
+- El decorado del patio y los escondites F2–F6 están en la franja de
+  césped entre el patio y la valla (norte y este, suelo a y = 0): dentro ya
+  no queda ningún punto a más de 20 studs de todas las ranuras.
+- `enPatio` teletransporta a (−26,25, 0, 0), el camino entre columnas.
+  `lanzarBolsa` lanza desde el frente del contenedor.
 
 ### `Mundo.Manual`: lo editado a mano sobrevive al horneado (16 sep)
 
@@ -381,7 +668,36 @@ Stats de Roblox. Qué se hizo y por qué:
   texturas IA (ya solo `MontanaBasura`) y si en calidad baja, sin
   Bloom/ColorCorrection, el look sigue gustando.
 
-### Interfaz "papel y tinta" (lotes 9–11, 15 sep)
+### Interfaz en Fusion con estilo "UI Kit" (23 sep)
+
+- Toda la UI se reescribió en **Fusion 0.3** (decisión del usuario). Fusion
+  vive copiado en `Packages/Fusion`; el Kit (`Client/UI/Kit`) sustituye a
+  `Componentes`. Estilo del "UI KIT GENERAL" de DEValen (capturas del
+  usuario): el kit no está en la Creator Store, así que se imitó el estilo y
+  los iconos salen del set gratuito "Simulator Icon Pack" (muy parecido).
+- **Las copias de ese set en la Toolbox traían scripts maliciosos
+  escondidos** (dentro de `UIStroke`, nombres tipo `CoreSkyboxSystem`,
+  `LightConfig`, `BloomDefect.Protocol`). Se insertaron en
+  `ServerStorage.CuarentenaIconos`, se borraron todos los scripts, se
+  apuntaron solo los ids de imagen en `Config/Iconos` y se borró la
+  cuarentena. Cualquier modelo gratis: mismo protocolo.
+- Rendimiento: el perfil llega hasta 4/s como tablas nuevas. Las pantallas
+  derivan primitivos con `Computed` (Fusion corta la propagación si no
+  cambian) y recorren definiciones de Config. El Álbum construye el modelo
+  de una tarjeta la primera vez que su set se ve (`("panel","Album")`
+  informa de `modelosConstruidos`).
+- Los pasteles del 23 sep se sustituyeron por los colores intensos del kit
+  (`Paleta.UI_KIT`, fijo por nombre de botón; semánticos rojo/morado/verde);
+  los studs se quedan como fondo (el kit usa un damero).
+- El **suelo** también lleva studs (`ArteMundo.studsSuelo`): una Texture
+  con la imagen `studs` en la cara de arriba del baseplate, el patio, los
+  caminos y el lote de tierra (con sus manchas), la solera, la plaza, el
+  spawn y las losas de las parcelas. Una baldosa cada 4 studs = un relieve
+  por stud (a 8 se veían grandes). Va en el horneado; en el place actual se
+  aplicó sin rehornear, cargando ArteMundo con el shim de
+  `hornear-desde-mcp` y llamando solo a `studsSuelo`.
+
+### Interfaz "papel y tinta" (lotes 9–11, 15 sep; sustituida el 23 sep)
 
 - Tema claro tipo pegatina (crema + contorno de tinta + sombra dura) con
   FredokaOne/Nunito, en `Componentes` v2. Un hijo no puede pintarse detrás
@@ -437,8 +753,8 @@ textura de basura; con primitivas eso será un MeshPart, hoy es gris
 
 Al activarlo, la colina **se sustituye entera por una montaña de basura con
 su mismo bulto** (decisión del usuario, lote 5: "mucha basura, equivalente al
-tamaño del montón, no un poquito"): `numPiezas` objetos (30–40 / 80–110 /
-160–200 según tamaño) con **modelo real** (latas, llantas, barriles, botellas,
+tamaño del montón, no un poquito"): `numPiezas` objetos (hoy 18–24 / 45–60 /
+90–115 según tamaño; eran 30–40 / 80–110 / 160–200) con **modelo real** (latas, llantas, barriles, botellas,
 bidones, cajas de cartón, periódicos, plátanos, huesos… y los premios:
 mascotas, fragmentos, tesoros, billetes, coleccionables; sin etiquetas)
 repartidos por TODO el volumen del casquete (`puntosEnColina`: muestreo
@@ -446,8 +762,8 @@ repartidos por TODO el volumen del casquete (`puntosEnColina`: muestreo
 interior), revueltos (giro libre, inclinación ±40°), brotando de abajo arriba
 en 1 s. Una grande son ~270 objetos / ~800 partes.
 
-**Premios por lotes**: `TAMANOS_MONTON[t].lotes` (14–18 / 22–28 / 34–44, los
-antiguos numPiezas) son las tiradas de `TIPO_OBJETO`; el resto hasta
+**Premios por lotes**: `TAMANOS_MONTON[t].lotes` (hoy 8–10 / 20–24 / 38–46
+tras el reequilibrio del 26 sep) son las tiradas de `TIPO_OBJETO`; el resto hasta
 `min/max` es basura de relleno. Así la cantidad de basura no multiplica
 mascotas ni fragmentos. La basura sí vale dinero: un montón da ahora 3–6×
 más $ que antes (ver §4, calibración pendiente).
@@ -491,13 +807,19 @@ Los objetos no desaparecen nunca (decisión del usuario, como en KOTAMON). Para
 que la repoblación no espere al último papel, un montón activo deja de contar
 como "disponible" cuando le queda menos del 25 % de sus objetos.
 
-### La bolsa se lanza entera, y si falla es de todos
+### La bolsa se lanza entera, y si falla es de su dueño
 
 Mantener F carga la fuerza (1,2 s = 70 studs); al soltar, la bolsa sale con
 TODO lo que llevaba hacia donde apuntas. Si entra en el Contenedor se recicla
 con +50 % (y +25 % más si iba llena) y cuenta para Puntería. Si falla cae como
-objeto `bolsa` que **cualquiera** puede recoger (decisión del usuario: es la
-tensión social ligera del patio). Reciclar por el prompt de cerca sigue
+objeto `bolsa` que **solo su dueño** puede recoger (`item.duenoId`). Hasta
+el 29 sep, si no volvía a por ella en 20 s se reciclaba sola sin bonus; el
+usuario lo quitó: ahora espera en el suelo, y si queda en alto (techo de la
+recicladora, tapa del contenedor) se baja junto al contenedor del lado del
+que lanzó (prueba `bolsaEnAlto`). Al salir del juego sus bolsas caídas se
+reciclan para él sin bonus. Hasta el 26 sep la podía recoger cualquiera (decisión del usuario:
+"tensión social"); la auditoría lo revirtió porque castiga al que arriesga y
+con público infantil invita al acoso. Reciclar por el prompt de cerca sigue
 existiendo, pero no cuenta para Puntería.
 
 La parábola se integra paso a paso en el servidor (`PivotTo`, sin física de
@@ -550,9 +872,10 @@ hacia donde mira la cámara en cada paso de física y pisa cualquier CFrame).
 
 ### Modelos por código
 
-`Utilidades/ModelosMascota` construye las 41 mascotas (forma por set y `forma`,
-tamaño por rareza, estado visible: torcida/apagada/reflectante/neón, manchas si
-está sucia; 1.673 partes para las 41×5 variantes) y sus fragmentos;
+`Utilidades/ModelosMascota` construye las mascotas (forma por familia de
+material y `forma`, tamaño por rareza, estado visible:
+torcida/apagada/reflectante/neón, manchas si está sucia; eran 41 hasta el
+26 sep, ahora 10) y sus fragmentos;
 `ModelosObjetos` la basura (16 formas: 4 por material), billetes, tesoros,
 figurinas, cintas, trajes y bolsas; `ModelosMonton` la colina; todos sobre
 `Primitivas`. Sirven al mundo y a los ViewportFrames del álbum: un solo
@@ -560,37 +883,74 @@ vocabulario visual.
 
 ## 4. Números de calibración (punto de partida)
 
-- Maxear las 7 mejoras: 232.430 $. Un montón chico deja 30–40 objetos, uno
-  mediano 80–110 y uno grande 160–200 (premios solo en 14–18 / 22–28 / 34–44
-  tiradas; el resto basura de relleno a 5–12 $: un grande son ~1.500–2.500 $
-  solo en basura, 3–6× lo de antes); billetes 20–80 $, tesoros 150–600 $.
-  Objetivo KOTAMON: ~5 h gratis → **recalibrar** VALOR_BASURA o los costes de
-  mejoras tras probar. La bolsa base (8) hace 4–35 viajes por montón: subir
-  `BOLSA_BASE` (GameConfig) es la palanca si se hace pesado.
-- Energía 100 (+15/nivel), excavar cuesta 10, refresco 50 $ restaura 30 (+8/nivel),
-  regen 1 punto / 2 s.
-- Bolsa 8 (+3/nivel), almacén 30 (+10/nivel), imán 1,5 studs/nivel, alcance 6 (+1/nivel).
-- Sobre Premium 149 gemas; Contenedor Dorado 25.000 $ o 150 gemas, 3 mascotas.
-- Repoblación: con ≤ 4 montones disponibles (lleno, o activo con ≥ 25 % de
-  sus objetos), 20 s después se rellenan los agotados. Nada caduca.
-- Lanzamiento: 1,2 s de carga = alcance máximo 70 studs; +50 % al entrar.
+Los objetivo son los del Diseño v2 (salen de una simulación de 400 partidas;
+el juego real será más lento). Estado tras el L1:
+
+- 4 mejoras al máximo: $118.030 (Bolsa 150, Alcance 120, Velocidad 200,
+  Brazo 180 de base, × 1,6^nivel, redondeo a la unidad).
+- Bolsa 10 (+3/nivel), alcance 6 (+1/nivel), velocidad 16 (+1,2/nivel),
+  brazo 25 (+4,5/nivel) studs.
+- Montones: 12 chicos de 20 piezas y 6 grandes de 60 (uno por cuadrante,
+  con un tesoro garantizado); una tirada por pieza: basura 94 %, billete 5 %,
+  tesoro 1 %; 90 % del material del cuadrante. Valor por pieza: Papel 5,
+  Plástico 7, Metal 15, Orgánico 25; billete ×6 y tesoro ×40 de su material.
+- Reposición: 45 s después de que un montón baje del 25 % (o se vacíe) se
+  retiran sus restos y vuelve la colina. Prioridad del excavador: 10 s.
+- Lanzamiento: 1,2 s de carga = el alcance del Brazo. Bonus al entrar: <10
+  studs 0; 10–19 +20 %; 20–29 +40 %; 30–44 +70 %; 45–59 +100 %; 60–70 +150 %;
+  racha +10 % por acierto seguido (tope +50 %). Pago = valor de las piezas ×
+  (1 + distancia + racha) × rebirth (× mascotas y pases en L6 y L8). Una
+  bolsa de 10 de plástico desde 25 studs, sin racha: $105. Bolsa perdida:
+  20 s hasta reciclarse sola.
 
 ## 5. Pendiente
 
-- **Guardar el place** tras hornear (el mundo v2, las variantes de
+- **Lotes L2–L10 del Diseño v2** (tabla en §3 "Diseño v2").
+- **Guardar el place** tras hornear (el mundo, las variantes de
   MaterialService y `ServerStorage.Arte` viven ahí; el `.rbxl` no va en git).
-- Interfaz, lotes 12–13: paneles (álbum con cartas estilo KOTAMON en
-  `UI/Carta`, tienda con iconos por mejora, revelación con volteo, logros,
-  base, reparación, probabilidades; retirar los alias `UI_FONDO/UI_PANEL/...`
-  de `Paleta`), pulido tablet/gamepad y docs. Plan en
-  `~/.claude/plans/bueno-ahora-que-ya-sharded-dusk.md`.
-- Arte 2D del usuario para la UI en `assets/ui/` (manos, iconos, marco de
-  carta); hasta entonces, glifos dibujados.
-- Arte pendiente del mundo: las 41 mascotas y el avatar del jugador.
+- Arte 2D del usuario para la UI en `assets/ui/` (iconos); hasta entonces,
+  glifos dibujados.
+- Arte pendiente del mundo: siluetas propias de las 41 mascotas y el avatar.
 - Fijar **Max players = 6** en Game Settings / Creator Dashboard
   (`Players.MaxPlayers` es de solo lectura por script).
 - Publicar el place y activar *Studio Access to API Services* para probar el
   DataStore; crear pases, productos y badges y rellenar sus ids.
-- Ids de audio de las 7 cintas (`sonidoId = 0`).
 - Prueba con 2+ jugadores del patio compartido (riesgo "tibio" del GDD §14).
-- Calibrar economía tras las pruebas cerradas.
+- Calibrar la economía con jugadores: tiempo de viaje y tasa de acierto (PC
+  y móvil) antes que nada.
+
+### Tienda "SHOP" de Blender (24 sep)
+
+La cabaña de Doña Chatarra se sustituye por dos contenedores apilados (petición del
+usuario): menta abajo con mostrador (sin toldo), coral arriba, y rótulo
+amarillo con letras 3D "SHOP". Fuente `assets/3d/Tienda.fbx` (escena `Tienda`
+del .blend del usuario; modelado en studs, origen en el suelo en el centro de
+la cabina, frente a -Y). En el place: `ServerStorage.Arte.Tienda`, pintada por
+sufijo (`Tienda_Menta`…) en `ArteMundo.tiendaDeMalla`. La cabina whitebox
+sigue siendo la colisión. Sin la malla, `ArteMundo.caseta` usa la cabaña de
+partes con el rótulo `Textos.MUNDO.tienda`.
+
+### Base del jugador de Blender (25 sep)
+
+Parcela rediseñada (petición del usuario, referencia: bases de simuladores
+actuales tipo Steal a Brainrot) y simplificada al mínimo: arco de entrada
+coral con el cartel del dueño, alfombra roja hasta un escenario con la
+vitrina de figurinas (2 baldas × 6), 3 podios a cada lado, radio y banco en
+las esquinas del fondo. Teléfono y almacén siguen de partes donde estaban.
+- Fuente `assets/3d/Base.fbx` (escena `Base` del .blend). En el place:
+  `ServerStorage.Arte.Base`. `ArteMundo.parcela` la clona; `construirParcela`
+  deja las partes whitebox con la misma disposición pero invisibles
+  (colisión, prompts, marcadores). Sin malla, se ven.
+- `ArteMundo.colocarImportada` deduce el frente de dos mallas conocidas (el
+  importador de Studio deja los modelos con el frente a −Z y la X del
+  diseño invertida); lo usan la tienda y la base.
+- El `Cartel` del dueño es el travesaño del arco (prompt "Me gusta" a 12).
+- Skin: las mallas Losa/Borde/Mueble llevan `Pintable` y `ColorBase`;
+  `Parcelas.pintar` vuelve a `ColorBase` sin skin.
+- Brillo por rareza: cada podio tiene un `Aro` de partes (la malla `Base_Aro`
+  se oculta) con una PointLight; `Parcelas.renderizar` lo pone en neón del
+  color de la rareza de lo exhibido.
+- Mascotas girando: tag `MascotaExhibida` (servidor) → `GiroExhibidas.client`
+  rota las partes localmente con BulkMoveTo.
+- `ConstructorMundo.rehacerParcelasYTienda()` rehace solo parcelas y tienda
+  sin hornear (por el shim de `hornear-desde-mcp.luau`).

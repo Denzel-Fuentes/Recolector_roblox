@@ -24,8 +24,12 @@ function Formato.dinero(n: number): string
 	return "$" .. Formato.miles(n)
 end
 
-function Formato.gemas(n: number): string
-	return Formato.miles(n) .. " Gemas"
+-- "x1,5", "x2": el multiplicador de dinero (coma decimal, sin ",0")
+function Formato.multiplicador(m: number): string
+	if m % 1 == 0 then
+		return "x" .. tostring(math.floor(m))
+	end
+	return "x" .. (string.format("%.1f", m):gsub("%.", ","))
 end
 
 function Formato.porcentaje(fraccion: number, decimales: number?): string

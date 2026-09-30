@@ -4,13 +4,15 @@
 	Los coleccionables secundarios de KOTAMON, 1:1 en cantidad:
 
 	  12 figurinas   6 en escondites FIJOS del patio + 6 aleatorias de montones.
-	                 Decorativas en la estanteria de tu base.
-	   7 cintas      salen de montones; se reproducen en la radio de tu base.
-	                 sonidoId = 0 es placeholder: la radio muestra el titulo y los
-	                 carretes girando hasta que haya audio.
+	   7 cintas      salen de montones. sonidoId = 0 es placeholder.
 	   3 trajes      CAMBIO frente al original: en Kotamon se regalan a Jenny; aqui
-	                 tu propio avatar se los pone. Abre trajes extra de pago.
-	   2 skins base  temas decorativos de la parcela (monetizacion cosmetica).
+	                 tu propio avatar se los pone. Mas 2 de pago (pases).
+
+	Diseno v2 (26 sep): figurinas, cintas y los 3 trajes gratis SE POSPONEN
+	(diluian los premios de los montones y su escaparate era la base, que ya
+	no existe). Los datos se quedan para volver en una actualizacion; lo que
+	los hace aparecer esta apagado en GameConfig.FUNCIONES. Los 2 trajes de
+	pago siguen a la venta.
 ]]
 
 export type Figurina = {
@@ -126,23 +128,6 @@ DefinicionesColeccionables.TRAJES = {
 	},
 }
 
-DefinicionesColeccionables.SKINS_BASE = {
-	{
-		id = "S1",
-		nombre = "Base Neón",
-		colorLosa = Color3.fromRGB(40, 40, 48),
-		colorMueble = Color3.fromRGB(190, 255, 60),
-		colorBorde = Color3.fromRGB(90, 150, 230),
-	},
-	{
-		id = "S2",
-		nombre = "Base Jardín",
-		colorLosa = Color3.fromRGB(120, 150, 80),
-		colorMueble = Color3.fromRGB(214, 196, 150),
-		colorBorde = Color3.fromRGB(150, 110, 70),
-	},
-}
-
 local function indexar<T>(lista: { T & { id: string } }): { [string]: T }
 	local mapa = {}
 	for _, item in lista do
@@ -154,7 +139,6 @@ end
 DefinicionesColeccionables.FIGURINA_POR_ID = indexar(DefinicionesColeccionables.FIGURINAS)
 DefinicionesColeccionables.CINTA_POR_ID = indexar(DefinicionesColeccionables.CINTAS)
 DefinicionesColeccionables.TRAJE_POR_ID = indexar(DefinicionesColeccionables.TRAJES)
-DefinicionesColeccionables.SKIN_POR_ID = indexar(DefinicionesColeccionables.SKINS_BASE)
 
 function DefinicionesColeccionables.figurinasFijas(): { Figurina }
 	local lista = {}

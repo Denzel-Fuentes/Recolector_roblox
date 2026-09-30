@@ -1,11 +1,13 @@
 --!strict
 --[[
 	ModelosObjetos
-	Los modelos whitebox de lo que se recoge y se lleva: basura real (16
-	formas, 4 por material), billetes, tesoros, figurinas, cintas, trajes y
+	Los modelos whitebox de lo que se recoge y se lleva: basura real (mallas
+	low-poly de ReplicatedStorage.Arte.Basura si el place las tiene; si no,
+	16 formas de primitivas, 4 por material), billetes, tesoros, fragmentos
+	de mascota, figurinas, cintas, trajes y
 	las dos bolsas (cerrada con nudo para lanzar, que usa la malla IA
 	ServerStorage.Arte.Bolsa si el place la tiene; abierta para las manos).
-	Las mascotas y sus fragmentos van en ModelosMascota; la colina de los
+	Las mascotas van en ModelosMascota; la colina de los
 	montones en ModelosMonton. Primitivas pone los ladrillos.
 
 	Regla de lectura a distancia (Config/Paleta): el color del cuerpo es el del
@@ -188,14 +190,87 @@ local MATERIAL_BASURA = {
 	Organico = Enum.Material.SmoothPlastic,
 }
 
+-- Mallas low-poly modeladas en Blender (ReplicatedStorage.Arte.Basura, un
+-- MeshPart "Basura_<Material>_<Forma>" con atributos Material, Forma y
+-- ColorVivo). Viven solo en el place, como Arte.Bolsa, pero en
+-- ReplicatedStorage y no en ServerStorage: la cinta de la recicladora
+-- construye basura en el cliente. El importador de Roblox ignora los colores
+-- de material de Blender: los colores van en una textura de paleta
+-- (assets/modelos/basura/Basura_Paleta.png, cada cara mapeada a su cuadro).
+-- Sin textura la malla es de un solo color y las de ColorVivo toman uno de
+-- Paleta.BASURA como las primitivas.
+-- Las rarezas (Material = "Rareza") no son un set: salen de vez en cuando
+-- dentro del material que dice RAREZA_EN.
+local RAREZA_EN = { Televisor = "Metal", PatoGoma = "Plastico" }
+local PROB_RAREZA = 0.04
+local TAMANO_MALLA = 1.6 -- lado mayor antes de ESCALA_BASURA (las formas de primitivas miden 1.2-2.4)
+
+local function mallasBasura(material: string): ({ MeshPart }, { MeshPart })
+	local comunes, rarezas = {}, {}
+	local arte = ReplicatedStorage:FindFirstChild("Arte")
+	local carpeta = arte and arte:FindFirstChild("Basura")
+	if not carpeta then
+		return comunes, rarezas
+	end
+	for _, p in carpeta:GetChildren() do
+		if p:IsA("MeshPart") then
+			local mat = p:GetAttribute("Material")
+			if mat == material then
+				table.insert(comunes, p)
+			elseif mat == "Rareza" and RAREZA_EN[p:GetAttribute("Forma") :: string] == material then
+				table.insert(rarezas, p)
+			end
+		end
+	end
+	return comunes, rarezas
+end
+
+local function basuraDeMalla(material: string, r: Random): Model?
+	local comunes, rarezas = mallasBasura(material)
+	if #comunes == 0 then
+		return nil
+	end
+	local lista = if #rarezas > 0 and r:NextNumber() < PROB_RAREZA then rarezas else comunes
+	local malla = lista[r:NextInteger(1, #lista)]
+	local forma = malla:GetAttribute("Forma") :: string
+	local m = nuevoModelo("Basura_" .. forma)
+	m:SetAttribute("Forma", forma)
+	local c = malla:Clone()
+	c.Name = "Cuerpo"
+	for _, a in { "Material", "Forma", "ColorVivo" } do
+		c:SetAttribute(a, nil)
+	end
+	local mayor = math.max(c.Size.X, c.Size.Y, c.Size.Z)
+	c.Size *= TAMANO_MALLA / mayor
+	c.CFrame = CFrame.new(0, c.Size.Y / 2, 0) * CFrame.Angles(0, r:NextNumber(0, math.pi * 2), 0)
+	local vivos = Paleta.BASURA[material]
+	-- Con textura de paleta los colores ya vienen en la malla (y Color no se ve)
+	local texturizada = c.TextureID ~= "" or c:FindFirstChildOfClass("SurfaceAppearance") ~= nil
+	if malla:GetAttribute("ColorVivo") and vivos and not texturizada then
+		c.Color = vivos[r:NextInteger(1, #vivos)]
+	end
+	c.CastShadow = false
+	c.Parent = m
+	m.PrimaryPart = c
+	pivoteEnSuelo(m)
+	m:ScaleTo(ESCALA_BASURA)
+	return m
+end
+
 -- Una pieza de basura de un material, con forma al azar (rng opcional para
--- pruebas deterministas). Atributo Forma = nombre de la forma. El color ya
--- no es el plano del set: cada pieza coge uno vivo de Paleta.BASURA (latas
--- rojas y azules, botellas cian...), como la montana de la referencia; el
--- material del set sigue en el atributo y en la bolsa/album.
+-- pruebas deterministas). Atributo Forma = nombre de la forma. Usa las
+-- mallas de Arte.Basura si el place las tiene; si no, las formas de
+-- primitivas de arriba. Con primitivas el color es uno vivo de
+-- Paleta.BASURA (latas rojas y azules, botellas cian...), como la montana
+-- de la referencia; el material del set sigue en el atributo y en la
+-- bolsa/album.
 function ModelosObjetos.basura(material: string, rng: Random?): Model
-	local formas = FORMAS_BASURA[material] or FORMAS_BASURA.Papel
 	local r = rng or rngBasura
+	local deMalla = basuraDeMalla(material, r)
+	if deMalla then
+		return deMalla
+	end
+	local formas = FORMAS_BASURA[material] or FORMAS_BASURA.Papel
 	local forma = formas[r:NextInteger(1, #formas)]
 	local m = nuevoModelo("Basura_" .. forma.nombre)
 	m:SetAttribute("Forma", forma.nombre)
@@ -229,6 +304,32 @@ function ModelosObjetos.billete(): Model
 	local m = nuevoModelo("Billete")
 	local c = bloque("Cuerpo", Vector3.new(1.3, 0.06, 0.65), CFrame.new(0, 0.05, 0) * CFrame.Angles(0, math.rad(20), 0), Paleta.BILLETE, m)
 	bloque("Sello", Vector3.new(0.4, 0.07, 0.4), c.CFrame * CFrame.new(0, 0.01, 0), Paleta.escalar(Paleta.BILLETE, 0.75), m)
+	m.PrimaryPart = c
+	pivoteEnSuelo(m)
+	return m
+end
+
+-- Fragmento de mascota (29 sep): una esquirla del color del set de su
+-- material con un rombo de neon encima y luz propia, para que asome entre
+-- la basura de la montana (es lo que el jugador busca con la vista).
+function ModelosObjetos.fragmento(material: string): Model
+	local m = nuevoModelo("Fragmento")
+	local color = Paleta.MATERIAL[material] or Paleta.TESORO
+	local c = cuna({
+		Nombre = "Cuerpo",
+		Size = Vector3.new(1.4, 0.9, 1.2),
+		CFrame = CFrame.new(0, 0.45, 0),
+		Color = color,
+		Parent = m,
+	})
+	bloque("Borde", Vector3.new(1.46, 0.12, 1.26), CFrame.new(0, 0.06, 0), Primitivas.aclarar(color, 0.5), m).Material = Enum.Material.Neon
+	local rombo = bloque("Rombo", Vector3.new(0.5, 0.5, 0.5), CFrame.new(0, 1.25, 0) * CFrame.Angles(math.rad(45), 0, math.rad(45)), Primitivas.aclarar(color, 0.6), m)
+	rombo.Material = Enum.Material.Neon
+	local luz = Instance.new("PointLight")
+	luz.Color = Primitivas.aclarar(color, 0.5)
+	luz.Range = 7
+	luz.Brightness = 2
+	luz.Parent = rombo
 	m.PrimaryPart = c
 	pivoteEnSuelo(m)
 	return m

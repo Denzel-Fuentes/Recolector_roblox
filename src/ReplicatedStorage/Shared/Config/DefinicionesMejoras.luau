@@ -1,16 +1,22 @@
 --!strict
 --[[
 	DefinicionesMejoras
-	Las 7 mejoras de KOTAMON, renombradas (Bag, Energy, Buzz, Capacity, Speed,
-	Range, Magnet). Nivel 0 = sin comprar; 10 compras por mejora.
+	Las 4 mejoras de la v2 (26 sep): Bolsa, Alcance, Velocidad y Brazo.
+	Nivel 0 = sin comprar; 10 compras por mejora; todas vuelven a 0 al
+	renacer (Rebirths).
+
+	Por que 4 y no 7: Energia y Chispa se fueron con la energia, Almacen con
+	las copias de mascota, y el Iman paso a las mascotas Raras y Epicas (solo
+	atrae su material). Brazo es nueva: sube el alcance maximo del
+	lanzamiento, y con el el techo del bonus por distancia.
 
 	Coste del siguiente nivel = costeBase * FACTOR ^ nivelActual, redondeado a
-	decenas. Con FACTOR 1.6 maxear las 7 cuesta ~230k $: a calibrar en pruebas.
+	la unidad: con FACTOR 1.6 el nivel 10 de Bolsa cuesta $10.308 y llevar las
+	4 al maximo, $118.030 (los numeros del diseno).
 
-	El VALOR efectivo de cada mejora se calcula aqui (y solo aqui) a partir de
-	GameConfig, para que la tienda muestre exactamente lo que el servidor aplica.
-	Los bonus de los Game Passes (velocidad, iman) se aplican encima, en
-	Services/Mejoras.
+	Valor = base + porNivel * nivel. Se calcula aqui (y solo aqui) para que la
+	tienda pinte exactamente lo que aplica el servidor; los pases que suman
+	(Bolsa XL) van encima, en Services/Mejoras.
 ]]
 
 local GameConfig = require(script.Parent.GameConfig)
@@ -20,21 +26,20 @@ export type Mejora = {
 	nombre: string,
 	descripcion: string,
 	costeBase: number,
+	base: number, -- valor a nivel 0
+	porNivel: number,
 	unidad: string,
-	original: string, -- nombre en KOTAMON, por trazabilidad con el GDD
+	decimales: number,
 }
 
 local DefinicionesMejoras = {}
 
 DefinicionesMejoras.LISTA = {
-	{ id = "Mochila", nombre = "Bolsa", descripcion = "Cuánta basura cabe en la bolsa antes de lanzarla", costeBase = 150, unidad = "objetos", original = "Bag" },
-	{ id = "Energia", nombre = "Energía", descripcion = "Cuánto puedes excavar antes de necesitar un refresco", costeBase = 200, unidad = "energía", original = "Energy" },
-	{ id = "Chispa", nombre = "Chispa", descripcion = "Cuánta energía restaura cada refresco", costeBase = 120, unidad = "energía", original = "Buzz" },
-	{ id = "Almacen", nombre = "Almacén", descripcion = "Cuántas mascotas caben en tu base", costeBase = 180, unidad = "mascotas", original = "Capacity" },
-	{ id = "Velocidad", nombre = "Velocidad", descripcion = "Velocidad de movimiento", costeBase = 250, unidad = "studs/s", original = "Speed" },
-	{ id = "Alcance", nombre = "Alcance", descripcion = "Distancia para agarrar basura", costeBase = 160, unidad = "studs", original = "Range" },
-	{ id = "Iman", nombre = "Imán", descripcion = "Radio de atracción de objetos", costeBase = 220, unidad = "studs", original = "Magnet" },
-}
+	{ id = "Bolsa", nombre = "Bolsa", descripcion = "Huecos de la bolsa", costeBase = 150, base = 10, porNivel = 3, unidad = "huecos", decimales = 0 },
+	{ id = "Alcance", nombre = "Alcance", descripcion = "Distancia para recoger", costeBase = 120, base = 6, porNivel = 1, unidad = "studs", decimales = 0 },
+	{ id = "Velocidad", nombre = "Velocidad", descripcion = "Velocidad al andar", costeBase = 200, base = 16, porNivel = 1.2, unidad = "studs/s", decimales = 1 },
+	{ id = "Brazo", nombre = "Brazo", descripcion = "Distancia máxima de lanzamiento", costeBase = 180, base = 25, porNivel = 4.5, unidad = "studs", decimales = 1 },
+} :: { Mejora }
 
 DefinicionesMejoras.POR_ID = {} :: { [string]: Mejora }
 for _, m in DefinicionesMejoras.LISTA do
@@ -48,28 +53,16 @@ function DefinicionesMejoras.coste(id: string, nivelActual: number): number?
 	if not def or nivelActual >= DefinicionesMejoras.NIVEL_MAX then
 		return nil
 	end
-	local bruto = def.costeBase * GameConfig.FACTOR_COSTE_MEJORA ^ nivelActual
-	return math.floor(bruto / 10 + 0.5) * 10
+	return math.floor(def.costeBase * GameConfig.FACTOR_COSTE_MEJORA ^ nivelActual + 0.5)
 end
 
 -- Valor efectivo SIN pases. nivel 0..10.
 function DefinicionesMejoras.valor(id: string, nivel: number): number
-	if id == "Mochila" then
-		return GameConfig.BOLSA_BASE + GameConfig.BOLSA_POR_NIVEL * nivel
-	elseif id == "Energia" then
-		return GameConfig.ENERGIA_BASE + GameConfig.ENERGIA_POR_NIVEL * nivel
-	elseif id == "Chispa" then
-		return GameConfig.REFRESCO_BASE + GameConfig.REFRESCO_POR_NIVEL * nivel
-	elseif id == "Almacen" then
-		return GameConfig.ALMACEN_BASE + GameConfig.ALMACEN_POR_NIVEL * nivel
-	elseif id == "Velocidad" then
-		return GameConfig.VELOCIDAD_BASE + GameConfig.VELOCIDAD_POR_NIVEL * nivel
-	elseif id == "Alcance" then
-		return GameConfig.ALCANCE_BASE + GameConfig.ALCANCE_POR_NIVEL * nivel
-	elseif id == "Iman" then
-		return GameConfig.IMAN_POR_NIVEL * nivel
+	local def = DefinicionesMejoras.POR_ID[id]
+	if not def then
+		return 0
 	end
-	return 0
+	return def.base + def.porNivel * nivel
 end
 
 function DefinicionesMejoras.textoValor(id: string, nivel: number): string
@@ -78,13 +71,14 @@ function DefinicionesMejoras.textoValor(id: string, nivel: number): string
 	if not def then
 		return tostring(v)
 	end
-	if id == "Velocidad" then
-		return string.format("%.1f %s", v, def.unidad)
-	end
-	return string.format("%d %s", v, def.unidad)
+	-- Sin ",0": 25 studs, 29,5 studs
+	local texto = if def.decimales > 0 and v % 1 ~= 0
+		then (string.format("%." .. def.decimales .. "f", v):gsub("%.", ","))
+		else tostring(math.floor(v + 0.5))
+	return texto .. " " .. def.unidad
 end
 
--- Coste total de llevar las 7 de 0 a 10 (dato de calibracion para CONTEXTO.md)
+-- Coste total de llevar las 4 de 0 a 10 (dato de calibracion: $118.030)
 function DefinicionesMejoras.costeTotal(): number
 	local total = 0
 	for _, m in DefinicionesMejoras.LISTA do

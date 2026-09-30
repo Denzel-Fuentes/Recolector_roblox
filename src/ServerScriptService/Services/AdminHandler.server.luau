@@ -3,15 +3,17 @@
 	AdminHandler
 	Comandos de chat para desarrollo y pruebas (TextChatService). Solo para
 	Admin.esAdmin. Sirven para llegar a cualquier punto del juego sin jugar
-	horas: probar el Contenedor Dorado, el Rey, la tienda con gemas, etc.
+	horas.
 
-	    /dar dinero 5000       /dar gemas 300
-	    /dar mascota latita 3  (id, estado 1..5, opcional "sucia")
-	    /dar fragmentos tapita /dar figurina F7   /dar cinta C1   /dar traje T2
-	    /dar todas             (una copia Regular de las 40: corona al Rey)
-	    /maxmejoras            /pases on|off      /repoblar
-	    /reset                 (perfil por defecto en memoria; se guarda al salir)
-	    /energia               (barra llena)
+	    /dar dinero 5000
+	    /dar mascota latita (una mas: nueva, o sube de nivel)
+	    /dar fragmento Plastin 3 (fragmentos de ese set, como reciclados)
+	    /dar todas         (una de cada una de las 40: corona al Rey)
+	    /dar figurina F7   /dar cinta C1   /dar traje T2
+	    /maxmejoras        /pases on|off   /repoblar
+	    /rebirths 2        (fija cuantos rebirths tiene; abre sus cuadrantes)
+	    /tutorial 0        (pasos del tutorial completados)
+	    /reset             (perfil por defecto en memoria; se guarda al salir)
 
 	Responde por NotificacionEvent. Los comandos se registran como
 	TextChatCommand para que el chat los reconozca y no los publique.
@@ -30,13 +32,13 @@ local Servicios = ServerScriptService:WaitForChild("Services")
 local Admin = require(Servicios:WaitForChild("Admin"))
 local Perfiles = require(Servicios:WaitForChild("Perfiles"))
 local Economia = require(Servicios:WaitForChild("Economia"))
-local Energia = require(Servicios:WaitForChild("Energia"))
 local Mejoras = require(Servicios:WaitForChild("Mejoras"))
-local Mascotas = require(Servicios:WaitForChild("Mascotas"))
 local Coleccionables = require(Servicios:WaitForChild("Coleccionables"))
 local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
 local Botin = require(Servicios:WaitForChild("Botin"))
-local Parcelas = require(Servicios:WaitForChild("Parcelas"))
+local Tutorial = require(Servicios:WaitForChild("Tutorial"))
+local Mascotas = require(Servicios:WaitForChild("Mascotas"))
+local Fragmentos = require(Servicios:WaitForChild("Fragmentos"))
 
 local NotificacionEvent = Red.evento("NotificacionEvent")
 
@@ -53,41 +55,37 @@ local function dar(jugador: Player, args: { string })
 	if que == "dinero" then
 		Economia.ganar(jugador, tonumber(args[2]) or 1000)
 		return "dinero: " .. Economia.dinero(jugador)
-	elseif que == "gemas" then
-		Economia.ganarGemas(jugador, tonumber(args[2]) or 100)
-		return "gemas: " .. Economia.gemas(jugador)
 	elseif que == "mascota" then
 		local id = args[2] or ""
 		if not DefinicionesMascotas.obtener(id) then
 			return "mascota desconocida: " .. id
 		end
-		local uid = Mascotas.agregar(jugador, id, tonumber(args[3]) or 2, args[4] == "sucia")
-		return if uid then ("copia " .. uid .. " de " .. id) else "no cabe en el almacen"
-	elseif que == "fragmentos" then
-		local id = args[2] or ""
-		if not DefinicionesMascotas.obtener(id) then
-			return "mascota desconocida: " .. id
+		local r = Mascotas.agregar(jugador, id)
+		return string.format("%s nivel %d%s", id, r.nivel, if r.dinero > 0 then " (+$" .. r.dinero .. ")" else "")
+	elseif que == "fragmento" then
+		local set = args[2] or "Plastin"
+		local ultimo = nil
+		for _ = 1, math.clamp(tonumber(args[3]) or 1, 1, 100) do
+			ultimo = Fragmentos.agregar(jugador, set, "admin") or ultimo
 		end
-		for _ = 1, GameConfig.FRAGMENTOS_POR_MASCOTA do
-			Mascotas.agregarFragmento(jugador, id)
+		if not ultimo then
+			return "set desconocido o cerrado: " .. set
 		end
-		return "fragmentos de " .. id .. ": " .. Mascotas.fragmentos(jugador, id)
-	elseif que == "figurina" or que == "cinta" or que == "traje" then
-		local nuevo = Coleccionables.agregar(jugador, que, args[2] or "")
-		Parcelas.renderizarPronto(jugador)
-		return que .. " " .. tostring(args[2]) .. (if nuevo then " anadida" else " ya la tenias o no existe")
+		return string.format("%s: %s %d/%d%s", set, ultimo.id, ultimo.n, ultimo.total, if ultimo.completa then " (completada)" else "")
 	elseif que == "todas" then
 		local n = 0
 		for _, def in DefinicionesMascotas.LISTA do
-			if def.rareza ~= "Mitica" and not Mascotas.tiene(jugador, def.id) then
-				if Mascotas.agregar(jugador, def.id, 2, false) then
-					n += 1
-				end
+			if def.id ~= DefinicionesMascotas.ID_REY and not Mascotas.tiene(jugador, def.id) then
+				Mascotas.agregar(jugador, def.id)
+				n += 1
 			end
 		end
-		return n .. " mascotas anadidas; Rey=" .. tostring(Mascotas.tiene(jugador, DefinicionesMascotas.ID_REY))
+		return string.format("%d mascotas anadidas; coleccion %d/40; rey=%s", n, Mascotas.distintas(jugador), tostring(Mascotas.tiene(jugador, DefinicionesMascotas.ID_REY)))
+	elseif que == "figurina" or que == "cinta" or que == "traje" then
+		local nuevo = Coleccionables.agregar(jugador, que, args[2] or "")
+		return que .. " " .. tostring(args[2]) .. (if nuevo then " anadida" else " ya la tenias o no existe")
 	end
-	return "uso: /dar dinero|gemas|mascota|fragmentos|figurina|cinta|traje|todas ..."
+	return "uso: /dar dinero|mascota|fragmento|todas|figurina|cinta|traje ..."
 end
 
 local COMANDOS: { [string]: (Player, { string }) -> string } = {
@@ -102,7 +100,7 @@ local COMANDOS: { [string]: (Player, { string }) -> string } = {
 		end
 		Perfiles.marcarSucio(jugador)
 		Mejoras.aplicarVelocidad(jugador)
-		return "las 7 mejoras al maximo"
+		return "las mejoras al maximo"
 	end,
 	pases = function(_jugador, args)
 		Monetizacion.fijarModoDev(args[1] == "on")
@@ -112,9 +110,18 @@ local COMANDOS: { [string]: (Player, { string }) -> string } = {
 		Botin.repoblarAhora()
 		return "montones repoblados"
 	end,
-	energia = function(jugador)
-		Energia.fijar(jugador, Energia.maxima(jugador))
-		return "energia llena"
+	rebirths = function(jugador, args)
+		local perfil = Perfiles.obtener(jugador)
+		if not perfil then
+			return "sin perfil"
+		end
+		perfil.rebirths = math.max(0, math.floor(tonumber(args[1]) or 0))
+		Perfiles.marcarSucio(jugador)
+		return "rebirths: " .. perfil.rebirths
+	end,
+	tutorial = function(jugador, args)
+		Tutorial.fijar(jugador, tonumber(args[1]) or 0)
+		return "tutorial: " .. Tutorial.completados(jugador) .. " pasos completados"
 	end,
 	reset = function(jugador)
 		local nuevo = Perfiles.porDefecto()
@@ -125,7 +132,6 @@ local COMANDOS: { [string]: (Player, { string }) -> string } = {
 			end
 		end
 		Perfiles.marcarSucio(jugador)
-		Parcelas.renderizarPronto(jugador)
 		Coleccionables.vestir(jugador)
 		Mejoras.aplicarVelocidad(jugador)
 		return "perfil reiniciado (se guardara asi al salir)"
