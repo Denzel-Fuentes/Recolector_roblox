@@ -3,6 +3,10 @@
   "tree": {
     "$className": "DataModel",
 
+    "ReplicatedFirst": {
+      "$path": "src/ReplicatedFirst"
+    },
+
     "ReplicatedStorage": {
       "Packages": {
         "$className": "Folder",

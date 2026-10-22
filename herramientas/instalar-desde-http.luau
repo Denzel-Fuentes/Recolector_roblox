@@ -11,6 +11,7 @@
 	    X.luau         -> ModuleScript   X.model.json  -> instancia (className)
 	    carpeta con init.luau -> ModuleScript con hijos (Fusion, PruebasDefinidas)
 	    carpetas       -> Folder (o el contenedor ya existente: StarterPlayerScripts)
+	    src/ReplicatedFirst/X -> hijo directo del servicio (su $path es el servicio)
 
 	Solo escribe Source si cambio, y borra lo que sobre dentro de las carpetas
 	gestionadas (semantica $path de Rojo). Es idempotente: se puede correr tras
@@ -161,12 +162,19 @@ for _, entrada in indice do
 	end
 end
 
+-- Servicios que en default.project.json llevan el $path ellos mismos (todo
+-- su contenido sale de src/): como Rojo, lo que sobre en ellos se borra. Un
+-- LocalScript viejo en ReplicatedFirst seguiria corriendo el primero en
+-- cada cliente.
+local SERVICIOS_CON_PATH = { ReplicatedFirst = true }
+
 -- Borrar lo que sobre en las carpetas gestionadas (semantica $path)
 for carpeta, esperados in gestionadas do
 	for _, hijo in carpeta:GetChildren() do
 		if not esperados[hijo.Name] and (hijo:IsA("LuaSourceContainer") or hijo:IsA("Folder") or hijo:IsA("RemoteEvent") or hijo:IsA("RemoteFunction")) then
-			-- Solo dentro de carpetas que NO son servicios (un servicio puede tener otras cosas)
-			if carpeta.Parent ~= game then
+			-- Solo dentro de carpetas que NO son servicios (un servicio puede
+			-- tener otras cosas), salvo los SERVICIOS_CON_PATH
+			if carpeta.Parent ~= game or SERVICIOS_CON_PATH[carpeta.ClassName] then
 				hijo:Destroy()
 				borrados += 1
 			end
