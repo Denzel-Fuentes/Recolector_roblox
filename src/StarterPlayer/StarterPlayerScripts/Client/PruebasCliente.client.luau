@@ -24,7 +24,13 @@
 	    Invoke("record", 32, true)            la tarjeta grande de record de distancia (true = del servidor)
 	    Invoke("idioma")                      idioma activo, separadores y una muestra de cada seccion
 	    Invoke("tablones")                    los tablones de ranking montados, sus filas visibles y tu fila
+	    Invoke("modulo", nombre, accion, ...) require(<ModuleScript nombre>).prueba[accion](...)
 	Fuera de Studio no crea nada.
+
+	El gancho "modulo" (22 oct) es la via para lo nuevo: un ModuleScript del
+	cliente (bajo Client, o en ReplicatedFirst si existe, p. ej. la pantalla de
+	carga) que exponga `prueba = { accion = function(...) ... end }` se prueba
+	sin tocar este script, que ya no se edita mas.
 ]]
 
 local RunService = game:GetService("RunService")
@@ -397,6 +403,39 @@ function acciones.botones()
 		table.insert(partes, string.format("%s: %s", nombre, if boton then (if boton.Visible then "visible" else "oculto") else "sin boton"))
 	end
 	return table.concat(partes, " | ")
+end
+
+-- El primer ModuleScript con ese nombre bajo raiz (nil si no hay)
+local function buscarModulo(raiz: Instance?, nombre: string): ModuleScript?
+	if not raiz then
+		return nil
+	end
+	for _, d in raiz:GetDescendants() do
+		if d:IsA("ModuleScript") and d.Name == nombre then
+			return d
+		end
+	end
+	return nil
+end
+
+-- Gancho generico: las pruebas de cada modulo viven en el propio modulo
+-- (su tabla `prueba`), bajo Client o en ReplicatedFirst
+function acciones.modulo(nombre, accion, ...)
+	if typeof(nombre) ~= "string" or typeof(accion) ~= "string" then
+		return "uso: (\"modulo\", nombre, accion, ...)"
+	end
+	local modulo = buscarModulo(script.Parent, nombre)
+		or buscarModulo(game:GetService("ReplicatedFirst"), nombre)
+	if not modulo then
+		return "no hay ningun ModuleScript " .. nombre .. " en Client ni en ReplicatedFirst"
+	end
+	local m = require(modulo)
+	local prueba = if typeof(m) == "table" then m.prueba else nil
+	local fn = if typeof(prueba) == "table" then prueba[accion] else nil
+	if typeof(fn) ~= "function" then
+		return nombre .. " no expone prueba." .. accion
+	end
+	return fn(...)
 end
 
 local function ejecutar(nombre, ...)

@@ -10,12 +10,15 @@
 	lixao, pedido = pedido, mejora = melhoria, insignia = emblema (asi lo
 	llama Roblox en pt-br), racha = sequencia, tesoro = tesouro, encestar =
 	acertar. "Rebirth" y "Turbo" no se traducen.
+	Bolsa llena = saco LOTADO, llenar la bolsa = LOTAR o saco (22 oct): en
+	Brasil "encher o saco" es fastidiar y "estar de saco cheio", estar harto;
+	con "saco" como termino del juego, nunca "cheio" ni "encher".
 ]]
 
 return {
 	HUD = {
 		bolsa = "Saco",
-		bolsaLlena = "Saco cheio! Jogue numa lixeira",
+		bolsaLlena = "Saco lotado! Jogue numa lixeira",
 		tienda = "Loja",
 		rebirth = "Rebirth",
 		pedidos = "Pedidos",
@@ -28,7 +31,7 @@ return {
 		clic = "CLIQUE",
 		fuerza = "Força",
 		bonusAqui = "+{pct} %",
-		bolsaLlenaBarra = "CHEIO!",
+		bolsaLlenaBarra = "LOTADO!",
 	},
 
 	MUNDO = {
@@ -87,7 +90,7 @@ return {
 		materialBloqueado = "{material}: Rebirth {n}",
 		prioridad = "Espere {s} s: é de {dueno}",
 		-- P3, 22 oct
-		bolsaNoLlena = "Encha o saco para poder jogá-lo",
+		bolsaNoLlena = "O saco precisa estar lotado para ser jogado",
 		bolsaViejaReciclada = "Sacos demais no chão: o mais antigo foi reciclado sozinho por {dinero}, sem bônus",
 	},
 
@@ -190,7 +193,7 @@ return {
 		separadas = "Recicle {objetivo} peças na lixeira da sua cor",
 		material = "Recicle {objetivo} de {parametro}",
 		tesoros = "Encontre {objetivo} tesouros",
-		bolsasLlenas = "Recicle {objetivo} sacos cheios",
+		bolsasLlenas = "Recicle {objetivo} sacos lotados",
 		hecho = "Feito!",
 		premioDia = "Complete os 3: {minutos} min de dinheiro x2",
 		premioCobrado = "Turbo do dia conquistado",
@@ -207,7 +210,7 @@ return {
 		separadas = "Separe",
 		material = "{parametro}",
 		tesoros = "Tesouros",
-		bolsasLlenas = "Sacos cheios",
+		bolsasLlenas = "Sacos lotados",
 		formato = "{etiqueta} {n}/{total}",
 	},
 
@@ -227,6 +230,9 @@ return {
 		cintaEncontrada = "Fita encontrada: {nombre}!",
 		-- P1, 22 oct
 		sesionEnOtroServidor = "Sua partida foi aberta em outro servidor. Entre de novo para continuar jogando.",
+		-- C2, 22 oct
+		versionNueva = "Há uma versão nova do jogo: entre de novo para continuar jogando.",
+		progresoRecuperado = "Seu progresso salvo voltou. O que você jogou enquanto não dava para salvar não fica guardado.",
 	},
 
 	MATERIALES = {
@@ -241,13 +247,33 @@ return {
 		paso = "Passo {n}/{total}",
 		paso1 = "Vá até o lixão",
 		paso2 = "Cave uma pilha: chegue perto e segure Cavar",
-		paso3 = "Pegue lixo até encher o saco",
+		paso3 = "Pegue lixo até lotar o saco",
 		paso4 = "Jogue o saco na lixeira azul: segure Jogar e solte",
 		paso5 = "Compre uma melhoria na Loja",
 		paso6 = "Pegue lixo de uma só cor e jogue na lixeira dela: paga o dobro",
 		paso7 = "Cumpra um pedido da recicladora",
 		paso8 = "Meta: as 4 melhorias no máximo e {dinero} para o Rebirth 1",
 		completado = "Tutorial concluído! Agora você é um reciclador",
+	},
+
+	-- C2, 22 oct
+	SONIDO = {
+		boton = "Som",
+		musica = "Música",
+		efectos = "Efeitos",
+		activado = "Ligado",
+		desactivado = "Desligado",
+	},
+
+	-- C2, 22 oct
+	CARGA = {
+		titulo = "Carregando…",
+		progreso = "Carregando seu progresso…",
+		consejo1 = "Separe o lixo por cores: na lixeira da sua cor paga o dobro.",
+		consejo2 = "Segure F por mais tempo para jogar mais longe.",
+		consejo3 = "Todo dia tem pedidos novos na recicladora.",
+		consejo4 = "Volte todo dia para pegar sua recompensa diária.",
+		consejo5 = "Os rebirths liberam novos tipos de lixo.",
 	},
 
 	DEF = {

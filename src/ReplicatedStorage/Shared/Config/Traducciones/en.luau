@@ -226,6 +226,9 @@ return {
 		cintaEncontrada = "Tape found: {nombre}!",
 		-- P1, 22 oct
 		sesionEnOtroServidor = "Your game was opened on another server. Rejoin to keep playing.",
+		-- C2, 22 oct
+		versionNueva = "There's a new version of the game: rejoin to keep playing.",
+		progresoRecuperado = "Your saved progress is back. What you played while it couldn't be saved isn't kept.",
 	},
 
 	MATERIALES = {
@@ -247,6 +250,26 @@ return {
 		paso7 = "Complete an order from the recycler",
 		paso8 = "Goal: all 4 upgrades maxed and {dinero} for Rebirth 1",
 		completado = "Tutorial complete! You're a real recycler",
+	},
+
+	-- C2, 22 oct
+	SONIDO = {
+		boton = "Sound",
+		musica = "Music",
+		efectos = "Effects",
+		activado = "On",
+		desactivado = "Off",
+	},
+
+	-- C2, 22 oct
+	CARGA = {
+		titulo = "Loading…",
+		progreso = "Loading your progress…",
+		consejo1 = "Sort trash by color: it pays double in its own bin.",
+		consejo2 = "Hold F longer to throw farther.",
+		consejo3 = "There are new orders at the recycler every day.",
+		consejo4 = "Come back every day for your daily reward.",
+		consejo5 = "Rebirths unlock new types of trash.",
 	},
 
 	DEF = {

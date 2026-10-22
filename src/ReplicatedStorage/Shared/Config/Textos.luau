@@ -264,6 +264,12 @@ Textos.NOTIFICACIONES = {
 	-- en otro servidor (bloqueo de sesion). Kick solo admite texto plano: el
 	-- servidor tiene que resolverlo en el idioma del jugador antes de enviarlo
 	sesionEnOtroServidor = "Tu partida se abrió en otro servidor. Vuelve a entrar para seguir jugando.",
+	-- C2, 22 oct: el perfil guardado es de una version mas nueva que la de
+	-- este servidor: se juega, pero sin guardar (Guardado.prepararPerfil)
+	versionNueva = "Hay una versión nueva del juego: vuelve a entrar para seguir jugando.",
+	-- C2, 22 oct: la carga en segundo plano encontro la partida guardada y
+	-- sustituye al perfil provisional (lo jugado con el se pierde)
+	progresoRecuperado = "Ya cargó tu progreso guardado. Lo que jugaste mientras no se podía guardar no se conserva.",
 }
 
 -- Nombres de los materiales en minuscula, para frases ("recicla 40 de papel")
@@ -289,6 +295,29 @@ Textos.TUTORIAL = {
 	paso7 = "Cumple un pedido de la recicladora",
 	paso8 = "Meta: las 4 mejoras al máximo y {dinero} para el Rebirth 1",
 	completado = "¡Tutorial completado! Ya eres un reciclador",
+}
+
+-- C2, 22 oct: el sonido (lo hace A1): el boton del HUD y los dos ajustes
+-- (perfil.ajustes), cada uno activado o desactivado
+Textos.SONIDO = {
+	boton = "Sonido",
+	musica = "Música",
+	efectos = "Efectos",
+	activado = "Activado",
+	desactivado = "Desactivado",
+}
+
+-- C2, 22 oct: la pantalla de carga (la hace L1). progreso sale si la carga
+-- tarda (a los 8 s); los consejos van rotando, de consejo1 a consejo5
+-- (claves con nombre y no una lista: Idioma traduce por clave)
+Textos.CARGA = {
+	titulo = "Cargando…",
+	progreso = "Cargando tu progreso…",
+	consejo1 = "Separa la basura por colores: en su contenedor paga el doble.",
+	consejo2 = "Mantén F más tiempo para lanzar más lejos.",
+	consejo3 = "Cada día hay pedidos nuevos en la recicladora.",
+	consejo4 = "Vuelve cada día a por tu recompensa diaria.",
+	consejo5 = "Los rebirths abren tipos nuevos de basura.",
 }
 
 function Textos.formatear(plantilla: string, valores: { [string]: any }): string
