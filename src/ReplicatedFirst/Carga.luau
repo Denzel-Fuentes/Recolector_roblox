@@ -48,8 +48,12 @@
 	- Precarga (ContentProvider:PreloadAsync) los iconos de Config/Iconos y,
 	  si existe, Config/Sonidos, del que toma los ids sin depender de su
 	  forma: textos "rbxassetid://N" y enteros de 7 cifras o mas, a cualquier
-	  profundidad (volumenes, tonos y tiempos son numeros pequenos). No se
-	  espera a que termine: nadie se queda en la pantalla por un icono.
+	  profundidad (volumenes, tonos y tiempos son numeros pequenos). Precarga
+	  una ImageLabel (o un Sound) sin padre por id, nunca el texto suelto:
+	  con el texto PreloadAsync pide el asset de otro tipo y falla ("Asset
+	  type does not match requested type"; en Studio, 22 de 23 iconos el
+	  22 oct). No se espera a que termine: nadie se queda en la pantalla por
+	  un icono.
 	- ResetOnSpawn = false: el personaje aparece con la pantalla puesta, y un
 	  ScreenGui que se resetea moriria justo entonces. DisplayOrder 1000: por
 	  encima de todo lo del juego (lo mas alto, Celebraciones, va en 25).
@@ -58,6 +62,9 @@
 	  fondo es Active para que los toques no muevan la camara de detras.
 	  Escala con la regla de Kit/Escala (alto / 900 entre 0,72 y 1,15; minimo
 	  0,8 en tactil). Con mando no hay nada que seleccionar.
+	- AutomaticSize solo crece dentro del padre: el consejo (que puede ocupar
+	  varias lineas en un telefono) vive en una zona fija bajo el indicador, y
+	  el titulo es una caja fija con el texto abajo (detalles en construir).
 
 	=== Pruebas (Studio, por PruebasCliente) ===
 	  ("modulo", "Carga", "estado")              que se ve y por que sigue o
@@ -116,8 +123,10 @@ local CUADRO = 34
 local HUECO_CUADROS = 14
 local SALTO = 18 -- lo que sube cada cuadro del indicador
 local TAMANO_TITULO = 42
+local ALTO_TITULO = 150 -- caja fija: hasta tres lineas del titulo
 local GROSOR_TITULO = 4 -- Kit/Texto: el contorno es un 10 % del tamano
 local TAMANO_CONSEJO = 22
+local ALTO_ZONA_CONSEJO = 240 -- donde puede crecer la pildora (unas siete lineas)
 local HUECO_TITULO = 14 -- encima del indicador ya queda el aire del salto
 local HUECO_CONSEJO = 30
 
@@ -148,9 +157,8 @@ type Vista = {
 	zoom: UIScale,
 	titulo: TextLabel,
 	contornoTitulo: UIStroke,
-	pildora: Frame,
 	contornoPildora: UIStroke,
-	consejo: TextLabel,
+	consejo: TextLabel, -- el texto y la pildora a la vez
 	conexiones: { RBXScriptConnection },
 	pedidos: { [Instance]: string }, -- el ultimo texto pedido por etiqueta
 	mostrado: { [Instance]: string }, -- el ultimo texto puesto (lo lee prueba.estado)
@@ -379,12 +387,15 @@ local function construir(nombre: string, padre: Instance): Vista
 		table.insert(cuadros, cuadro)
 	end
 
+	-- Caja FIJA de hasta tres lineas con el texto abajo: si no cabe en una,
+	-- crece hacia arriba sin tocar el indicador. Sin AutomaticSize: cuelga
+	-- fuera de Centro y alli no creceria (ver ZonaConsejo)
 	local titulo = Instance.new("TextLabel")
 	titulo.Name = "Titulo"
 	titulo.AnchorPoint = Vector2.new(0.5, 1)
 	titulo.Position = UDim2.new(0.5, 0, 0, -HUECO_TITULO)
-	titulo.Size = UDim2.fromScale(1, 0)
-	titulo.AutomaticSize = Enum.AutomaticSize.Y -- dos lineas crecen hacia arriba
+	titulo.Size = UDim2.new(1, 0, 0, ALTO_TITULO)
+	titulo.TextYAlignment = Enum.TextYAlignment.Bottom
 	titulo.BackgroundTransparency = 1
 	titulo.FontFace = FUENTE_TITULO
 	titulo.TextSize = TAMANO_TITULO
@@ -397,30 +408,28 @@ local function construir(nombre: string, padre: Instance): Vista
 	local contornoTitulo = contorno(titulo, GROSOR_TITULO)
 	contornoTitulo.Transparency = 1
 
-	local pildora = Instance.new("Frame")
-	pildora.Name = "Consejo"
-	pildora.AnchorPoint = Vector2.new(0.5, 0)
-	pildora.Position = UDim2.new(0.5, 0, 1, HUECO_CONSEJO)
-	pildora.Size = UDim2.fromScale(1, 0)
-	pildora.AutomaticSize = Enum.AutomaticSize.Y
-	pildora.BackgroundColor3 = PALETA.UI_PAPEL
-	pildora.BackgroundTransparency = 1
-	pildora.BorderSizePixel = 0
-	pildora.Parent = centro
-	esquinas(pildora, RADIO)
-	local contornoPildora = contorno(pildora, GROSOR)
-	contornoPildora.Transparency = 1
-	local relleno = Instance.new("UIPadding")
-	relleno.PaddingTop = UDim.new(0, 14)
-	relleno.PaddingBottom = UDim.new(0, 14)
-	relleno.PaddingLeft = UDim.new(0, 20)
-	relleno.PaddingRight = UDim.new(0, 20)
-	relleno.Parent = pildora
+	-- El consejo es UNA TextLabel que hace de pildora (fondo, borde y
+	-- relleno) con AutomaticSize Y, arriba del todo de una ZONA fija y
+	-- transparente bajo el indicador. AutomaticSize solo crece dentro de su
+	-- padre: colgada de Centro por fuera de sus limites, o dentro de un marco
+	-- que tambien era AutomaticSize, se quedaba en una linea y cortaba el
+	-- resto en pantallas estrechas (Studio, 22 oct)
+	local zona = Instance.new("Frame")
+	zona.Name = "ZonaConsejo"
+	zona.AnchorPoint = Vector2.new(0.5, 0)
+	zona.Position = UDim2.new(0.5, 0, 1, HUECO_CONSEJO)
+	zona.Size = UDim2.new(1, 0, 0, ALTO_ZONA_CONSEJO)
+	zona.BackgroundTransparency = 1
+	zona.Parent = centro
 	local consejo = Instance.new("TextLabel")
-	consejo.Name = "Texto"
+	consejo.Name = "Consejo"
+	consejo.AnchorPoint = Vector2.new(0.5, 0)
+	consejo.Position = UDim2.fromScale(0.5, 0)
 	consejo.Size = UDim2.fromScale(1, 0)
 	consejo.AutomaticSize = Enum.AutomaticSize.Y
+	consejo.BackgroundColor3 = PALETA.UI_PAPEL
 	consejo.BackgroundTransparency = 1
+	consejo.BorderSizePixel = 0
 	consejo.FontFace = FUENTE_CUERPO
 	consejo.TextSize = TAMANO_CONSEJO
 	consejo.TextColor3 = PALETA.UI_TINTA
@@ -428,7 +437,18 @@ local function construir(nombre: string, padre: Instance): Vista
 	consejo.AutoLocalize = false
 	consejo.Text = ""
 	consejo.TextTransparency = 1
-	consejo.Parent = pildora
+	consejo.Parent = zona
+	esquinas(consejo, RADIO)
+	local contornoPildora = contorno(consejo, GROSOR)
+	-- En una TextLabel, Contextual contornearia las letras: aqui es el borde
+	contornoPildora.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	contornoPildora.Transparency = 1
+	local relleno = Instance.new("UIPadding")
+	relleno.PaddingTop = UDim.new(0, 14)
+	relleno.PaddingBottom = UDim.new(0, 14)
+	relleno.PaddingLeft = UDim.new(0, 20)
+	relleno.PaddingRight = UDim.new(0, 20)
+	relleno.Parent = consejo
 
 	local vista: Vista = {
 		gui = gui,
@@ -438,7 +458,6 @@ local function construir(nombre: string, padre: Instance): Vista
 		zoom = zoom,
 		titulo = titulo,
 		contornoTitulo = contornoTitulo,
-		pildora = pildora,
 		contornoPildora = contornoPildora,
 		consejo = consejo,
 		conexiones = {},
@@ -570,7 +589,7 @@ local function rotarConsejos(vista: Vista)
 			vista.claveConsejo = clave
 			if not vista.pildoraVisible then
 				vista.pildoraVisible = true
-				animar(vista.pildora, ENTRADA_TEXTO, { BackgroundTransparency = 0 })
+				animar(vista.consejo, ENTRADA_TEXTO, { BackgroundTransparency = 0 })
 				animar(vista.contornoPildora, ENTRADA_TEXTO, { Transparency = 0 })
 			end
 			cambiarTexto(vista, vista.consejo, nil, carga[clave])
@@ -701,14 +720,29 @@ local function idsSonidos(valor: any, lista: { string }, vistos: { [string]: boo
 	end
 end
 
-local function precargarLista(lista: { string })
+-- Por instancias, no por texto (ver cabecera): una ImageLabel o un Sound
+-- sin padre por id, que se destruyen al acabar; lo que queda es la cache de
+-- ContentProvider, que es lo que aprovechan el HUD y los sonidos
+local function precargarLista(lista: { string }, clase: "ImageLabel" | "Sound")
 	if #lista == 0 then
 		return
 	end
 	local cuenta = estado.precarga
 	cuenta.total += #lista
+	local instancias: { Instance } = {}
+	for _, id in lista do
+		if clase == "Sound" then
+			local sonido = Instance.new("Sound")
+			sonido.SoundId = id
+			table.insert(instancias, sonido)
+		else
+			local imagen = Instance.new("ImageLabel")
+			imagen.Image = id
+			table.insert(instancias, imagen)
+		end
+	end
 	local ok, err = pcall(function()
-		ContentProvider:PreloadAsync(lista, function(_contenido: string, resultado: Enum.AssetFetchStatus)
+		ContentProvider:PreloadAsync(instancias, function(_contenido: string, resultado: Enum.AssetFetchStatus)
 			if resultado == Enum.AssetFetchStatus.Success then
 				cuenta.hechos += 1
 			else
@@ -716,6 +750,9 @@ local function precargarLista(lista: { string })
 			end
 		end)
 	end)
+	for _, instancia in instancias do
+		instancia:Destroy()
+	end
 	if not ok then
 		anotar("precarga: " .. tostring(err))
 	end
@@ -734,8 +771,8 @@ local function precargar()
 		estado.precarga.sonidos = "sin Config/Sonidos"
 	end
 	-- Primero los iconos: son pocos y el HUD los quiere en cuanto se vea
-	precargarLista(iconos)
-	precargarLista(sonidos)
+	precargarLista(iconos, "ImageLabel")
+	precargarLista(sonidos, "Sound")
 	estado.precarga.terminada = true
 end
 
@@ -904,10 +941,11 @@ function prueba.estado(): string
 		tostring(listo),
 		if jugador.Character then "si" else "no"))
 	if vista then
+		local quitadaEn = estado.quitadaEn
 		table.insert(lineas, "  se ve: " .. describirVista(vista))
 		table.insert(lineas, string.format("  CARGA.progreso a los %d s: %s", SEGUNDOS_PROGRESO,
 			if vista.claveTitulo == "progreso" then "puesto"
-				elseif estado.quitadaEn and not estado.tarde then "no hizo falta (se quito antes)"
+				elseif quitadaEn and quitadaEn < SEGUNDOS_PROGRESO then "no hizo falta (se quito antes)"
 				elseif estado.tarde then "no puesto (el perfil ya habia respondido, o no hay textos)"
 				else "aun no"))
 		if not vista.destruida then
