@@ -12,6 +12,11 @@
 	dependa del perfil (velocidad, grupo de colision por rebirth) ve
 	un personaje sin perfil. Si el perfil no llega nunca, a los
 	15 s se carga igual: un jugador sin personaje es peor que uno sin guardar.
+
+	Llevarlo a la plaza es un salto del servidor: se avisa a Movimiento
+	(permitirSalto) para que no lo tome por un teletransporte del cliente
+	(el personaje nace donde Roblox lo pone y una muestra podria caer entre
+	eso y el PivotTo).
 ]]
 
 local Players = game:GetService("Players")
@@ -20,6 +25,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Servicios = ServerScriptService:WaitForChild("Services")
 local Perfiles = require(Servicios:WaitForChild("Perfiles"))
 local Mundo = require(Servicios:WaitForChild("Mundo"))
+local Movimiento = require(Servicios:WaitForChild("Movimiento"))
 
 local RESPALDO_SIN_PERFIL = 15
 
@@ -32,6 +38,7 @@ local function cargarSiFalta(jugador: Player)
 end
 
 local function alAparecer(jugador: Player, personaje: Model)
+	Movimiento.permitirSalto(jugador)
 	personaje:PivotTo(Mundo.cframeAparicion())
 	local humanoide = personaje:WaitForChild("Humanoid", 5) :: Humanoid?
 	if humanoide then

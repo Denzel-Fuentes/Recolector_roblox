@@ -13,6 +13,9 @@ local Cuadrantes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild
 
 local Mundo = require(script.Parent.Parent:WaitForChild("Mundo"))
 local Botin = require(script.Parent.Parent:WaitForChild("Botin"))
+local Bolsa = require(script.Parent.Parent:WaitForChild("Bolsa"))
+local ObjetosPatio = require(script.Parent.Parent:WaitForChild("ObjetosPatio"))
+local Movimiento = require(script.Parent.Parent:WaitForChild("Movimiento"))
 
 local Comunes = {}
 
@@ -23,10 +26,13 @@ function Comunes.jugador(): Player
 	return j
 end
 
--- Teletransporta al personaje (un poco por encima para que no se hunda)
+-- Teletransporta al personaje (un poco por encima para que no se hunda). Es
+-- un salto del servidor: se avisa a Movimiento, que si no lo tomaria por un
+-- teletransporte del cliente y dejaria 2 s sin recoger ni lanzar
 function Comunes.teletransportar(j: Player, pos: Vector3)
 	local ch = j.Character
 	if ch then
+		Movimiento.permitirSalto(j)
 		ch:PivotTo(CFrame.new(pos + Vector3.new(0, 3, 0)))
 	end
 end
@@ -45,6 +51,32 @@ function Comunes.yaLanzo(j: Player)
 	if perfil and (perfil.estadisticas.lanzamientos or 0) < 5 then
 		perfil.estadisticas.lanzamientos = 5
 		Perfiles.marcarSucio(j)
+	end
+end
+
+local PAPEL = { tipo = "basura", nombre = "Papel", material = "Papel", valor = 6 }
+
+-- El servidor solo lanza la bolsa LLENA (P3, 22 oct): vacia la bolsa y la
+-- llena hasta su capacidad (la del momento: nivel de la mejora y Bolsa XL)
+-- con copias de `item` (por defecto un papel de $6), o con lo que devuelva
+-- item(i) si es una funcion. Devuelve cuantas piezas metio.
+function Comunes.llenarBolsa(j: Player, item: any?): number
+	Bolsa.vaciar(j)
+	local n = Bolsa.capacidad(j)
+	local items = table.create(n)
+	for i = 1, n do
+		table.insert(items, if typeof(item) == "function" then item(i) else table.clone(item or PAPEL))
+	end
+	Bolsa.meterVarios(j, items)
+	return n
+end
+
+-- Quita del suelo, sin cobrarlas, las bolsas caidas del jugador que dejaron
+-- otras pruebas: las que buscan "su" bolsa no deben dar con una vieja, y el
+-- tope de bolsas caidas (Lanzamiento) no debe reciclar ninguna a mitad
+function Comunes.limpiarBolsasCaidas(j: Player)
+	for _, obj in ObjetosPatio.bolsasDe(j) do
+		ObjetosPatio.retirar(obj.id)
 	end
 end
 

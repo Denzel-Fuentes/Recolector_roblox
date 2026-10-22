@@ -174,6 +174,7 @@ end
 function Pruebas.brazoLimita()
 	local j = jugador()
 	Comunes.yaLanzo(j)
+	Comunes.limpiarBolsasCaidas(j)
 	local p = Perfiles.obtener(j)
 	local nivelAntes = p.mejoras.Brazo
 	local zona = Mundo.zonaAcierto()
@@ -181,8 +182,8 @@ function Pruebas.brazoLimita()
 		p.mejoras.Brazo = nivel
 		teletransportar(j, zona.Position + Vector3.new(0, 0, -40))
 		task.wait(0.6)
-		Bolsa.vaciar(j)
-		Bolsa.meter(j, { tipo = "basura", nombre = "Papel", material = "Papel", valor = 6 })
+		-- Llena: el servidor no lanza una bolsa a medias (P3, 22 oct)
+		Comunes.llenarBolsa(j)
 		local antes = Perfiles.leerEstadistica(j, "aciertos")
 		local lanzo = Botin.lanzarBolsa(j, zona.Position, 1)
 		task.wait(4.3)

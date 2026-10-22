@@ -25,7 +25,12 @@
 	es). Asi los prompts horneados en el place no necesitan scripts propios.
 
 	Cada remote tiene cooldown por jugador: un cliente modificado que dispare
-	1000 reclamos por segundo solo consigue que se ignoren.
+	1000 reclamos por segundo solo consigue que se ignoren. Y nada de lo que
+	llega se usa sin mirarlo (P3, 22 oct): el id del reclamo es un string
+	corto; el punto y la fuerza del lanzamiento, numeros finitos con el punto
+	dentro del mapa (Lanzamiento.argumentosValidos; un NaN o un infinito
+	daban una parabola NaN). Tras un movimiento imposible (Movimiento) no se
+	excava; recoger y lanzar ya lo rechazan ObjetosPatio y Lanzamiento.
 ]]
 
 local Players = game:GetService("Players")
@@ -45,6 +50,8 @@ local Perfiles = require(Servicios:WaitForChild("Perfiles"))
 local Bolsa = require(Servicios:WaitForChild("Bolsa"))
 local Botin = require(Servicios:WaitForChild("Botin"))
 local ObjetosPatio = require(Servicios:WaitForChild("ObjetosPatio"))
+local Lanzamiento = require(Servicios:WaitForChild("Lanzamiento"))
+local Movimiento = require(Servicios:WaitForChild("Movimiento"))
 local AvisosMundo = require(Servicios:WaitForChild("AvisosMundo"))
 
 local ReclamarObjetoEvent = Red.evento("ReclamarObjetoEvent")
@@ -152,7 +159,8 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, jugador)
 	end
 	local monton = Botin.montonDe(prompt)
 	if monton then
-		if enCooldown(jugador, "excavar", 0.5) then
+		-- Recien llegado de un salto imposible: ese monton no lo alcanzo andando
+		if enCooldown(jugador, "excavar", 0.5) or Movimiento.sospechoso(jugador) then
 			return
 		end
 		local ok, motivo = Botin.excavar(jugador, monton)
@@ -167,26 +175,35 @@ end)
 
 -- === Remotes ===
 
+-- Los ids de ObjetosPatio son un contador: un string mas largo no es de nadie
+local LARGO_MAX_ID = 16
+
 -- (objetoId, porMira?): porMira = la recogida automatica de la mira en el
 -- movil (mismas reglas que el clic, sin avisos de rechazo)
 ReclamarObjetoEvent.OnServerEvent:Connect(function(jugador, objetoId, porMira)
-	if typeof(objetoId) ~= "string" or enCooldown(jugador, "reclamar", GameConfig.COOLDOWN_REMOTE) then
+	if typeof(objetoId) ~= "string" or #objetoId > LARGO_MAX_ID or enCooldown(jugador, "reclamar", GameConfig.COOLDOWN_REMOTE) then
 		return
 	end
 	Botin.reclamar(jugador, objetoId, if porMira == true then "mira" else "clic")
 end)
 
+-- (punto, fuerza): lo que no sea un Vector3 y un numero finitos con el punto
+-- en el mapa se ignora sin gastar el cooldown
 LanzarObjetoEvent.OnServerEvent:Connect(function(jugador, punto, fuerza)
-	if typeof(punto) ~= "Vector3" or typeof(fuerza) ~= "number" or enCooldown(jugador, "lanzar", 0.4) then
+	if not Lanzamiento.argumentosValidos(punto, fuerza) or enCooldown(jugador, "lanzar", 0.4) then
 		return
 	end
 	local ok, motivo = Botin.lanzarBolsa(jugador, punto, fuerza)
 	if not ok then
-		-- Burbuja sobre la cabeza (AvisosMundo), no toast
+		-- Burbuja sobre la cabeza (AvisosMundo), no toast. Sin aviso para
+		-- "movimiento" (Movimiento) ni "argumentos": un cliente legitimo no
+		-- llega ahi, o se le pasa en 2 s
 		if motivo == "demasiadoCerca" then
 			AvisosMundo.sobreJugador(jugador, Idioma.mensaje("PATIO.demasiadoCerca"))
 		elseif motivo == "nadaQueLanzar" then
 			AvisosMundo.sobreJugador(jugador, Idioma.mensaje("PATIO.nadaQueLanzar"), { icono = "bolsa" })
+		elseif motivo == "bolsaNoLlena" then
+			AvisosMundo.sobreJugador(jugador, Idioma.mensaje("PATIO.bolsaNoLlena"), { icono = "bolsa" })
 		end
 	end
 end)

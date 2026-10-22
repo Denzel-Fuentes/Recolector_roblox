@@ -1,8 +1,10 @@
 --!strict
 --[[
 	Patio (ModuleScript)
-	Unica responsabilidad: saber quien esta DENTRO del patio de basura y hacer
-	visible que va a recoger: brazos extendidos y la bolsa abierta en las manos.
+	Unica responsabilidad: estar en el patio de basura. Quien esta DENTRO,
+	que se le vea recoger (brazos extendidos y la bolsa abierta en las
+	manos) y con que vista lo mira el (primera o tercera persona: la aplica
+	el cliente, aqui solo se guarda en el perfil).
 
 	Se decide en el servidor (posicion del personaje dentro del rectangulo de
 	GameConfig.PATIO) y se publica como atributo EnPatio del Player:
@@ -11,12 +13,22 @@
 
 	La pose de brazos (Utilidades/PoseBrazos) se escribe en Transform cada
 	Stepped: el Animator la pisaria si se pusiera una sola vez. La escribe
-	cada cliente para todos los personajes con EnPatio (Escena.client) y
-	tambien aqui, porque Transform no se replica y la vista de servidor de
-	Studio es donde el usuario mira su personaje desde fuera. La bolsa
+	cada cliente para todos los personajes con EnPatio (Escena.client).
+	Transform no se replica, asi que el servidor no la ve: en Studio tambien
+	se escribe aqui cada Stepped, porque la vista de servidor de Studio es
+	donde el usuario mira su personaje desde fuera; fuera de Studio no la ve
+	nadie y no se paga ese bucle por frame (P3, 22 oct). La bolsa
 	(ModelosObjetos.bolsaAbierta) se suelda al torso justo entre las manos,
-	medidas de verdad una vez puesta la pose, crece con el llenado y, llena,
-	se cierra con su nudo (las manos la cogen entonces por el nudo).
+	medidas de verdad con la pose puesta (fuera de Studio se pone un par de
+	frames solo para medir, una vez por personaje: el punto no cambia y vale
+	para cada bolsa siguiente; la estimacion de PoseBrazos se va casi un
+	stud), crece con el llenado y, llena, se cierra con su nudo (las manos la
+	cogen entonces por el nudo).
+
+	La vista (CamaraEvent, PatioHandler) va con cooldown: alternarla sin
+	parar escribiria el perfil cada vez. La ultima pedida durante el cooldown
+	se guarda al acabar: el cliente ya cambio de vista y el perfil no puede
+	quedarse con la anterior.
 ]]
 
 local Players = game:GetService("Players")
@@ -31,17 +43,29 @@ local PoseBrazos = require(Shared:WaitForChild("Utilidades"):WaitForChild("PoseB
 local Senal = require(Shared:WaitForChild("Utilidades"):WaitForChild("Senal"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
+local Perfiles = require(Servicios:WaitForChild("Perfiles"))
 local Bolsa = require(Servicios:WaitForChild("Bolsa"))
 local Cosmeticos = require(Servicios:WaitForChild("Cosmeticos"))
 
 local Patio = {}
 
 Patio.alCambiar = Senal.nueva() :: Senal.Senal<Player, boolean>
+-- Segundos minimos entre dos escrituras de la vista en el perfil
+Patio.COOLDOWN_VISTA = 0.5
 
 local dentro: { [Player]: boolean } = {}
 
 -- Studs que sube la bolsa atada respecto a la abierta (ver colocarBolsa)
 local SUBIDA_CERRADA = 0.6
+
+-- El bucle que pone la pose en el servidor cada frame (solo en Studio, ver
+-- cabecera; Patio.poseCadaFrame lo enciende y lo apaga)
+local conexionPose: RBXScriptConnection? = nil
+
+-- Donde quedan las manos de cada personaje con la pose puesta, en
+-- coordenadas del torso: se mide una vez por personaje (ver cabecera)
+type Medida = { personaje: Model, torso: BasePart, manos: CFrame }
+local medidas: { [Player]: Medida } = {}
 
 function Patio.estaDentro(jugador: Player): boolean
 	return dentro[jugador] == true
@@ -60,11 +84,11 @@ local function quitarBolsa(personaje: Model)
 end
 
 -- Punto medio REAL entre las manos (en coordenadas del torso) una vez puesta
--- la pose: el servidor tambien la aplica, y el largo real del brazo depende
--- del avatar (los rig attachments no estan en los extremos de las partes, asi
--- que calcularlo desde los tamanos se va casi un stud). Si aun no hay manos
--- se usa la estimacion de PoseBrazos.
-local function puntoManos(personaje: Model): (BasePart?, CFrame?)
+-- la pose: el largo real del brazo depende del avatar (los rig attachments no
+-- estan en los extremos de las partes, asi que calcularlo desde los tamanos
+-- se va casi un stud). Si las manos aun no estan al frente se usa la
+-- estimacion de PoseBrazos. El tercer valor dice si es medida de verdad.
+local function puntoManos(personaje: Model): (BasePart?, CFrame?, boolean)
 	local torso = personaje:FindFirstChild("UpperTorso") or personaje:FindFirstChild("Torso")
 	local derecha = personaje:FindFirstChild("RightHand") or personaje:FindFirstChild("Right Arm")
 	local izquierda = personaje:FindFirstChild("LeftHand") or personaje:FindFirstChild("Left Arm")
@@ -74,10 +98,34 @@ local function puntoManos(personaje: Model): (BasePart?, CFrame?)
 		local pi = if izquierda.Name == "Left Arm" then (izquierda.CFrame * CFrame.new(0, -0.7, 0)).Position else izquierda.Position
 		local medio = torso.CFrame:PointToObjectSpace((pd + pi) / 2)
 		if medio.Z < -0.8 then -- ya estan al frente (con la pose puesta)
-			return torso, CFrame.new(medio)
+			return torso, CFrame.new(medio), true
 		end
 	end
-	return PoseBrazos.puntoManos(personaje)
+	local torsoEstimado, manosEstimadas = PoseBrazos.puntoManos(personaje)
+	return torsoEstimado, manosEstimadas, false
+end
+
+-- Las manos del personaje con la pose: la medida guardada o, si no la hay,
+-- se mide (fuera de Studio poniendo la pose un par de frames en Stepped,
+-- despues del Animator, como el bucle de Studio). Puede ceder.
+local function manosDe(jugador: Player, personaje: Model): (BasePart?, CFrame?)
+	local medida = medidas[jugador]
+	if medida and medida.personaje == personaje and medida.torso.Parent == personaje then
+		return medida.torso, medida.manos
+	end
+	if not conexionPose then
+		local conexion = RunService.Stepped:Connect(function()
+			PoseBrazos.aplicar(personaje)
+		end)
+		RunService.Heartbeat:Wait()
+		RunService.Heartbeat:Wait()
+		conexion:Disconnect()
+	end
+	local torso, manos, medido = puntoManos(personaje)
+	if torso and manos and medido then
+		medidas[jugador] = { personaje = personaje, torso = torso, manos = manos }
+	end
+	return torso, manos
 end
 
 local function colocarBolsa(jugador: Player)
@@ -85,8 +133,9 @@ local function colocarBolsa(jugador: Player)
 	if not personaje or not dentro[jugador] then
 		return
 	end
-	local torso, manos = puntoManos(personaje)
-	if not torso or not manos then
+	local torso, manos = manosDe(jugador, personaje)
+	-- Medir puede haber cedido: sigue siendo el mismo personaje y sigue dentro
+	if not torso or not manos or jugador.Character ~= personaje or not dentro[jugador] or torso.Parent ~= personaje then
 		return
 	end
 	quitarBolsa(personaje)
@@ -170,19 +219,85 @@ function Patio.actualizar()
 	end
 end
 
--- Pose de brazos en la vista del servidor (ver cabecera)
-RunService.Stepped:Connect(function()
-	for jugador, esta in dentro do
-		local personaje = jugador.Character
-		if esta and personaje then
-			PoseBrazos.aplicar(personaje)
-		end
+-- Pose de brazos en la vista del servidor cada Stepped (ver cabecera). Por
+-- defecto solo en Studio; las pruebas la apagan para probar el camino de un
+-- servidor publicado (Antitrampas.poseSinBucle)
+function Patio.poseCadaFrame(activa: boolean)
+	if activa and not conexionPose then
+		conexionPose = RunService.Stepped:Connect(function()
+			for jugador, esta in dentro do
+				local personaje = jugador.Character
+				if esta and personaje then
+					PoseBrazos.aplicar(personaje)
+				end
+			end
+		end)
+	elseif not activa and conexionPose then
+		conexionPose:Disconnect()
+		conexionPose = nil
 	end
-end)
+end
+Patio.poseCadaFrame(RunService:IsStudio())
+
+-- Para pruebas: si hay medida de las manos del personaje actual del jugador
+-- (en coordenadas del torso), o nil si aun no se midio de verdad
+function Patio.medidaManos(jugador: Player): CFrame?
+	local medida = medidas[jugador]
+	return if medida and medida.personaje == jugador.Character then medida.manos else nil
+end
+
+-- ===========================================================================
+-- La vista en el patio (CamaraEvent)
+-- ===========================================================================
+
+type EstadoVista = { ultima: number, pendiente: string? }
+local vistas: { [Player]: EstadoVista } = {}
+
+local function guardarVista(jugador: Player, vista: string)
+	local perfil = Perfiles.obtener(jugador)
+	if perfil and perfil.camara ~= vista then
+		perfil.camara = vista
+		Perfiles.marcarSucio(jugador)
+	end
+end
+
+-- "primera" | "tercera" pedida por el cliente: (ok, motivo) con motivo
+-- "guardada", "invalida" o "cooldown". Con cooldown no se escribe ya, pero
+-- la ultima pedida se guarda al acabar (ver cabecera)
+function Patio.elegirVista(jugador: Player, vista: any): (boolean, string)
+	if vista ~= "primera" and vista ~= "tercera" then
+		return false, "invalida"
+	end
+	local estado = vistas[jugador]
+	if not estado then
+		estado = { ultima = -math.huge, pendiente = nil }
+		vistas[jugador] = estado
+	end
+	local espera = estado.ultima + Patio.COOLDOWN_VISTA - os.clock()
+	if espera <= 0 then
+		estado.ultima = os.clock()
+		guardarVista(jugador, vista)
+		return true, "guardada"
+	end
+	local yaProgramada = estado.pendiente ~= nil
+	estado.pendiente = vista
+	if not yaProgramada then
+		task.delay(espera, function()
+			local pendiente = estado.pendiente
+			estado.pendiente = nil
+			if pendiente and vistas[jugador] == estado then
+				estado.ultima = os.clock()
+				guardarVista(jugador, pendiente)
+			end
+		end)
+	end
+	return false, "cooldown"
+end
 
 local function engancharPersonaje(jugador: Player)
 	jugador.CharacterAdded:Connect(function()
 		dentro[jugador] = nil
+		medidas[jugador] = nil
 		jugador:SetAttribute("EnPatio", false)
 	end)
 end
@@ -194,6 +309,8 @@ end
 Players.PlayerRemoving:Connect(function(jugador)
 	dentro[jugador] = nil
 	pendientes[jugador] = nil
+	medidas[jugador] = nil
+	vistas[jugador] = nil
 end)
 
 -- Al cambiar de diseno de bolsa se rehace la que lleva en las manos

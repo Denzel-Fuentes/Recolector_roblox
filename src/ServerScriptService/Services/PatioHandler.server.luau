@@ -3,8 +3,9 @@
 	PatioHandler
 	Bucle que decide quien esta dentro del patio (Services/Patio) cada 0.2 s.
 	Separado de Botin para que la pose de brazos y la primera persona no
-	dependan del estado de los montones. Y guarda la vista elegida en el
-	patio (CamaraEvent: "primera" | "tercera"; la aplica el cliente).
+	dependan del estado de los montones. Y pasa a Patio la vista elegida en
+	el patio (CamaraEvent: "primera" | "tercera"; la aplica el cliente), que
+	la valida y la guarda con cooldown (Patio.elegirVista).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,14 +16,9 @@ local Red = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Utili
 
 local Servicios = ServerScriptService:WaitForChild("Services")
 local Patio = require(Servicios:WaitForChild("Patio"))
-local Perfiles = require(Servicios:WaitForChild("Perfiles"))
 
 Red.evento("CamaraEvent").OnServerEvent:Connect(function(jugador, vista)
-	local perfil = Perfiles.obtener(jugador)
-	if perfil and (vista == "primera" or vista == "tercera") and perfil.camara ~= vista then
-		perfil.camara = vista
-		Perfiles.marcarSucio(jugador)
-	end
+	Patio.elegirVista(jugador, vista)
 end)
 
 local acumulado = 0

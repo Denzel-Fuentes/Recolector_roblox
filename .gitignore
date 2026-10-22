@@ -8,3 +8,7 @@
 /*.rbxl.lock
 
 sourcemap.json
+
+# Claude Code: copias aisladas de los agentes y ajustes locales
+/.claude/worktrees/
+/.claude/settings.local.json

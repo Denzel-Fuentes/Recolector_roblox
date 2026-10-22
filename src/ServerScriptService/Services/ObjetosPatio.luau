@@ -17,9 +17,11 @@
 
 	Quien reclama por "clic" tiene que estar a Alcance + 2 de la SUPERFICIE del
 	objeto (Utilidades/Geometria, la misma medida que usa el cliente para
-	resaltar). Al reclamar, el modelo vuela 0,25 s al torso del jugador
-	(feedback) y se destruye. (El Iman, que reclamaba sin distancia lo que
-	arrastraba, se fue con las mascotas el 3 oct.)
+	resaltar) y no haberse movido hace un momento mas de lo que puede andando
+	(Movimiento, P3 22 oct: tras un teletransporte o un speed hack, 2 s sin
+	recoger, motivo "movimiento"). Al reclamar, el modelo vuela 0,25 s al torso
+	del jugador (feedback) y se destruye. (El Iman, que reclamaba sin
+	distancia lo que arrastraba, se fue con las mascotas el 3 oct.)
 
 	Recoger no cuesta nada (diseno v2: sin energia); el unico limite es la
 	bolsa.
@@ -66,6 +68,7 @@ local Perfiles = require(Servicios:WaitForChild("Perfiles"))
 local Mejoras = require(Servicios:WaitForChild("Mejoras"))
 local Bolsa = require(Servicios:WaitForChild("Bolsa"))
 local AvisosMundo = require(Servicios:WaitForChild("AvisosMundo"))
+local Movimiento = require(Servicios:WaitForChild("Movimiento"))
 
 local NotificacionEvent = Red.evento("NotificacionEvent")
 
@@ -215,13 +218,19 @@ local function encimaDe(obj: Objeto): Vector3
 	return modelo:GetPivot().Position + Vector3.new(0, 1.5, 0)
 end
 
-local function alAlcance(jugador: Player, obj: Objeto): boolean
+-- Al alcance de la mano: (ok, motivo si no). Recien llegado de un salto que
+-- no dio el servidor (Movimiento), nada lo esta: lo que tiene delante no lo
+-- alcanzo andando
+local function alAlcance(jugador: Player, obj: Objeto): (boolean, string)
+	if Movimiento.sospechoso(jugador) then
+		return false, "movimiento"
+	end
 	local personaje = jugador.Character
 	local root = personaje and personaje:FindFirstChild("HumanoidRootPart")
 	if not root or not root:IsA("BasePart") then
-		return false
+		return false, "lejos"
 	end
-	return Geometria.distanciaASuperficie(obj.modelo, root.Position) <= Mejoras.valor(jugador, "Alcance") + 2
+	return Geometria.distanciaASuperficie(obj.modelo, root.Position) <= Mejoras.valor(jugador, "Alcance") + 2, "lejos"
 end
 
 -- Mete el item en la bolsa del jugador. false si no cabe. Recoger NUNCA paga:
@@ -323,8 +332,11 @@ function ObjetosPatio.reclamar(jugador: Player, objetoId: string, origen: string
 	if obj.reclamadoPor then
 		return false, "yaReclamado"
 	end
-	if (origen == "clic" or origen == "mira") and not alAlcance(jugador, obj) then
-		return false, "lejos"
+	if origen == "clic" or origen == "mira" then
+		local cerca, motivoLejos = alAlcance(jugador, obj)
+		if not cerca then
+			return false, motivoLejos
+		end
 	end
 	local puede, motivo = ObjetosPatio.puedeReclamar(jugador, obj)
 	if not puede then
@@ -366,7 +378,8 @@ function ObjetosPatio.retirar(objetoId: string, porQuien: Player?): boolean
 	return true
 end
 
--- Bolsas caidas de un jugador (para reciclarlas al salir)
+-- Bolsas caidas de un jugador, libres o no (Lanzamiento: el tope de bolsas
+-- en el suelo y reciclarlas al salir)
 function ObjetosPatio.bolsasDe(jugador: Player): { Objeto }
 	local lista = {}
 	for _, obj in objetos do

@@ -21,14 +21,36 @@
 	(castigaba al que se arriesga): los 30 s son el punto medio. Como ya no hay
 	reciclado de respaldo, una bolsa que queda en alto (el techo de la
 	recicladora, la tapa del contenedor) donde no se alcanza se deja en el
-	suelo junto al contenedor, del lado del que lanzo. Si el dueno sale, sus
-	bolsas caidas se reciclan para el (sin bonus): no pierde lo que llevaba.
+	suelo junto al contenedor, del lado del que lanzo. Cada jugador tiene
+	como mucho TOPE_BOLSAS_CAIDAS en el suelo: con una mas, la mas vieja se
+	recicla sola para el, sin bonus, y se le avisa (P3, 22 oct: sin tope, un
+	cliente que lanzara sin parar llenaria el patio de modelos).
+
+	Al salir (Perfiles.alSalir, que Guardado dispara ANTES del guardado de
+	salida; aqui se cobra sin ceder) se cobra para el, sin bonus, lo que
+	tenga en el suelo Y lo que tenga en el aire. Hasta el 22 oct se hacia en
+	PlayerRemoving, que no tiene orden con el guardado, y lo que estaba en el
+	aire se cobraba al caer, quiza despues de guardar (se perdia), o se
+	quedaba en el suelo de alguien que ya no estaba. Cada bolsa en el aire es
+	un Vuelo; lo resuelve una sola vez quien llegue primero (el bucle de
+	vuelo al entrar o al posarse, o la salida), y el otro ya no paga.
+
+	El servidor solo lanza bolsas LLENAS (P3, 22 oct; antes solo lo imponia el
+	cliente y uno modificado farmeaba aciertos, rachas, pedidos e insignias con
+	una pieza), valida el punto y la fuerza que llegan del remote
+	(argumentosValidos: finitos y dentro del mapa) y no deja lanzar a quien
+	acaba de moverse mas de lo que puede (Movimiento).
 
 	El primer lanzamiento de un perfil SIEMPRE entra (diseno v2): apunta
 	solo al contenedor GENERAL sin limite de brazo, y si aun asi algo lo tumbara,
 	cuenta como dentro al caer. El primer tiro tiene que salir bien para
-	enganchar. Las cuentas del arco estan en Utilidades/Trayectoria, las
-	mismas que dibujan la linea de ayuda en el cliente.
+	enganchar, pero no da mas de lo que da el Brazo: paga como mucho la
+	distancia del Brazo y no cuenta para records ni para mejorDistanciaAcierto
+	(de la que salen las insignias de distancia). Hasta el 22 oct contaba la
+	distancia real: un novato que lanzaba desde el patio cobraba +150 % y se
+	llevaba "Francotirador" con un record imposible de batir. Las cuentas del
+	arco estan en Utilidades/Trayectoria, las mismas que dibujan la linea de
+	ayuda en el cliente.
 
 	Records: el personal (mejorDistanciaAcierto) y el del servidor (en
 	memoria, por sesion) le salen al que los bate en una tarjeta grande
@@ -36,7 +58,14 @@
 
 	La parabola se simula aqui con PivotTo sobre un modelo anclado (con un par
 	de botes al caer y rebote contra la pared del contenedor): sin fisica
-	y determinista, el servidor decide si entro. Entre paso y paso se barre
+	y determinista, el servidor decide si entro. Cada paso es el EXACTO de
+	una aceleracion constante (pos += vel*dt + g*dt^2/2): hasta el 22 oct
+	era Euler (vel += g*dt; pos += vel*dt), que deja la bolsa 0,5*g*t*dt mas
+	baja que el arco de Trayectoria; a 60 fps caia 0,4 studs corta y a 30,
+	0,8: desde 20 studs la bolsa daba en la pared del contenedor al que se
+	apuntaba al centro (la boca de los de tipo mide 4,5 x 3,5), segun los fps
+	del servidor, y la linea de ayuda prometia un tiro que no se hacia
+	(lanzarATipo pasaba 2 de cada 6). Entre paso y paso se barre
 	una esfera del tamano de la bolsa contra el mundo solido (lo que tiene
 	CanQuery: el esqueleto whitebox, la colision de la recicladora, las
 	colinas; el decorado no): contra una pared rebota, sobre una superficie
@@ -75,6 +104,7 @@ local ObjetosPatio = require(Servicios:WaitForChild("ObjetosPatio"))
 local Mejoras = require(Servicios:WaitForChild("Mejoras"))
 local Cosmeticos = require(Servicios:WaitForChild("Cosmeticos"))
 local AvisosMundo = require(Servicios:WaitForChild("AvisosMundo"))
+local Movimiento = require(Servicios:WaitForChild("Movimiento"))
 local Senal = require(Utilidades:WaitForChild("Senal"))
 
 -- Un contenedor visto desde la bolsa en vuelo: la caja entera (sus paredes)
@@ -96,7 +126,21 @@ local FeedEvent = Red.evento("FeedEvent")
 
 type Item = TiposPatio.Item
 
+-- Una bolsa en el aire: lo que lleva, su modelo y si ya se resolvio (entro,
+-- se poso en el suelo o se cobro porque su dueno salio). El bucle de vuelo y
+-- la salida se la disputan: la resuelve el primero que llega (resolver) y el
+-- otro no hace nada. Sin ningun yield entre mirarlo y marcarlo, como el
+-- reclamo de ObjetosPatio.
+type Vuelo = {
+	items: { Item },
+	modelo: Model,
+	resuelto: boolean,
+}
+
 local Lanzamiento = {}
+
+-- Bolsas caidas que puede tener un jugador a la vez en el suelo (ver cabecera)
+Lanzamiento.TOPE_BOLSAS_CAIDAS = 3
 
 -- (jugador, distancia, racha) cada vez que una bolsa entra; la escuchan el
 -- Tutorial, los pedidos y las insignias
@@ -126,11 +170,99 @@ local RADIO_BOLSA = 0.7
 local CENTRO_BOLSA = Vector3.new(0, RADIO_BOLSA, 0)
 -- Normal mas vertical que esto = superficie donde posarse; si no, pared
 local NORMAL_SUELO = 0.7
+-- Lo que se acepta del remote (argumentosValidos). El punto apuntado puede
+-- quedar fuera de los muros Limite sin trampa: la camara del cliente puede
+-- estar lejos del personaje y, apuntando al cielo, manda un punto a 40 studs
+-- de ella; el margen lo deja pasar (solo da la direccion: el alcance lo pone
+-- el Brazo). Lo que no pasa es un NaN, un infinito o un punto a miles de
+-- studs, con los que la parabola y el barrido salian NaN.
+local LIMITE_NUMERO = 1e4
+local MARGEN_MAPA = 150
+local ALTURA_MIN_MAPA = -100
+local ALTURA_MAX_MAPA = 500
 
 local lanzamientos: { [Player]: number } = {}
+-- Las bolsas en el aire de cada jugador (ver Vuelo)
+local vuelos: { [Player]: { [Vuelo]: boolean } } = {}
 
 -- Record de distancia del servidor en esta sesion
 local recordServidor = 0
+
+-- Resuelve un vuelo si nadie lo hizo aun: true si le toca a quien llama
+-- (que entonces paga o lo deja en el suelo), false si ya estaba resuelto
+local function resolver(jugador: Player, vuelo: Vuelo): boolean
+	if vuelo.resuelto then
+		return false
+	end
+	vuelo.resuelto = true
+	local propios = vuelos[jugador]
+	if propios then
+		propios[vuelo] = nil
+		if next(propios) == nil then
+			vuelos[jugador] = nil
+		end
+	end
+	return true
+end
+
+-- La caja (en horizontal) que encierran los muros Limite, o nil si el mundo
+-- no los tiene. Son geometria horneada: se calcula una vez.
+type Caja = { minX: number, maxX: number, minZ: number, maxZ: number }
+local cajaMapa: Caja? = nil
+local function limitesDelMapa(): Caja?
+	if cajaMapa then
+		return cajaMapa
+	end
+	local caja: Caja? = nil
+	for _, inst in CollectionService:GetTagged("Limite") do
+		if inst:IsA("BasePart") then
+			local cf, tamano = inst.CFrame, inst.Size
+			-- La caja alineada de la parte (los muros son rectos, pero por si acaso)
+			local mitad = Vector3.new(
+				math.abs(cf.RightVector.X) * tamano.X + math.abs(cf.UpVector.X) * tamano.Y + math.abs(cf.LookVector.X) * tamano.Z,
+				0,
+				math.abs(cf.RightVector.Z) * tamano.X + math.abs(cf.UpVector.Z) * tamano.Y + math.abs(cf.LookVector.Z) * tamano.Z
+			) / 2
+			local p = cf.Position
+			if not caja then
+				caja = { minX = p.X - mitad.X, maxX = p.X + mitad.X, minZ = p.Z - mitad.Z, maxZ = p.Z + mitad.Z }
+			else
+				caja.minX = math.min(caja.minX, p.X - mitad.X)
+				caja.maxX = math.max(caja.maxX, p.X + mitad.X)
+				caja.minZ = math.min(caja.minZ, p.Z - mitad.Z)
+				caja.maxZ = math.max(caja.maxZ, p.Z + mitad.Z)
+			end
+		end
+	end
+	cajaMapa = caja
+	return caja
+end
+
+local function finito(x: number): boolean
+	return x == x and math.abs(x) < LIMITE_NUMERO
+end
+
+-- Si el punto y la fuerza que manda el cliente se pueden usar: un Vector3 y
+-- un numero, finitos (x == x descarta NaN; el limite, los infinitos) y el
+-- punto dentro del mapa con su margen (ver MARGEN_MAPA). Lo usan
+-- BotinHandler (antes de gastar el cooldown) y lanzarBolsa.
+function Lanzamiento.argumentosValidos(punto: any, fuerza: any): boolean
+	if typeof(punto) ~= "Vector3" or typeof(fuerza) ~= "number" then
+		return false
+	end
+	if not (finito(punto.X) and finito(punto.Y) and finito(punto.Z) and finito(fuerza)) then
+		return false
+	end
+	if punto.Y < ALTURA_MIN_MAPA or punto.Y > ALTURA_MAX_MAPA then
+		return false
+	end
+	local caja = limitesDelMapa()
+	if caja then
+		return punto.X >= caja.minX - MARGEN_MAPA and punto.X <= caja.maxX + MARGEN_MAPA
+			and punto.Z >= caja.minZ - MARGEN_MAPA and punto.Z <= caja.maxZ + MARGEN_MAPA
+	end
+	return true
+end
 
 -- Registra un acierto desde `distancia` (studs al contenedor) y devuelve
 -- (bonus total del tiro, racha, bonus de la distancia). Separado del vuelo
@@ -169,11 +301,32 @@ function Lanzamiento.recordServidor(): number
 	return recordServidor
 end
 
--- Una bolsa caida de alguien que sale se recicla para el, sin bonus (antes
--- del guardado final: no pierde lo que llevaba)
-local function reciclarAlSalir(dueno: Player, obj: TiposPatio.Objeto)
-	if ObjetosPatio.retirar(obj.id, dueno) then
-		Bolsa.reciclarSinBonus(dueno, obj.item.contenido or {})
+-- Recicla para su dueno, sin bonus, una bolsa caida (al salir, o la mas
+-- vieja al pasar el tope). Devuelve lo cobrado, o nil si ya no estaba (la
+-- recogio alguien en el mismo instante: mismo cerrojo que el reclamo).
+local function reciclarCaida(dueno: Player, obj: TiposPatio.Objeto): number?
+	if not ObjetosPatio.retirar(obj.id, dueno) then
+		return nil
+	end
+	return Bolsa.reciclarSinBonus(dueno, obj.item.contenido or {}).dinero
+end
+
+-- Con una bolsa caida mas que el tope, las mas viejas (las que se posaron
+-- antes: menor libreEn) se reciclan solas para su dueno y se le avisa
+local function aplicarTope(dueno: Player)
+	local caidas = ObjetosPatio.bolsasDe(dueno)
+	local sobran = #caidas - Lanzamiento.TOPE_BOLSAS_CAIDAS
+	if sobran <= 0 then
+		return
+	end
+	table.sort(caidas, function(a, b)
+		return (a.item.libreEn or 0) < (b.item.libreEn or 0)
+	end)
+	for i = 1, sobran do
+		local dinero = reciclarCaida(dueno, caidas[i])
+		if dinero then
+			NotificacionEvent:FireClient(dueno, Idioma.mensaje("PATIO.bolsaViejaReciclada", { dinero = Idioma.dinero(dinero) }), "aviso")
+		end
 	end
 end
 
@@ -255,8 +408,11 @@ local ASENTARSE = 0.35
 -- la pared del contenedor y aun asi acabo dentro de la caja, se deja fuera,
 -- pegada a el. Si quedo en alto, donde no se alcanza, se deja junto al
 -- contenedor del lado del jugador (ya no se recicla sola: si no, se perderia).
--- `rot` es el giro con el que acabo el vuelo.
-local function dejarEnElSuelo(jugador: Player, modelo: Model, pos: Vector3, chocoPared: boolean, cajaCF: CFrame, cajaSize: Vector3, items: { Item }, alturaSuelo: number, rot: CFrame)
+-- `rot` es el giro con el que acabo el vuelo. El vuelo se resuelve al
+-- registrarla, despues de que ruede: hasta entonces sigue "en el aire" para
+-- la salida de su dueno.
+local function dejarEnElSuelo(jugador: Player, vuelo: Vuelo, pos: Vector3, chocoPared: boolean, cajaCF: CFrame, cajaSize: Vector3, alturaSuelo: number, rot: CFrame)
+	local modelo = vuelo.modelo
 	local suelo = Vector3.new(pos.X, alturaSuelo, pos.Z)
 	local l = cajaCF:PointToObjectSpace(pos)
 	local sobreLaCaja = math.abs(l.X) <= cajaSize.X / 2 and math.abs(l.Z) <= cajaSize.Z / 2
@@ -296,13 +452,26 @@ local function dejarEnElSuelo(jugador: Player, modelo: Model, pos: Vector3, choc
 		end
 	end
 	apoyar(modelo, suelo, reposo)
+	-- Mientras rodaba pudo salir su dueno: entonces su salida ya la cobro, y
+	-- no se deja en el suelo de alguien que no esta
+	if not resolver(jugador, vuelo) then
+		modelo:Destroy()
+		return
+	end
+	if not jugador.Parent then
+		-- Se fue y su salida aun no llego (si no, estaria resuelto): se cobra
+		-- ya, sin bonus, antes de que se guarde
+		modelo:Destroy()
+		Bolsa.reciclarSinBonus(jugador, vuelo.items)
+		return
+	end
 	-- Solo del dueno hasta libreEn (cuenta desde que se posa); el atributo es
 	-- para la cuenta atras del cliente (TemporizadorBolsas)
 	local libreEn = workspace:GetServerTimeNow() + GameConfig.BOLSA_LIBRE_SEGUNDOS
 	local item: Item = {
 		tipo = "bolsa",
 		nombre = Textos.formatear(Textos.PATIO.bolsaDe, { dueno = jugador.DisplayName }),
-		contenido = items,
+		contenido = vuelo.items,
 		dueno = jugador.DisplayName,
 		duenoId = jugador.UserId,
 		libreEn = libreEn,
@@ -312,6 +481,7 @@ local function dejarEnElSuelo(jugador: Player, modelo: Model, pos: Vector3, choc
 	ObjetosPatio.registrar(item, modelo, nil)
 	Lanzamiento.registrarFallo(jugador)
 	Lanzamiento.alFallar:Fire(jugador)
+	aplicarTope(jugador)
 	-- Sin toast (6 oct): la cuenta atras encima de la bolsa ya dice que hay
 	-- que ir a por ella y cuanto queda (TemporizadorBolsas)
 end
@@ -322,20 +492,30 @@ local function distanciaA(contenedor: Mundo.Contenedor, desde: Vector3): number
 	return Vector3.new(zona.Position.X - desde.X, 0, zona.Position.Z - desde.Z).Magnitude
 end
 
-local function acertar(jugador: Player, modelo: Model, items: { Item }, distancia: number, material: string?)
-	modelo:Destroy()
+-- `primero`: el primer lanzamiento del perfil (entra siempre, sin limite de
+-- brazo): paga como mucho la distancia del Brazo y no es record de nadie
+local function acertar(jugador: Player, vuelo: Vuelo, distancia: number, material: string?, primero: boolean)
+	vuelo.modelo:Destroy()
+	if not resolver(jugador, vuelo) then
+		return -- su dueno salio con ella en el aire y ya se cobro
+	end
 	if not jugador.Parent then
-		-- Salio con la bolsa en el aire: se recicla sin bonus (su perfil sigue
-		-- ahi hasta el guardado final de DataService)
-		Bolsa.reciclarSinBonus(jugador, items)
+		-- Se fue y su salida aun no llego: se cobra ya, sin bonus
+		Bolsa.reciclarSinBonus(jugador, vuelo.items)
 		return
 	end
+	if primero then
+		distancia = math.min(distancia, Mejoras.valor(jugador, "Brazo"))
+	end
 	local bonus, racha, bonusDistancia = Lanzamiento.registrarAcierto(jugador, distancia)
-	local resumen = Bolsa.depositarItems(jugador, items, bonus, material)
+	local resumen = Bolsa.depositarItems(jugador, vuelo.items, bonus, material)
 	local redondeada = math.floor(distancia + 0.5)
 	Perfiles.estadistica(jugador, "aciertos", 1)
 	local recordAntes = Perfiles.leerEstadistica(jugador, "mejorDistanciaAcierto")
-	Perfiles.estadisticaMaxima(jugador, "mejorDistanciaAcierto", redondeada)
+	if not primero then
+		-- De aqui salen tambien las insignias de distancia (Insignias)
+		Perfiles.estadisticaMaxima(jugador, "mejorDistanciaAcierto", redondeada)
+	end
 	-- Sin toast (peticion del usuario, 5 oct): letras grandes y efectos en el
 	-- cliente (Celebraciones) con el desglose: dinero, distancia, bonus,
 	-- racha y separacion
@@ -351,11 +531,12 @@ local function acertar(jugador: Player, modelo: Model, items: { Item }, distanci
 		malSeparadas = resumen.malSeparadas,
 		posicion = if contenedor then contenedor.zona.Position else nil,
 	})
-	-- Records (desde la distancia minima con bonus: a quemarropa no cuenta).
-	-- Al que lo bate, una tarjeta grande (NotificacionEvent "record",
-	-- "distancia|servidor|personal"; 7 oct: en el feed se leia muy pequeno);
-	-- a los demas, el del servidor en el feed (la senal social)
-	if DefinicionesPunteria.cuentaParaRacha(distancia) then
+	-- Records (desde la distancia minima con bonus: a quemarropa no cuenta;
+	-- el primer tiro tampoco). Al que lo bate, una tarjeta grande
+	-- (NotificacionEvent "record", "distancia|servidor|personal"; 7 oct: en
+	-- el feed se leia muy pequeno); a los demas, el del servidor en el feed
+	-- (la senal social)
+	if not primero and DefinicionesPunteria.cuentaParaRacha(distancia) then
 		if redondeada > recordServidor then
 			recordServidor = redondeada
 			NotificacionEvent:FireClient(jugador, tostring(redondeada) .. "|servidor", "record")
@@ -373,8 +554,13 @@ local function acertar(jugador: Player, modelo: Model, items: { Item }, distanci
 end
 
 -- fuerza 0..1: la carga limita el alcance (fuerza 1 = el Brazo del jugador).
--- Devuelve (ok, motivo).
+-- Devuelve (ok, motivo); motivos de rechazo: "argumentos", "cooldown",
+-- "sinPersonaje", "movimiento", "nadaQueLanzar", "bolsaNoLlena",
+-- "demasiadoCerca".
 function Lanzamiento.lanzarBolsa(jugador: Player, punto: Vector3, fuerza: number): (boolean, string)
+	if not Lanzamiento.argumentosValidos(punto, fuerza) then
+		return false, "argumentos"
+	end
 	local ahora = os.clock()
 	if ahora - (lanzamientos[jugador] or 0) < COOLDOWN then
 		return false, "cooldown"
@@ -386,9 +572,19 @@ function Lanzamiento.lanzarBolsa(jugador: Player, punto: Vector3, fuerza: number
 	if not root or not root:IsA("BasePart") or not general then
 		return false, "sinPersonaje"
 	end
+	-- Acaba de moverse mas de lo que puede andando (Movimiento): ese tiro no
+	-- se lo gano caminando hasta aqui
+	if Movimiento.sospechoso(jugador) then
+		return false, "movimiento"
+	end
 	local zona = general.zona
 	if Bolsa.cuenta(jugador) == 0 then
 		return false, "nadaQueLanzar"
+	end
+	-- Solo se lanza la bolsa llena (decision del usuario, 29 sep). El cliente
+	-- ni lo intenta antes; el servidor lo impone desde el 22 oct (P3)
+	if not Bolsa.estaLlena(jugador) then
+		return false, "bolsaNoLlena"
 	end
 	local origen = Trayectoria.origen(root.Position)
 	-- A quemarropa de cualquiera de los cinco no se lanza (se entrega a mano)
@@ -494,8 +690,19 @@ function Lanzamiento.lanzarBolsa(jugador: Player, punto: Vector3, fuerza: number
 	paramsVuelo.FilterType = Enum.RaycastFilterType.Exclude
 	paramsVuelo.FilterDescendantsInstances = excluirVuelo
 
-	local vuelo = Trayectoria.vuelo(alcance)
-	local v0 = Trayectoria.velocidadInicial(origen, objetivo, vuelo)
+	-- Desde aqui (sin haber cedido desde que se vacio la bolsa) lo que lleva
+	-- esta en el aire: si su dueno sale antes de que se resuelva, lo cobra la
+	-- salida (cobrarAlSalir)
+	local vuelo: Vuelo = { items = items, modelo = modelo, resuelto = false }
+	local propios = vuelos[jugador]
+	if not propios then
+		propios = {}
+		vuelos[jugador] = propios
+	end
+	propios[vuelo] = true
+
+	local duracion = Trayectoria.vuelo(alcance)
+	local v0 = Trayectoria.velocidadInicial(origen, objetivo, duracion)
 
 	-- Parabola integrada paso a paso (no en forma cerrada) para poder rebotar:
 	-- al tocar el suelo la bolsa bota un par de veces perdiendo velocidad, y
@@ -526,8 +733,11 @@ function Lanzamiento.lanzarBolsa(jugador: Player, punto: Vector3, fuerza: number
 			ultimo = ahora2
 			local t = ahora2 - t0
 			local anterior = pos
+			-- Paso exacto con aceleracion constante: la bolsa sigue el arco de
+			-- Trayectoria sean cuales sean los fps (ver cabecera; con Euler caia
+			-- 0,5*g*t*dt mas baja)
+			pos += vel * dt + 0.5 * GRAVEDAD * dt * dt
 			vel += GRAVEDAD * dt
-			pos += vel * dt
 			local paso = pos - anterior
 			if paso.Magnitude > 1e-3 then
 				local choque = workspace:Spherecast(anterior + CENTRO_BOLSA, RADIO_BOLSA, paso, paramsVuelo)
@@ -570,7 +780,7 @@ function Lanzamiento.lanzarBolsa(jugador: Player, punto: Vector3, fuerza: number
 					porLaBoca = true -- ya estaba sobre la boca y sigue bajando
 				end
 				if porLaBoca and d.abierto then
-					acertar(jugador, modelo, items, distanciaA(d.contenedor, origen), d.contenedor.material)
+					acertar(jugador, vuelo, distanciaA(d.contenedor, origen), d.contenedor.material, primero)
 					return
 				elseif porLaBoca then
 					-- Contenedor cerrado (tipo aun bloqueado): rebota en la tapa
@@ -616,11 +826,11 @@ function Lanzamiento.lanzarBolsa(jugador: Player, punto: Vector3, fuerza: number
 				pos = Vector3.new(pos.X, suelo, pos.Z)
 				if botes >= BOTES_MAX or -vel.Y < VELOCIDAD_BOTE_MIN then
 					if primero then
-						acertar(jugador, modelo, items, distanciaA(general, origen), nil)
+						acertar(jugador, vuelo, distanciaA(general, origen), nil, true)
 						return
 					end
 					local d = chocoCon or dianaCercana(pos)
-					dejarEnElSuelo(jugador, modelo, pos, chocoCon ~= nil, d.cajaCF, d.cajaSize, items, suelo, rot)
+					dejarEnElSuelo(jugador, vuelo, pos, chocoCon ~= nil, d.cajaCF, d.cajaSize, suelo, rot)
 					return
 				end
 				botes += 1
@@ -629,26 +839,53 @@ function Lanzamiento.lanzarBolsa(jugador: Player, punto: Vector3, fuerza: number
 			end
 			if t > GameConfig.VIDA_PROYECTIL then
 				if primero then
-					acertar(jugador, modelo, items, distanciaA(general, origen), nil)
+					acertar(jugador, vuelo, distanciaA(general, origen), nil, true)
 					return
 				end
 				local d = chocoCon or dianaCercana(pos)
-				dejarEnElSuelo(jugador, modelo, pos, chocoCon ~= nil, d.cajaCF, d.cajaSize, items, suelo, rot)
+				dejarEnElSuelo(jugador, vuelo, pos, chocoCon ~= nil, d.cajaCF, d.cajaSize, suelo, rot)
 				return
 			end
 			RunService.Heartbeat:Wait()
+		end
+		-- El modelo desaparecio en el aire: si fue la salida de su dueno, ya
+		-- esta cobrado; si fue otra cosa (no deberia), se cobra sin bonus para
+		-- que lo que llevaba no se pierda
+		if resolver(jugador, vuelo) then
+			Bolsa.reciclarSinBonus(jugador, items)
 		end
 	end)
 	return true, "lanzado"
 end
 
-function Lanzamiento.iniciar()
-	game:GetService("Players").PlayerRemoving:Connect(function(jugador)
-		lanzamientos[jugador] = nil
-		-- Sus bolsas caidas se reciclan para el antes del guardado final
-		for _, obj in ObjetosPatio.bolsasDe(jugador) do
-			reciclarAlSalir(jugador, obj)
+-- Lo que el jugador deja en el patio al salir, cobrado para el sin bonus:
+-- lo que tiene en el aire y sus bolsas caidas. Lo llama Perfiles.alSalir
+-- (Guardado lo dispara ANTES del guardado de salida, una vez por jugador,
+-- tambien en el cierre del servidor) y no cede en ningun momento: el
+-- guardado empieza en cuanto acaba. Las pruebas lo llaman directamente.
+function Lanzamiento.cobrarAlSalir(jugador: Player)
+	lanzamientos[jugador] = nil
+	local propios = vuelos[jugador]
+	vuelos[jugador] = nil
+	if propios then
+		for vuelo in propios do
+			if not vuelo.resuelto then
+				vuelo.resuelto = true
+				vuelo.modelo:Destroy()
+				Bolsa.reciclarSinBonus(jugador, vuelo.items)
+			end
 		end
+	end
+	for _, obj in ObjetosPatio.bolsasDe(jugador) do
+		reciclarCaida(jugador, obj)
+	end
+end
+
+function Lanzamiento.iniciar()
+	Perfiles.alSalir:Connect(Lanzamiento.cobrarAlSalir)
+	game:GetService("Players").PlayerRemoving:Connect(function(jugador)
+		-- Solo limpieza: el dinero ya lo dejo cobrarAlSalir en el perfil
+		lanzamientos[jugador] = nil
 	end)
 end
 
