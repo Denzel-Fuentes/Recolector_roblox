@@ -30,11 +30,19 @@ GameConfig.REINTENTOS_DATASTORE = 3
 -- seguidos sin escribir: un servidor vivo nunca llega). Si esta viva (el
 -- jugador acaba de cambiar de servidor y el otro aun guarda su salida), se
 -- reintenta cada SESION_REINTENTO s y a los SESION_ESPERA_ROBO s se roba.
--- Un reintento sin escribir no gasta el limite de 1 escritura cada 6 s por
+-- SESION_ESPERA_ROBO va por encima del peor caso de una salida lenta (cola
+-- detras de un autoguardado, 3 intentos con sus esperas y los reintentos de
+-- salida): robar antes dejaria sin guardar lo ultimo que se jugo alli. Un
+-- reintento sin escribir no gasta el limite de 1 escritura cada 6 s por
 -- clave.
 GameConfig.SESION_CADUCA = 600
-GameConfig.SESION_ESPERA_ROBO = 20
+GameConfig.SESION_ESPERA_ROBO = 60
 GameConfig.SESION_REINTENTO = 5
+-- Si el guardado de salida falla con la sesion aun nuestra, se reintenta
+-- REINTENTOS_SALIDA veces mas, cada ESPERA_REINTENTO_SALIDA s, sin soltar el
+-- turno de la clave, antes de dar el perfil por perdido
+GameConfig.REINTENTOS_SALIDA = 2
+GameConfig.ESPERA_REINTENTO_SALIDA = 5
 -- Si la carga falla las REINTENTOS_DATASTORE veces, se juega con un perfil
 -- que no se guarda y se reintenta en segundo plano: la primera vez a los
 -- tantos segundos, y cada vez el doble (hasta 5 minutos) mientras siga

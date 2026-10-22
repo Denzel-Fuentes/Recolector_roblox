@@ -176,9 +176,10 @@ Perfiles.MIGRACIONES = {
 
 -- Migra (version a version, hasta `hasta`; por defecto VERSION_PERFIL),
 -- rellena lo que falte con el perfil por defecto sin tocar lo que ya hay y
--- borra lo OBSOLETO. Un perfil de una version MAS NUEVA (otro servidor con
--- codigo mas reciente) conserva su version: no se le baja, y sus campos
--- desconocidos se guardan tal cual.
+-- borra lo OBSOLETO. Un perfil de una version MAS NUEVA (lo escribio un
+-- servidor con codigo mas reciente) conserva su version y no se le borra
+-- nada (lo que aqui es obsoleto alli puede volver a usarse): solo se
+-- rellena para poder jugarlo. Guardado no lo guarda (prepararPerfil).
 function Perfiles.completar(datos: any, hasta: number?): Perfil
 	local objetivo = hasta or GameConfig.VERSION_PERFIL
 	local base = Perfiles.porDefecto()
@@ -194,8 +195,10 @@ function Perfiles.completar(datos: any, hasta: number?): Perfil
 		end
 		datos.version = v
 	end
-	for _, clave in OBSOLETOS do
-		datos[clave] = nil
+	if desde <= objetivo then
+		for _, clave in OBSOLETOS do
+			datos[clave] = nil
+		end
 	end
 	for clave, valorDefecto in pairs(base :: any) do
 		local v = datos[clave]
@@ -256,6 +259,18 @@ end
 
 function Perfiles.estaCargado(jugador: Player): boolean
 	return cargados[jugador] == true
+end
+
+-- Un perfil provisional (no se pudo leer el DataStore al entrar) pasa a
+-- guardable sin sustituirlo: la carga en segundo plano vio que no habia
+-- nada guardado, asi que lo jugado mientras tanto es su partida
+function Perfiles.marcarCargado(jugador: Player)
+	if not perfiles[jugador] then
+		return
+	end
+	cargados[jugador] = true
+	sucios[jugador] = true
+	jugador:SetAttribute("PerfilListo", true)
 end
 
 function Perfiles.quitar(jugador: Player)

@@ -5,8 +5,9 @@
 	publica los valores de cada jugador (y al salir, en Perfiles.alSalir),
 	cada INTERVALO_LECTURA lee los primeros puestos y los manda a todos
 	(RankingsEvent). Un cliente que acaba de entrar pide la ultima lectura con
-	RankingsEvent:FireServer(). Al cerrar el servidor se publica a quien
-	quede y se esperan las escrituras en curso (antes se perdian).
+	RankingsEvent:FireServer(). Al cerrar el servidor se esperan las
+	escrituras en curso (antes se perdian); las de los jugadores que quedan
+	las lanza su alSalir, que el cierre de Guardado dispara.
 ]]
 
 local Players = game:GetService("Players")
@@ -48,10 +49,11 @@ Perfiles.alSalir:Connect(function(jugador)
 	Rankings.olvidar(jugador)
 end)
 
+-- Al cerrar no se republica: el cierre de Guardado hace salir a cada jugador
+-- y alSalir (arriba) publica. Se cede un momento para que esas escrituras
+-- empiecen y se esperan.
 game:BindToClose(function()
-	for _, jugador in Players:GetPlayers() do
-		task.spawn(Rankings.publicar, jugador)
-	end
+	task.wait()
 	Rankings.esperarEscrituras(25)
 end)
 
