@@ -33,16 +33,16 @@ export type Insignia = {
 local DefinicionesInsignias = {}
 
 DefinicionesInsignias.LISTA = {
-	{ id = "primerReciclaje", nombre = "Primer reciclaje", descripcion = "Recicla tu primera bolsa", icono = "bolsa", badgeId = 0, estadistica = "depositos", meta = 1 },
-	{ id = "primerAcierto", nombre = "¡Dentro!", descripcion = "Encesta tu primera bolsa", icono = "lanzar", badgeId = 0, estadistica = "aciertos", meta = 1 },
-	{ id = "tiro30", nombre = "Brazo fuerte", descripcion = "Encesta desde 30 m", icono = "lanzar", badgeId = 0, estadistica = "mejorDistanciaAcierto", meta = 30 },
+	{ id = "primerReciclaje", nombre = "Primer reciclaje", descripcion = "Recicla tu primera bolsa", icono = "bolsa", badgeId = 631345206120928, estadistica = "depositos", meta = 1 },
+	{ id = "primerAcierto", nombre = "¡Dentro!", descripcion = "Encesta tu primera bolsa", icono = "lanzar", badgeId = 3953566545203854, estadistica = "aciertos", meta = 1 },
+	{ id = "tiro30", nombre = "Brazo fuerte", descripcion = "Encesta desde 30 m", icono = "lanzar", badgeId = 1648592040983966, estadistica = "mejorDistanciaAcierto", meta = 30 },
 	{ id = "tiro60", nombre = "Francotirador", descripcion = "Encesta desde 60 m", icono = "lanzar", badgeId = 0, estadistica = "mejorDistanciaAcierto", meta = 60 },
-	{ id = "racha5", nombre = "En racha", descripcion = "Encesta 5 seguidas", icono = "estrella", badgeId = 0, estadistica = "rachaMaxima", meta = 5 },
+	{ id = "racha5", nombre = "En racha", descripcion = "Encesta 5 seguidas", icono = "estrella", badgeId = 2634568567143469, estadistica = "rachaMaxima", meta = 5 },
 	{ id = "racha10", nombre = "Imparable", descripcion = "Encesta 10 seguidas", icono = "estrella", badgeId = 0, estadistica = "rachaMaxima", meta = 10 },
 	{ id = "piezas1000", nombre = "Reciclador", descripcion = "Recicla 1.000 piezas", icono = "bolsa", badgeId = 0, estadistica = "objetosReciclados", meta = 1000 },
 	{ id = "piezas10000", nombre = "Gran reciclador", descripcion = "Recicla 10.000 piezas", icono = "bolsa", badgeId = 0, estadistica = "objetosReciclados", meta = 10000 },
 	{ id = "separadas500", nombre = "Separa bien", descripcion = "Recicla 500 piezas en su contenedor de color", icono = "setPapel", badgeId = 0, estadistica = "piezasSeparadas", meta = 500 },
-	{ id = "primerTesoro", nombre = "Buscatesoros", descripcion = "Encuentra un tesoro en la basura", icono = "cofre", badgeId = 0, estadistica = "tesorosEncontrados", meta = 1 },
+	{ id = "primerTesoro", nombre = "Buscatesoros", descripcion = "Encuentra un tesoro en la basura", icono = "cofre", badgeId = 1640127059845951, estadistica = "tesorosEncontrados", meta = 1 },
 	{ id = "dinero10k", nombre = "Ahorrador", descripcion = "Gana $10.000 en total", icono = "billete", badgeId = 0, estadistica = "dineroGanadoTotal", meta = 10000 },
 	{ id = "dinero1M", nombre = "Millonario", descripcion = "Gana $1.000.000 en total", icono = "billete", badgeId = 0, estadistica = "dineroGanadoTotal", meta = 1000000 },
 	{ id = "mejoraMax", nombre = "A tope", descripcion = "Lleva una mejora al máximo", icono = "bota", badgeId = 0, mejorasAlMaximo = 1 },
