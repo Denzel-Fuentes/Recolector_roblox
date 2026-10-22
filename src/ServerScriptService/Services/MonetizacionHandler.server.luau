@@ -2,8 +2,10 @@
 --[[
 	MonetizacionHandler
 	Cablea MarketplaceService con el modulo Monetizacion:
-	  - ProcessReceipt (Developer Products), idempotente;
-	  - PromptGamePassPurchaseFinished (pases): marca la cache y avisa;
+	  - ProcessReceipt (Developer Products): idempotente, y PurchaseGranted
+	    solo con la compra ya guardada (Monetizacion.procesarRecibo);
+	  - PromptGamePassPurchaseFinished (pases): marca la cache, dispara
+	    Monetizacion.alComprarPase y avisa;
 	  - al cargar el perfil, consulta los pases reales.
 
 	El cliente lanza los prompts de compra directamente con MarketplaceService
@@ -33,9 +35,8 @@ MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(jugador, game
 	if not comprado then
 		return
 	end
-	local pase = Productos.pasePorGamePassId(gamePassId)
+	local pase = Monetizacion.registrarCompraPase(jugador, gamePassId)
 	if pase then
-		Monetizacion.marcarPase(jugador, pase.id)
 		NotificacionEvent:FireClient(jugador, Idioma.mensaje("NOTIFICACIONES.compraRobux", { nombre = Idioma.mensajeNombre("Pases", pase) }), "exito")
 	end
 end)

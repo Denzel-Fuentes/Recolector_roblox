@@ -7,19 +7,30 @@
 	=== Pases ===
 	Al entrar se consulta UserOwnsGamePassAsync para cada pase con id real y se
 	cachea en perfil.pasesCache (para que el cliente pinte "Comprado" sin
-	preguntar). PromptGamePassPurchaseFinished actualiza la cache al instante.
+	preguntar). PromptGamePassPurchaseFinished actualiza la cache al instante
+	(registrarCompraPase) y dispara alComprarPase.
 
-	MODO DEV: en Studio, con GameConfig.PASES_DEV_EN_STUDIO, todos los pases
-	cuentan como comprados para poder probar sus efectos sin ids reales.
-	/pases off (Admin) lo apaga en la sesion para probar el juego sin ellos.
+	MODO DEV: SOLO EN STUDIO, con GameConfig.PASES_DEV_EN_STUDIO, todos los
+	pases cuentan como comprados para poder probar sus efectos sin ids reales.
+	/pases on|off (Admin, que tambien es solo de Studio) lo cambia en la
+	sesion. Fuera de Studio fijarModoDev no hace nada y modoDev() es siempre
+	false: antes, un /pases on en el juego publicado daba todos los pases a
+	todo el servidor. "Estar en Studio" es esStudio(), sustituible en pruebas.
 
 	=== Recibos (Developer Products) ===
-	ProcessReceipt tiene que ser IDEMPOTENTE: Roblox puede reintentar el mismo
-	recibo si el servidor no respondio. Por eso:
-	  - si perfil.recibos ya contiene el PurchaseId -> PurchaseGranted sin dar nada;
-	  - si el perfil no cargo (no se podra guardar) -> NotProcessedYet, y Roblox
-	    lo reintenta mas tarde en vez de perder la compra;
-	  - si no, se otorga, se anota el recibo y se devuelve PurchaseGranted.
+	ProcessReceipt tiene que ser IDEMPOTENTE (Roblox reintenta el mismo
+	recibo mientras no se le devuelva PurchaseGranted) y solo puede devolver
+	PurchaseGranted con la compra YA GUARDADA: si el servidor cae despues,
+	Roblox ya no lo reintenta. Por eso:
+	  - si el perfil aun no cargo, se espera (Perfiles.esperar, ESPERA_PERFIL
+	    s); sin perfil guardable -> NotProcessedYet, y Roblox lo reintenta;
+	  - si perfil.recibos ya tiene el PurchaseId (un reintento) no se da nada
+	    otra vez: solo se vuelve a guardar;
+	  - si no, se otorga y se anota el recibo en el perfil;
+	  - en los dos casos, Guardado.guardarAhora: PurchaseGranted solo si
+	    quedo escrito; si no, NotProcessedYet. Lo otorgado se queda en memoria
+	    con su recibo anotado: el reintento lo encuentra y no lo repite, y si
+	    el jugador se va, el guardado de salida lo persiste.
 	La lista de recibos se recorta a 50 (FIFO): mas que suficiente para los
 	reintentos, sin crecer para siempre.
 ]]
@@ -37,35 +48,57 @@ local Senal = require(Shared:WaitForChild("Utilidades"):WaitForChild("Senal"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
 local Perfiles = require(Servicios:WaitForChild("Perfiles"))
+local Guardado = require(Servicios:WaitForChild("Guardado"))
 
 local Monetizacion = {}
 
 Monetizacion.alCambiarPases = Senal.nueva() :: Senal.Senal<Player>
+-- (jugador, id del producto de Config/Productos) al OTORGAR un producto: una
+-- vez por compra (el reintento de un recibo ya otorgado no lo repite)
 Monetizacion.alComprarProducto = Senal.nueva() :: Senal.Senal<Player, string>
+-- (jugador, id del pase de Config/Productos) al completarse la compra de un
+-- pase (PromptGamePassPurchaseFinished con la compra hecha)
+Monetizacion.alComprarPase = Senal.nueva() :: Senal.Senal<Player, string>
 
-local modoDev = RunService:IsStudio() and GameConfig.PASES_DEV_EN_STUDIO
+-- Sustituibles en pruebas
+Monetizacion.esStudio = function(): boolean
+	return RunService:IsStudio()
+end
+Monetizacion.ESPERA_PERFIL = 10
+Monetizacion.jugadorPorId = function(userId: number): Player?
+	return Players:GetPlayerByUserId(userId)
+end
+
 local MAX_RECIBOS = 50
 
+-- Lo pedido (GameConfig o /pases); solo cuenta dentro de Studio
+local modoDevPedido = GameConfig.PASES_DEV_EN_STUDIO
+
 function Monetizacion.modoDev(): boolean
-	return modoDev
+	return modoDevPedido and Monetizacion.esStudio()
 end
 
 -- El cliente necesita saber si el modo dev esta activo para pintar los pases
 -- como comprados sin que eso se guarde en el perfil.
 Perfiles.extrasSnapshot = function(_jugador: Player)
-	return { modoDev = modoDev }
+	return { modoDev = Monetizacion.modoDev() }
 end
 
-function Monetizacion.fijarModoDev(activo: boolean)
-	modoDev = activo
+-- Solo en Studio. Devuelve si se aplico.
+function Monetizacion.fijarModoDev(activo: boolean): boolean
+	if not Monetizacion.esStudio() then
+		return false
+	end
+	modoDevPedido = activo
 	for _, jugador in Players:GetPlayers() do
 		Perfiles.marcarSucio(jugador)
 		Monetizacion.alCambiarPases:Fire(jugador)
 	end
+	return true
 end
 
 function Monetizacion.tienePase(jugador: Player, idPase: string): boolean
-	if modoDev then
+	if Monetizacion.modoDev() then
 		return true
 	end
 	local perfil = Perfiles.obtener(jugador)
@@ -109,6 +142,19 @@ function Monetizacion.marcarPase(jugador: Player, idPase: string)
 	Monetizacion.alCambiarPases:Fire(jugador)
 end
 
+-- La compra de un pase acaba de completarse (PromptGamePassPurchaseFinished):
+-- se anota en la cache y se avisa. Devuelve el pase (nil si el id no es
+-- de ninguno del catalogo).
+function Monetizacion.registrarCompraPase(jugador: Player, gamePassId: number): Productos.Pase?
+	local pase = Productos.pasePorGamePassId(gamePassId)
+	if not pase then
+		return nil
+	end
+	Monetizacion.marcarPase(jugador, pase.id)
+	Monetizacion.alComprarPase:Fire(jugador, pase.id)
+	return pase
+end
+
 -- Lo que hace cada producto al otorgarse lo decide el servicio dueno de ese
 -- efecto (p. ej. el Turbo de dinero), que se registra aqui: asi Monetizacion
 -- no depende de todos los sistemas que se venden.
@@ -135,19 +181,29 @@ local function recordarRecibo(perfil: Perfiles.Perfil, purchaseId: string)
 	end
 end
 
+local function guardado(jugador: Player): Enum.ProductPurchaseDecision
+	if Guardado.guardarAhora(jugador, "recibo") then
+		return Enum.ProductPurchaseDecision.PurchaseGranted
+	end
+	return Enum.ProductPurchaseDecision.NotProcessedYet
+end
+
 function Monetizacion.procesarRecibo(recibo: { [string]: any }): Enum.ProductPurchaseDecision
-	local jugador = Players:GetPlayerByUserId(recibo.PlayerId)
+	local jugador = Monetizacion.jugadorPorId(recibo.PlayerId)
 	if not jugador then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
-	local perfil = Perfiles.obtener(jugador)
+	-- Recien entrado: su perfil puede estar cargando todavia
+	local perfil = Perfiles.obtener(jugador) or Perfiles.esperar(jugador, Monetizacion.ESPERA_PERFIL)
 	if not perfil or not Perfiles.estaCargado(jugador) then
-		-- Sin perfil guardable no se puede garantizar que la compra persista.
+		-- Sin perfil guardable no se puede garantizar que la compra persista
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 	local purchaseId = tostring(recibo.PurchaseId)
 	if table.find(perfil.recibos, purchaseId) then
-		return Enum.ProductPurchaseDecision.PurchaseGranted
+		-- Ya otorgado: un reintento. No se da otra vez; solo se asegura que
+		-- quede guardado antes de confirmarlo
+		return guardado(jugador)
 	end
 	local producto = Productos.productoPorProductId(recibo.ProductId)
 	if not producto then
@@ -160,7 +216,7 @@ function Monetizacion.procesarRecibo(recibo: { [string]: any }): Enum.ProductPur
 	recordarRecibo(perfil, purchaseId)
 	Perfiles.estadistica(jugador, "comprasRobux", 1)
 	Perfiles.marcarSucio(jugador)
-	return Enum.ProductPurchaseDecision.PurchaseGranted
+	return guardado(jugador)
 end
 
 -- Punto de entrada para pruebas y para Admin: simula un recibo sin Robux.

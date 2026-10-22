@@ -11,13 +11,19 @@
 	que ya estan en el perfil, mas barato que engancharse a cada senal que
 	mueve una estadistica, y ningun modulo tiene que acordarse de avisar.
 
-	Los badgeId se rellenan despues de crearlos en el Creator Dashboard: a
-	quien ya tenia la insignia en el perfil se le otorga el Badge al entrar.
-	BadgeService va siempre en pcall y en su propio hilo (puede tardar o
-	fallar; nunca debe frenar el juego).
+	=== Badges de Roblox ===
+	Al entrar se pregunta de una vez que Badges tiene ya el jugador, con
+	CheckUserBadgesAsync en lotes de hasta LOTE ids (antes: un
+	UserHasBadgeAsync por insignia), y se guarda en una cache de la sesion.
+	Con ella se otorgan las que tenia en el perfil y aun no tiene en Roblox
+	(su Badge se creo despues) y, durante la partida, las nuevas, sin volver
+	a preguntar. BadgeService va siempre en pcall y en su propio hilo (puede
+	tardar o fallar; nunca debe frenar el juego). El servicio es sustituible
+	en pruebas (Insignias.servicio).
 ]]
 
 local BadgeService = game:GetService("BadgeService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
@@ -38,23 +44,107 @@ local Insignias = {}
 -- (jugador, id) cada insignia nueva
 Insignias.alConseguir = Senal.nueva() :: Senal.Senal<Player, string>
 
--- Otorga el Badge de Roblox si existe y aun no lo tiene
+-- BadgeService o un sustituto con CheckUserBadgesAsync y AwardBadge
+Insignias.servicio = BadgeService :: any
+-- Maximo de ids por llamada a CheckUserBadgesAsync (limite de Roblox)
+Insignias.LOTE = 10
+
+-- Por jugador: badgeId -> true (lo tiene) | false (no lo tiene). Sin
+-- entrada = no se sabe.
+local tiene: { [Player]: { [number]: boolean } } = {}
+-- Otorgamientos en curso (para no pedir el mismo dos veces a la vez)
+local otorgando: { [Player]: { [number]: boolean } } = {}
+-- Lo ultimo que respondio Roblox, para diagnostico (las pruebas lo leen)
+local diagnostico: { string } = {}
+
+local function anotar(texto: string)
+	-- Lo que responde un servicio de prueba se marca: no es Roblox
+	table.insert(diagnostico, if Insignias.servicio == BadgeService then texto else "(falso) " .. texto)
+	if #diagnostico > 30 then
+		table.remove(diagnostico, 1)
+	end
+end
+
+function Insignias.diagnostico(): { string }
+	return table.clone(diagnostico)
+end
+
+local function cacheDe(jugador: Player): { [number]: boolean }
+	local c = tiene[jugador]
+	if not c then
+		c = {}
+		tiene[jugador] = c
+	end
+	return c
+end
+
+-- Que Badges de `ids` tiene el jugador: pregunta en lotes de LOTE solo por
+-- los que no estan en la cache y la rellena. Devuelve cuantas llamadas hizo.
+-- Un lote que falla deja sus ids sin saber (se reintentaran).
+function Insignias.consultarBadges(jugador: Player, ids: { number }): number
+	local cache = cacheDe(jugador)
+	local faltan = {}
+	for _, id in ids do
+		if id ~= 0 and cache[id] == nil and not table.find(faltan, id) then
+			table.insert(faltan, id)
+		end
+	end
+	local llamadas = 0
+	for inicio = 1, #faltan, Insignias.LOTE do
+		local lote = table.move(faltan, inicio, math.min(inicio + Insignias.LOTE - 1, #faltan), 1, {})
+		llamadas += 1
+		local ok, resultado = pcall(function()
+			return Insignias.servicio:CheckUserBadgesAsync(jugador.UserId, lote)
+		end)
+		if ok and typeof(resultado) == "table" then
+			for _, id in lote do
+				cache[id] = table.find(resultado, id) ~= nil
+			end
+		else
+			anotar(string.format("CheckUserBadgesAsync(%d ids) fallo: %s", #lote, tostring(resultado)))
+		end
+	end
+	return llamadas
+end
+
+-- Si el jugador tiene ese Badge segun la cache (nil = no se sabe)
+function Insignias.tieneBadge(jugador: Player, badgeId: number): boolean?
+	local c = tiene[jugador]
+	return c and c[badgeId]
+end
+
+-- Otorga el Badge de Roblox de la insignia si existe y no lo tiene ya
 local function otorgarBadge(jugador: Player, def: DefinicionesInsignias.Insignia)
-	if def.badgeId == 0 then
+	local id = def.badgeId
+	if id == 0 then
 		return
 	end
+	local cache = cacheDe(jugador)
+	local enCurso = otorgando[jugador] or {}
+	otorgando[jugador] = enCurso
+	if cache[id] == true or enCurso[id] then
+		return
+	end
+	enCurso[id] = true
 	task.spawn(function()
-		local ok, tiene = pcall(function()
-			return BadgeService:UserHasBadgeAsync(jugador.UserId, def.badgeId)
-		end)
-		if ok and not tiene and jugador.Parent then
-			local otorgado, err = pcall(function()
-				return BadgeService:AwardBadge(jugador.UserId, def.badgeId)
+		if cache[id] == nil then
+			Insignias.consultarBadges(jugador, { id })
+		end
+		if cache[id] == false and jugador.Parent then
+			local ok, resultado = pcall(function()
+				return Insignias.servicio:AwardBadge(jugador.UserId, id)
 			end)
-			if not otorgado then
-				warn("[Insignias] no se pudo otorgar " .. def.id .. ": " .. tostring(err))
+			if ok and resultado == true then
+				cache[id] = true
+				anotar(string.format("AwardBadge %s (%d): otorgada", def.id, id))
+			elseif ok then
+				anotar(string.format("AwardBadge %s (%d): devolvio %s", def.id, id, tostring(resultado)))
+			else
+				anotar(string.format("AwardBadge %s (%d): error %s", def.id, id, tostring(resultado)))
+				warn("[Insignias] no se pudo otorgar " .. def.id .. ": " .. tostring(resultado))
 			end
 		end
+		enCurso[id] = nil
 	end)
 end
 
@@ -80,19 +170,39 @@ function Insignias.comprobar(jugador: Player): number
 	return nuevas
 end
 
+-- Al entrar: una consulta en lote de todos los Badges del juego y se
+-- otorgan los de las insignias que ya tenia en el perfil
+function Insignias.alEntrar(jugador: Player, perfil: Perfiles.Perfil): number
+	local ids = {}
+	for _, def in DefinicionesInsignias.LISTA do
+		if def.badgeId ~= 0 then
+			table.insert(ids, def.badgeId)
+		end
+	end
+	local llamadas = Insignias.consultarBadges(jugador, ids)
+	for _, def in DefinicionesInsignias.LISTA do
+		if perfil.logros[def.id] then
+			otorgarBadge(jugador, def)
+		end
+	end
+	return llamadas
+end
+
+-- Olvida la cache de un jugador (al salir; las pruebas, para empezar de cero)
+function Insignias.olvidar(jugador: Player)
+	tiene[jugador] = nil
+	otorgando[jugador] = nil
+end
+
 function Insignias.iniciar()
 	Perfiles.alCargar:Connect(function(jugador, perfil)
-		-- Las que ya tenia y cuyo Badge se creo despues
-		for _, def in DefinicionesInsignias.LISTA do
-			if perfil.logros[def.id] then
-				otorgarBadge(jugador, def)
-			end
-		end
+		task.spawn(Insignias.alEntrar, jugador, perfil)
 		Insignias.comprobar(jugador)
 	end)
 	Perfiles.alCambiar:Connect(function(jugador)
 		Insignias.comprobar(jugador)
 	end)
+	Players.PlayerRemoving:Connect(Insignias.olvidar)
 end
 
 return Insignias
