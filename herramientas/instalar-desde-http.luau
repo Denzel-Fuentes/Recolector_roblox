@@ -26,8 +26,11 @@ local BASE = "http://localhost:8123"
 
 HttpService.HttpEnabled = true
 
+-- Rojo sube los scripts con finales de linea LF aunque en disco esten en
+-- CRLF (core.autocrlf=true en Windows): se normaliza igual, o cada pasada
+-- reescribiria ~140 Source sin cambios y Rojo los volveria a parchear.
 local function get(ruta)
-	return HttpService:GetAsync(BASE .. ruta, true)
+	return (HttpService:GetAsync(BASE .. ruta, true):gsub("\r\n", "\n"))
 end
 
 local indice = HttpService:JSONDecode(get("/index.json"))
