@@ -4,6 +4,7 @@
 > - **Nombre (variante con verbo):** es **Recíclatas: Lanza la Basura** · en **Recíclatas: Throw the Trash** · pt **Recíclatas: Jogue o Lixo**. Sustituye a "Garbage Collector".
 > - **Servidores privados:** de pago, **50 Robux al mes**.
 > - **Consola:** apagada al abrir (se activará tras una pasada de mando).
+> - **Género:** Simulación → Simulador incremental (solo se puede cambiar cada 3 meses).
 > - Icono: la propuesta 1 (`thumbnails/icon_512.png`).
 
 > 22 oct 2026. Lo que se escribe en el Creator Dashboard para abrir el juego: nombre, descripción, género, dispositivos, servidores privados, icono y miniaturas, en **español (idioma fuente), inglés y portugués**. Usa la terminología del juego (`Config/Textos`, `Config/Traducciones/en` y `pt`) y solo promete lo que hay o lo que la economía v4 aprobada (`docs/Economia-v4.md`) añade antes de abrir; §2.6 dice de qué depende cada frase. Los recuentos de caracteres están comprobados.

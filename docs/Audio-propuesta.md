@@ -1,5 +1,7 @@
 # Propuesta de audio — Recíclatas
 
+> **Decisión del usuario (22 oct 2026):** se integran los **recomendados** de cada sonido y de la música, con la biblioteca con licencia incluida (Roblox, APMOfficial y ProSoundEffects). El usuario los escuchará jugando y cambiará los que no le gusten en `Config/Sonidos` (un id por clave).
+
 > 22 oct 2026. Hoy el juego no tiene ni un sonido. Esto es una **lista de candidatos para escuchar y aprobar**: no se ha insertado nada en el place ni se ha tocado código; otro paquete los integrará después. Cada sonido trae 2–3 candidatos con la recomendación marcada, el volumen de partida y si suena en 2D (interfaz, solo lo oye el jugador) o en 3D (en el mundo, con distancia).
 >
 > **Regla de licencia aplicada.** Solo audio que cualquier experiencia puede usar: el subido por **Roblox** (cuenta 1) y el de su **biblioteca con licencia** (los más de 100.000 efectos y pistas "de socios" que citan los documentos de Roblox). Esa biblioteca no está en la cuenta "Roblox", sino en dos cuentas verificadas: **APMOfficial** (música y jingles; cada ficha acaba en "Courtesy of APM Music") y **ProSoundEffects** (efectos; "Courtesy of Pro Sound Effects"). Las he tratado como "biblioteca con licencia", que es lo que pedía el encargo; si se quiere solo la cuenta "Roblox", ver §7, punto 6. Se descartó todo lo subido por otros creadores. Los 79 audios citados se comprobaron uno a uno el 22 oct: creador, publicado, gratis y visible en la Creator Store.
