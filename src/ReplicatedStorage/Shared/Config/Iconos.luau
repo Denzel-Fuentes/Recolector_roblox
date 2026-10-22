@@ -37,6 +37,7 @@ Iconos.IMAGENES = {
 	raton = 13443203578, -- Cursors/Classic
 	lata = 0,
 	flecha = 15403007921, -- Strength (brazo): fuerza de lanzamiento
+	sonido = 0, -- altavoz: el boton Sonido del HUD (glifo dibujado)
 
 	-- Paneles (prioridad 2)
 	estrella = 17368097932, -- Star

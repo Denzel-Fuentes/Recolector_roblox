@@ -29,6 +29,13 @@
 	Pruebas: workspace.RecicladoraEfectos lleva los atributos Lista, EnCinta y
 	Bloques de la del GENERAL, Vistas con cuantas hay listas y Cola con los
 	objetos que esperan en todas (lo lee PruebasCliente "recicladora").
+
+	Sonido (Client/Sonido): tres por recicladora, 3D a volumen bajo y con
+	poco alcance (Config/Sonidos: solo se oye la que esta cerca). El motor
+	de la trituradora suena siempre en bucle, como giran sus rodillos, y
+	triturando sube de tono y de volumen; la cinta, en bucle mientras lleva
+	basura (se pausa y sigue donde iba); la prensa, una vez al salir cada
+	bloque. Los bucles cuelgan de una parte de la maquina: se van con ella.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -41,6 +48,8 @@ local Datos = require(Shared:WaitForChild("Config"):WaitForChild("Recicladora"))
 local Utilidades = Shared:WaitForChild("Utilidades")
 local ModelosObjetos = require(Utilidades:WaitForChild("ModelosObjetos"))
 local Red = require(Utilidades:WaitForChild("Red"))
+
+local Sonido = require(script.Parent:WaitForChild("Sonido"))
 
 local RecicladoraEvent = Red.evento("RecicladoraEvent")
 
@@ -74,6 +83,12 @@ type Vista = {
 	anguloCinta: number,
 	anguloRampa: number,
 	desplazamiento: number,
+	-- Sonido: el motor (siempre) y la cinta (con basura), y en que estado se
+	-- dejaron (solo se tocan al cambiar)
+	sonidoTrituradora: Sonido.Bucle?,
+	sonidoCinta: Sonido.Bucle?,
+	triturandoSonaba: boolean,
+	cintaSonaba: boolean,
 }
 type Viaje = {
 	vista: Vista,
@@ -164,6 +179,10 @@ local function preparar(modelo: Model)
 		anguloCinta = 0,
 		anguloRampa = 0,
 		desplazamiento = 0,
+		sonidoTrituradora = nil,
+		sonidoCinta = nil,
+		triturandoSonaba = false,
+		cintaSonaba = false,
 	}
 	for _, p in Datos.RUTA_BASURA do
 		table.insert(v.rutaBasura, pivote:PointToWorldSpace(p * escala))
@@ -208,6 +227,20 @@ local function preparar(modelo: Model)
 	local molde = modelo:WaitForChild("BloqueMolde", 5)
 	v.molde = if molde and molde:IsA("Model") then molde else nil
 	encenderLuces(v, false)
+	-- Sonido: el motor en un rodillo de la trituradora (giran siempre: suena
+	-- siempre) y la cinta en uno de sus rodillos o sus listones
+	local motor = if #v.trituradora > 0 then v.trituradora[1].parte else nil
+	if motor then
+		v.sonidoTrituradora = Sonido.bucle("trituradora", { padre = motor })
+		local s = v.sonidoTrituradora
+		if s then
+			s.sonar()
+		end
+	end
+	local banda = if #v.cinta > 0 then v.cinta[1].parte elseif #v.listones > 0 then v.listones[1].parte else motor
+	if banda then
+		v.sonidoCinta = Sonido.bucle("cinta", { padre = banda })
+	end
 	vistas[v.clave] = v
 	contarVistas()
 	if v.clave == GENERAL then
@@ -357,6 +390,8 @@ local function sacarBloque(v: Vista)
 	b.WorldPivot = CFrame.new(centro.Position) * v.modelo:GetPivot().Rotation * CFrame.new(0, -tamano.Y / 2, 0)
 	b.Name = "Bloque"
 	b.Parent = efectos
+	-- La prensa, donde empieza la rampa
+	Sonido.tocar("prensa", { posicion = v.rutaBloque[1] or centro.Position })
 	table.insert(v.bloques, b)
 	actualizarBloques(v)
 	if #v.bloques > Datos.MAX_BLOQUES then
@@ -458,7 +493,29 @@ RunService.RenderStepped:Connect(function(dt)
 
 	local ahora = os.clock()
 	for _, v in vistas do
-		local giro = if ahora < v.triturandoHasta then Datos.GIRO_TRITURANDO else Datos.GIRO_TRITURADORA
+		local triturando = ahora < v.triturandoHasta
+		-- El motor sube de tono y de volumen mientras tritura
+		if triturando ~= v.triturandoSonaba then
+			v.triturandoSonaba = triturando
+			local motor = v.sonidoTrituradora
+			if motor then
+				motor.intensidad(if triturando then 1 else 0)
+			end
+		end
+		-- La cinta suena mientras lleva basura
+		local conBasura = v.enCinta > 0
+		if conBasura ~= v.cintaSonaba then
+			v.cintaSonaba = conBasura
+			local cinta = v.sonidoCinta
+			if cinta then
+				if conBasura then
+					cinta.sonar()
+				else
+					cinta.pausar()
+				end
+			end
+		end
+		local giro = if triturando then Datos.GIRO_TRITURANDO else Datos.GIRO_TRITURADORA
 		v.anguloTrituradora += dt * giro
 		for _, g in v.trituradora do
 			girar(g, v.anguloTrituradora)

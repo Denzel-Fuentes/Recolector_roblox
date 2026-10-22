@@ -20,6 +20,13 @@
 	{ tipo, contenedor, dinero, distancia?, bonusPct?, racha?, separadas,
 	malSeparadas, posicion? }. Una celebracion nueva corta la anterior.
 	PruebasCliente la dispara con ("celebracion") para verla sin lanzar.
+
+	Sonido (Client/Sonido), solo para quien cobra: la fanfarria "dentro" al
+	acertar (un tono mas alta si todo iba bien separado: la misma, mas
+	alegre, docs/Audio-propuesta §1.7), "contarDinero" en bucle mientras
+	cuenta la cifra y "cobro" cuando el dinero llega al contador. La musica
+	baja a la mitad mientras dura. El golpe de la bolsa en el contenedor no
+	va aqui: lo oyen todos (SonidosMundo, por RecicladoraEvent).
 ]]
 
 local Players = game:GetService("Players")
@@ -39,6 +46,7 @@ local Fusion = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("
 
 local Kit = require(script.Parent:WaitForChild("Kit"))
 local Escala = require(script.Parent:WaitForChild("Kit"):WaitForChild("Escala"))
+local Sonido = require(script.Parent.Parent:WaitForChild("Sonido"))
 
 local Children = Fusion.Children
 local peek = Fusion.peek
@@ -53,6 +61,17 @@ local TEXTURA_DESTELLO = "rbxasset://textures/particles/sparkles_main.dds"
 local DURACION = 2.4 -- de principio a fin
 local VUELO = 1.7 -- cuando el dinero sale volando al contador
 local FUNDIDO = 1.95 -- cuando se funde todo
+-- Lo que tarda el dinero en llegar al contador desde que sale (su Spring)
+local LLEGADA = 0.25
+-- La fanfarria cuando todo lo de la bolsa fue a su contenedor
+local TONO_SEPARADO = 1.06
+-- La musica, a este factor mientras dura la celebracion
+local ATENUACION = 0.5
+
+-- El bucle de contar la cifra: uno para todas (una celebracion corta la
+-- anterior) y quien lo puso en marcha, para no pararle la cuenta a la nueva
+local sonidoContar: Sonido.Bucle? = nil
+local contando: any = nil
 
 export type Datos = {
 	tipo: string,
@@ -301,6 +320,13 @@ local function celebrar(d: Datos)
 		efectoMundo(d.posicion, color)
 	end
 
+	-- Sonido: la musica baja mientras dura y, al acertar, la fanfarria
+	Sonido.atenuarMusica(ATENUACION, DURACION)
+	if d.tipo ~= "entrega" then
+		local bienSeparado = (d.separadas or 0) > 0 and (d.malSeparadas or 0) == 0
+		Sonido.tocar("dentro", { tono = if bienSeparado then TONO_SEPARADO else nil })
+	end
+
 	-- Linea de tiempo
 	escalaTitulo:set(1)
 	giroTitulo:set(0)
@@ -309,6 +335,13 @@ local function celebrar(d: Datos)
 			return
 		end
 		escalaDinero:set(1)
+		-- La cifra cuenta con su sonido en bucle
+		sonidoContar = sonidoContar or Sonido.bucle("contarDinero")
+		local bucle = sonidoContar
+		if bucle and d.dinero > 0 then
+			contando = s
+			bucle.sonar(true)
+		end
 		local t0 = os.clock()
 		while actual == s do
 			local t = math.min(1, (os.clock() - t0) / 0.6)
@@ -317,6 +350,11 @@ local function celebrar(d: Datos)
 				break
 			end
 			RunService.RenderStepped:Wait()
+		end
+		-- Acabo de contar (o la corto otra): fuera el bucle, si aun es el suyo
+		if bucle and contando == s then
+			contando = nil
+			bucle.parar()
 		end
 	end)
 	for i, escala in escalasPildora do
@@ -331,6 +369,13 @@ local function celebrar(d: Datos)
 			posDinero:set(destinoDinero())
 			escalaDinero:set(0.35)
 			escalaTitulo:set(0.6)
+		end
+	end)
+	-- Las monedas cuando el dinero llega al contador: unas decimas despues
+	-- del golpe y la fanfarria, para no pisarlos
+	task.delay(VUELO + LLEGADA, function()
+		if actual == s and d.dinero > 0 then
+			Sonido.tocar("cobro")
 		end
 	end)
 	task.delay(FUNDIDO, function()

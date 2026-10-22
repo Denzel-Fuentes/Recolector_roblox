@@ -177,6 +177,9 @@ GameConfig.COOLDOWN_REMOTE = 0.15
 -- que es lo que el servidor acepta por jugador.
 GameConfig.INTERVALO_RECOGIDA = 0.16
 GameConfig.DISTANCIA_INTERACCION = 12
+-- Entre dos cambios de ajustes (AjustesEvent): el servidor ignora los que
+-- llegan antes (Services/Ajustes) y el panel junta los seguidos en un envio
+GameConfig.COOLDOWN_AJUSTES = 0.25
 
 -- === Monetizacion ===
 -- En Studio, con esta bandera, todos los pases cuentan como comprados para

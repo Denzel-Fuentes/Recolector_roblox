@@ -269,6 +269,16 @@ DIBUJOS.camara = function(l, color)
 	forma(l, 0.42, 0.46, 0.16, 0.16, Paleta.UI_TINTA, 0.5)
 end
 
+-- Altavoz con dos ondas: el boton Sonido del HUD (ajustes de musica y
+-- efectos). Caja y cono del color; las ondas, barras amarillas que crecen
+DIBUJOS.sonido = function(l, color)
+	local c = color or Paleta.UI_CARTAS
+	forma(l, 0.08, 0.36, 0.2, 0.28, oscuro(c), 0.2)
+	forma(l, 0.22, 0.18, 0.24, 0.64, c, 0.3)
+	forma(l, 0.56, 0.35, 0.11, 0.3, Paleta.UI_PRIMARIO, 0.5)
+	forma(l, 0.76, 0.2, 0.11, 0.6, Paleta.UI_PRIMARIO, 0.5)
+end
+
 DIBUJOS.engranaje = function(l, color)
 	local c = color or GRIS
 	for i = 0, 3 do

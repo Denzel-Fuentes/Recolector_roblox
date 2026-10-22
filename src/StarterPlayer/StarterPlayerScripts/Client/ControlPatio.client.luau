@@ -35,6 +35,15 @@
 	esa direccion. Apuntar al hueco del Contenedor es la habilidad: la
 	ZonaAcierto no bloquea el raycast, asi que el rayo llega al piso interior
 	del contenedor.
+
+	Sonido (Client/Sonido, claves de Config/Sonidos): "carga" en bucle
+	mientras se mantiene F (una pasada dura lo que tarda en cargarse y se
+	sostiene arriba; sube de volumen con la carga), "bolsaLlena" una vez por
+	llenado y "denegado" al PULSAR para recoger con la bolsa llena (no en la
+	repeticion del clic mantenido: la pieza que la llena ya suena el timbre
+	y un "no" detras sobraria). El whoosh de la bolsa que sale no suena aqui
+	sino en la bolsa, para que lo oigan los demas (SonidosMundo, con la
+	fuerza que el servidor le apunta).
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -60,6 +69,7 @@ local Geometria = require(Utilidades:WaitForChild("Geometria"))
 
 local EstadoCliente = require(script.Parent:WaitForChild("EstadoCliente"))
 local LineaTrayectoria = require(script.Parent:WaitForChild("LineaTrayectoria"))
+local Sonido = require(script.Parent:WaitForChild("Sonido"))
 local UI = script.Parent:WaitForChild("UI")
 local Menu = require(UI:WaitForChild("Menu"))
 local Kit = require(UI:WaitForChild("Kit"))
@@ -106,6 +116,16 @@ end
 local function bolsaLlena(bolsa: any): boolean
 	return bolsa.capacidad > 0 and #bolsa.items >= bolsa.capacidad
 end
+
+-- El aviso de bolsa llena suena al llenarse, no cada vez que llega la bolsa
+local estabaLlena = bolsaLlena(EstadoCliente.bolsa)
+EstadoCliente.alCambiarBolsa:Connect(function(bolsa)
+	local llena = bolsaLlena(bolsa)
+	if llena and not estabaLlena then
+		Sonido.tocar("bolsaLlena")
+	end
+	estabaLlena = llena
+end)
 
 -- Un objeto es una pieza de montana (BasePart con ObjetoId) o un modelo con
 -- ObjetoId (tesoro metido en la montana, bolsa caida): lo primero que tenga
@@ -201,12 +221,17 @@ local ultimoId: string? = nil
 local ultimoIdEn = 0
 
 -- Con la bolsa llena no se pide nada: el HUD sacude la barra de bolsa
--- (antes era un toast del servidor). Una pieza de un tipo bloqueado SI se
--- pide aunque no se resalte: el servidor la rechaza con una burbuja con el
--- candado encima (AvisosMundo), que es como el jugador se entera.
-local function intentarReclamar(posPantalla: Vector2?)
+-- (antes era un toast del servidor) y, si es una pulsacion nueva (no la
+-- repeticion del clic mantenido), suena "denegado". Una pieza de un tipo
+-- bloqueado SI se pide aunque no se resalte: el servidor la rechaza con una
+-- burbuja con el candado encima (AvisosMundo), que es como el jugador se
+-- entera.
+local function intentarReclamar(posPantalla: Vector2?, pulsacion: boolean)
 	if bolsaLlena(EstadoCliente.bolsa) then
 		EstadoCliente.alRecogerConBolsaLlena:Fire()
+		if pulsacion then
+			Sonido.tocar("denegado")
+		end
 		return
 	end
 	local resultado = rayoDesdePantalla(posPantalla)
@@ -225,9 +250,10 @@ local function intentarReclamar(posPantalla: Vector2?)
 	end
 end
 
-local function recogerAhora()
+-- pulsacion: viene de pulsar (clic, X, RECOGER), no de mantener
+local function recogerAhora(pulsacion: boolean?)
 	ultimoIntento = os.clock()
-	intentarReclamar(posicionCursor())
+	intentarReclamar(posicionCursor(), pulsacion == true)
 end
 
 UserInputService.InputBegan:Connect(function(input, procesado)
@@ -236,11 +262,11 @@ UserInputService.InputBegan:Connect(function(input, procesado)
 	end
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		recogiendo = true
-		recogerAhora()
+		recogerAhora(true)
 	elseif input.KeyCode == Enum.KeyCode.ButtonX then
 		-- Gamepad: lo que hay en el centro de la pantalla
 		recogiendo = true
-		recogerAhora()
+		recogerAhora(true)
 	end
 end)
 
@@ -268,7 +294,7 @@ local function recoger(_nombre: string, estado: Enum.UserInputState)
 			return Enum.ContextActionResult.Pass
 		end
 		recogiendoTactil = true
-		recogerAhora()
+		recogerAhora(true)
 		return Enum.ContextActionResult.Sink
 	elseif estado == Enum.UserInputState.End or estado == Enum.UserInputState.Cancel then
 		recogiendoTactil = false
@@ -294,9 +320,30 @@ local function puntoObjetivo(): Vector3
 end
 
 local cargando: number? = nil -- os.clock() del inicio de la carga
+-- El sonido de la carga: uno solo, que se reinicia en cada pulsacion
+local sonidoCarga: Sonido.Bucle? = nil
+
+-- Deja la carga a cero, con su sonido parado y sin linea; devuelve cuando
+-- empezo (nil si no se estaba cargando)
+local function soltarCarga(): number?
+	local inicio = cargando
+	cargando = nil
+	local s = sonidoCarga
+	if s then
+		s.parar()
+	end
+	EstadoCliente.fijarCarga(0)
+	LineaTrayectoria.ocultar()
+	return inicio
+end
 
 local function lanzar(_nombre: string, estado: Enum.UserInputState)
 	if Menu.hayAbierto() then
+		-- Se abrio un panel con la carga a medias: al soltar se cancela (si
+		-- no, la carga y su sonido en bucle se quedaban puestos)
+		if cargando and estado ~= Enum.UserInputState.Begin then
+			soltarCarga()
+		end
 		return Enum.ContextActionResult.Pass
 	end
 	if estado == Enum.UserInputState.Begin then
@@ -304,13 +351,18 @@ local function lanzar(_nombre: string, estado: Enum.UserInputState)
 			return Enum.ContextActionResult.Pass
 		end
 		cargando = os.clock()
+		sonidoCarga = sonidoCarga or Sonido.bucle("carga")
+		local s = sonidoCarga
+		if s then
+			-- Una pasada dura la carga entera; luego se queda en su cola
+			s.durar(GameConfig.FUERZA_LANZAMIENTO.segundosCarga)
+			s.intensidad(0)
+			s.sonar(true)
+		end
 		return Enum.ContextActionResult.Sink
 	elseif estado == Enum.UserInputState.End or estado == Enum.UserInputState.Cancel then
-		local inicio = cargando
-		cargando = nil
 		local fuerza = EstadoCliente.cargaLanzamiento
-		EstadoCliente.fijarCarga(0)
-		LineaTrayectoria.ocultar()
+		local inicio = soltarCarga()
 		if inicio and estado == Enum.UserInputState.End and os.clock() - inicio >= GameConfig.FUERZA_LANZAMIENTO.minimo then
 			LanzarObjetoEvent:FireServer(puntoObjetivo(), math.max(fuerza, 0.15))
 		end
@@ -322,6 +374,10 @@ end
 RunService.RenderStepped:Connect(function()
 	if cargando then
 		EstadoCliente.fijarCarga((os.clock() - cargando) / GameConfig.FUERZA_LANZAMIENTO.segundosCarga)
+		local s = sonidoCarga
+		if s then
+			s.intensidad(EstadoCliente.cargaLanzamiento)
+		end
 		-- Ayuda de punteria en los primeros lanzamientos
 		LineaTrayectoria.dibujar(puntoObjetivo(), EstadoCliente.cargaLanzamiento)
 	end

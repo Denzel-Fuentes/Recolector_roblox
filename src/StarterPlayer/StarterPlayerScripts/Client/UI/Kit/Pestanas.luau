@@ -11,6 +11,9 @@
 
 	La seleccion es un Value que posee quien crea las pestanas: el panel
 	decide que se ve con Computed(use(seleccion)). Devuelve la barra.
+
+	Cambiar de pestana suena "pestana" (Client/Sonido); pulsar la que ya
+	esta elegida, nada.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,9 +22,12 @@ local Fusion = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("
 local Paleta = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("Paleta"))
 local Tema = require(script.Parent:WaitForChild("Tema"))
 local Studs = require(script.Parent:WaitForChild("Studs"))
+-- Kit -> UI -> Client
+local Sonido = require(script.Parent.Parent.Parent:WaitForChild("Sonido"))
 
 local Children = Fusion.Children
 local OnEvent = Fusion.OnEvent
+local peek = Fusion.peek
 
 type U<T> = Fusion.UsedAs<T>
 
@@ -72,6 +78,9 @@ return function(scope: any, p: Props): Frame
 					return if use(elegida) then 3 else 2
 				end),
 				[OnEvent("Activated")] = function()
+					if peek(p.Seleccion) ~= i then
+						Sonido.tocar("pestana")
+					end
 					p.Seleccion:set(i)
 					if p.alCambiar then
 						p.alCambiar(i)

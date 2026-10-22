@@ -115,9 +115,12 @@ scope:Pantalla({
 			Text = "",
 			AutoButtonColor = false,
 			-- PC: arriba a la izquierda (la botonera va a media altura).
-			-- Tactil: debajo de la botonera (2 x 88 a 0,8 = ~150 de alto)
+			-- Tactil: debajo de la botonera, con sus medidas (Kit/Tema;
+			-- desde el 22 oct son 3 filas: ~227 de alto)
 			Position = scope:Computed(function(use)
-				return if use(tactil) then UDim2.fromOffset(16, 176) else UDim2.fromOffset(16, 16)
+				return if use(tactil)
+					then UDim2.fromOffset(16, math.ceil(Tema.BOTONERA.ARRIBA_TACTIL + Tema.altoBotoneraTactil() + 10))
+					else UDim2.fromOffset(16, 16)
 			end),
 			Size = scope:Computed(function(use)
 				return UDim2.fromOffset(if use(tactil) then 240 else 330, 0)

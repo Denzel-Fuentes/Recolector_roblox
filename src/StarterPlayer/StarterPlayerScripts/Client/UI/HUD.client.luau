@@ -5,11 +5,13 @@
 	Diseno v2: en el patio la pantalla muestra solo lo que se usa al jugar
 	(bolsa, dinero, fuerza y el feed); el resto va a los botones.
 
-	  izquierda      botonera: Tienda (Q), Rebirth (R), Pedidos (P) y Camara
-	                 (V: primera/tercera persona en el patio, lote 9). Cada
-	                 boton de panel aparece cuando su panel existe
-	                 (UI/<Nombre>), asi cada lote que trae un panel trae su
-	                 boton
+	  izquierda      botonera de 2 columnas x 3 filas: Tienda (Q), Rebirth
+	                 (R), Pedidos (P), Camara (V: primera/tercera persona,
+	                 lote 9) y Sonido (A1, 22 oct: abre el panel Ajustes con
+	                 Musica y Efectos); el sexto hueco queda para el boton de
+	                 Recompensas. Cada boton de panel aparece cuando su panel
+	                 existe (UI/<Nombre>), asi cada lote que trae un panel
+	                 trae su boton. Todos suenan "clic" (Client/Sonido)
 	  arriba-dcha    "Contadores": la pildora verde grande del dinero, el
 	                 Turbo si esta en marcha (x2 y lo que le queda) y, debajo,
 	                 el pedido del dia mas avanzado ("Separa 12/40")
@@ -52,6 +54,7 @@ local Fusion = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("
 
 local Cliente = script.Parent.Parent
 local EstadoCliente = require(Cliente:WaitForChild("EstadoCliente"))
+local Sonido = require(Cliente:WaitForChild("Sonido"))
 local Kit = require(script.Parent:WaitForChild("Kit"))
 local Tema = require(script.Parent:WaitForChild("Kit"):WaitForChild("Tema"))
 local Escala = require(script.Parent:WaitForChild("Kit"):WaitForChild("Escala"))
@@ -139,11 +142,16 @@ do
 end
 
 -- ===========================================================================
--- Izquierda: botonera de 4
+-- Izquierda: botonera de 2 x 3
 -- ===========================================================================
 
--- 88 (era 76: el usuario los queria un poco mas grandes, 29 sep)
-local LADO_ICONO = 88
+-- 2 columnas x 3 filas de 88 (A1, 22 oct: era 2 x 2; con Sonido son 5 y el
+-- sexto hueco es para Recompensas). Las medidas viven en Kit/Tema
+-- (BOTONERA) porque Tutorial.client pone su pildora tactil debajo
+local LADO_ICONO = Tema.BOTONERA.LADO
+local HUECO_ICONOS = Tema.BOTONERA.HUECO
+local COLUMNAS_BOTONERA = Tema.BOTONERA.COLUMNAS
+local FILAS_BOTONERA = Tema.BOTONERA.FILAS
 
 local function botonIcono(nombre: string, texto: string, icono: string, tecla: string?, orden: number, alPulsar: () -> (), extra: any?)
 	local encima = scope:Value(false)
@@ -177,7 +185,10 @@ local function botonIcono(nombre: string, texto: string, icono: string, tecla: s
 		[OnEvent("MouseLeave")] = function()
 			encima:set(false)
 		end,
-		[OnEvent("Activated")] = alPulsar,
+		[OnEvent("Activated")] = function()
+			Sonido.tocar("clic")
+			alPulsar()
+		end,
 		[Children] = {
 			scope:New("UIScale")({ Scale = escala }),
 			scope:Icono({
@@ -234,21 +245,23 @@ local function alternarVista()
 end
 
 -- Panel (o accion), texto, icono y atajo de cada boton. Los de panel solo
--- salen si su panel existe.
-local BOTONES: { { panel: string?, accion: (() -> ())?, texto: string, icono: string, tecla: string } } = {
+-- salen si su panel existe. Sonido abre el panel "Ajustes" (UI/Ajustes) y
+-- no tiene atajo.
+local BOTONES: { { panel: string?, accion: (() -> ())?, texto: string, icono: string, tecla: string? } } = {
 	{ panel = "Tienda", texto = Textos.HUD.tienda, icono = "telefono", tecla = "Q" },
 	{ panel = "Rebirth", texto = Textos.HUD.rebirth, icono = "estrella", tecla = "R" },
 	{ panel = "Pedidos", texto = Textos.HUD.pedidos, icono = "libreta", tecla = "P" },
 	{ accion = alternarVista, texto = Textos.HUD.camara, icono = "camara", tecla = "V" },
+	{ panel = "Ajustes", texto = Textos.SONIDO.boton, icono = "sonido" },
 }
 
 local hijosBotonera: { any } = {
 	scope:New("UIScale")({
 		Scale = scope:Computed(function(use)
-			return if use(tactil) then 0.8 else 1
+			return if use(tactil) then Tema.BOTONERA.ESCALA_TACTIL else 1
 		end),
 	}),
-	scope:Rejilla({ Celda = UDim2.fromOffset(LADO_ICONO, LADO_ICONO), Espacio = 10 }),
+	scope:Rejilla({ Celda = UDim2.fromOffset(LADO_ICONO, LADO_ICONO), Espacio = HUECO_ICONOS }),
 }
 for orden, b in BOTONES do
 	local panel = b.panel
@@ -264,9 +277,12 @@ end
 
 local botonera = scope:New("Frame")({
 	Name = "Botonera",
-	Size = UDim2.fromOffset(LADO_ICONO * 2 + 10, LADO_ICONO * 2 + 10),
+	Size = UDim2.fromOffset(
+		LADO_ICONO * COLUMNAS_BOTONERA + HUECO_ICONOS * (COLUMNAS_BOTONERA - 1),
+		LADO_ICONO * FILAS_BOTONERA + HUECO_ICONOS * (FILAS_BOTONERA - 1)
+	),
 	Position = scope:Computed(function(use)
-		return if use(tactil) then UDim2.fromOffset(MARGEN, 16) else UDim2.new(0, MARGEN, 0.46, 0)
+		return if use(tactil) then UDim2.fromOffset(MARGEN, Tema.BOTONERA.ARRIBA_TACTIL) else UDim2.new(0, MARGEN, 0.46, 0)
 	end),
 	AnchorPoint = scope:Computed(function(use)
 		return if use(tactil) then Vector2.zero else Vector2.new(0, 0.5)
