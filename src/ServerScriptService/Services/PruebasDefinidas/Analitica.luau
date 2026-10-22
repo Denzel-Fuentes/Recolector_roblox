@@ -37,6 +37,7 @@ local Lanzamiento = require(Servicios:WaitForChild("Lanzamiento"))
 local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
 local Botin = require(Servicios:WaitForChild("Botin"))
 local Mundo = require(Servicios:WaitForChild("Mundo"))
+local Movimiento = require(Servicios:WaitForChild("Movimiento"))
 
 local Comunes = require(script.Parent:WaitForChild("Comunes"))
 local jugador, teletransportar = Comunes.jugador, Comunes.teletransportar
@@ -89,7 +90,10 @@ end
 -- sale con ella, una vez; los 8 pasos del tutorial, con sus senales de
 -- verdad (el recorrido de la prueba tutorial), son los pasos 2..9 en orden;
 -- otra vuelta al tutorial no repite ninguno; y sin plataforma el paso 1
--- sale igual a los ESPERA_PLATAFORMA s, con "desconocida"
+-- sale igual a los ESPERA_PLATAFORMA s, con "desconocida". Con el
+-- AnalyticsService de verdad (ENVIAR_EN_STUDIO encendido mientras dura): el
+-- recorrido dispara los cuatro tipos de evento y Studio acepta sus firmas
+-- (escribe una linea "event fired" por cada uno)
 function Pruebas.analiticaEmbudo()
 	local j = jugador()
 	local p = Perfiles.obtener(j)
@@ -97,6 +101,10 @@ function Pruebas.analiticaEmbudo()
 		return "sin perfil => FALLO"
 	end
 	Analitica.reiniciarLimites()
+	local enviarPrevio = Analitica.ENVIAR_EN_STUDIO
+	Analitica.ENVIAR_EN_STUDIO = true
+	local estadoAntes = Analitica.estado()
+	local desdeTodo = Analitica.contador()
 	local previo = p.tutorial
 	local dineroPrevio = p.dinero
 	local plataformaPrevia = Analitica.plataformaDe(j)
@@ -171,6 +179,19 @@ function Pruebas.analiticaEmbudo()
 	local tarde = eventos(desde, "embudo")
 	local plazoOk = antesDelPlazo == 0 and #tarde == 1 and tarde[1].valor == 1 and tarde[1].campos[1] == "Plataforma - desconocida"
 
+	-- Las firmas: todo lo de la prueba llego al servicio de verdad sin error
+	local estadoTras = Analitica.estado()
+	local todos = Analitica.desde(desdeTodo)
+	local porTipo, firmasOk = {}, true
+	for _, e in todos do
+		porTipo[e.tipo] = (porTipo[e.tipo] or 0) + 1
+		firmasOk = firmasOk and e.ok
+	end
+	local enviados = estadoTras.enviados - estadoAntes.enviados
+	firmasOk = firmasOk and enviados == #todos and estadoTras.sinEnviar == estadoAntes.sinEnviar
+		and (porTipo.embudo or 0) > 0 and (porTipo.economia or 0) > 0 and (porTipo.progresion or 0) > 0 and (porTipo.personalizado or 0) > 0
+
+	Analitica.ENVIAR_EN_STUDIO = enviarPrevio
 	Analitica.ESPERA_PLATAFORMA = esperaPrevia
 	Analitica.fijarPlataforma(j, plataformaPrevia)
 	p.estadisticas.pedidosCompletados = pedidosPrevios
@@ -178,15 +199,17 @@ function Pruebas.analiticaEmbudo()
 	restaurarPedidos()
 	Tutorial.fijar(j, previo)
 	Bolsa.vaciar(j)
-	return string.format("paso 1: esperaba a la plataforma=%s, %s | tutorial: pasos [%s] [%s] (esperado [%s] [%s]) ok=%s plataforma=%s | otra vuelta: %d repetidos | sin plataforma: antes del plazo %d, despues %s => %s",
+	return string.format("paso 1: esperaba a la plataforma=%s, %s | tutorial: pasos [%s] [%s] (esperado [%s] [%s]) ok=%s plataforma=%s | otra vuelta: %d repetidos | sin plataforma: antes del plazo %d, despues %s | AnalyticsService de verdad: %d de %d enviados (embudo %d, economia %d, progresion %d, propios %d) => %s",
 		tostring(esperaba), describir(paso1), table.concat(serie, ","), table.concat(nombres, ","),
 		table.concat(serieEsperada, ","), table.concat(esperados, ","), tostring(todosOk), tostring(plataformaOk),
-		repetidos, antesDelPlazo, describir(tarde[1]),
-		ok(paso1Ok and pasosOk and repetidos == 0 and plazoOk))
+		repetidos, antesDelPlazo, describir(tarde[1]), enviados, #todos,
+		porTipo.embudo or 0, porTipo.economia or 0, porTipo.progresion or 0, porTipo.personalizado or 0,
+		ok(paso1Ok and pasosOk and repetidos == 0 and plazoOk and firmasOk))
 end
 
 -- Fuentes (depositos en el de papel y en el general, un pedido, lo que
--- entra sin senal al salir) y un sumidero (una mejora de verdad), cada uno
+-- entro sin senal, que se cuadra al salir) y un sumidero (una mejora de
+-- verdad), cada uno
 -- con su sku, cantidad, tipo de transaccion, saldo final y campos
 -- (plataforma, rebirths, nivel medio); un deposito sin dinero no deja nada
 function Pruebas.analiticaEconomia()
@@ -239,17 +262,19 @@ function Pruebas.analiticaEconomia()
 	local camposOk = mejora ~= nil and mejora.campos[1] == "Plataforma - teclado"
 		and mejora.campos[2] == "Rebirths - " .. Analitica.tramoRebirths(p.rebirths)
 		and mejora.campos[3] == "Nivel - " .. tostring(math.floor(total / #DefinicionesMejoras.LISTA))
-	-- Un deposito sin dinero no deja evento de economia (y pone al dia lo
-	-- ganado: el dinero que la prueba dio para la mejora no cuenta abajo)
+	-- Un deposito sin dinero no deja evento de economia
 	local antes = #eventos(desde, "economia")
 	Analitica.deposito(j, Bolsa.resumenVacio())
 	local sinDinero = #eventos(desde, "economia") == antes
-	-- Al salir: lo que entro sin senal (la bolsa que se recicla) y la sesion
+	-- Al salir: lo que entro sin ningun evento de aqui (lo que Bolsa recicla
+	-- sin bonus) y la sesion. Antes se cuadra lo que habia (el dinero que la
+	-- prueba dio para la mejora, el de otras pruebas): solo deben quedar 77
+	Analitica.cuadrar(j, p)
 	Economia.ganar(j, 77)
 	local tutorialAhora = p.tutorial
 	Analitica.salida(j, p)
-	task.wait() -- la fuente de la salida va diferida
-	comprobar("Reciclaje_Salida", "fuente", 77, p.dinero, "Gameplay")
+	task.wait() -- el cuadre de la salida va diferido
+	comprobar("Reciclaje_SinBonus", "fuente", 77, p.dinero, "Gameplay")
 	local sesion = eventos(desde, "personalizado", "Sesion")
 	local sesionOk = #sesion == 1 and sesion[1].ok and sesion[1].campos[1] == "Plataforma - teclado"
 		and sesion[1].campos[2] == "Rebirths - " .. Analitica.tramoRebirths(p.rebirths)
@@ -428,10 +453,16 @@ function Pruebas.analiticaSinServicio()
 		end
 	end
 	local estadoTras = Analitica.estado()
+	-- Vuelve el servicio (el de verdad, aunque en Studio no se envie: se
+	-- enciende para esta llamada y se mira que de verdad llego a el)
 	Analitica.usarServicio(previo)
+	local enviarPrevio = Analitica.ENVIAR_EN_STUDIO
+	Analitica.ENVIAR_EN_STUDIO = true
 	local desdeVuelta = Analitica.contador()
 	Analitica.personalizado(j, "Prueba", 1, { "Prueba - si" })
 	local vuelta = Analitica.desde(desdeVuelta)[1]
+	local enviadosVuelta = Analitica.estado().enviados - estadoTras.enviados
+	Analitica.ENVIAR_EN_STUDIO = enviarPrevio
 	task.wait(0.1) -- MessageOut puede llegar un instante despues
 	conexion:Disconnect()
 	p.dinero = dineroAntes
@@ -439,17 +470,18 @@ function Pruebas.analiticaSinServicio()
 	Tutorial.fijar(j, tutorialAntes)
 	Perfiles.marcarSucio(j)
 	local contados = estadoTras.fallos - estadoAntes.fallos
-	return string.format("sin errores=%s (%s) | el deposito pago $%d (resumen $%s) | %d eventos fallidos en el registro, %d contados, %d errores propios | %d avisos | al volver: %s => %s",
+	return string.format("sin errores=%s (%s) | el deposito pago $%d (resumen $%s) | %d eventos fallidos en el registro, %d contados, %d errores propios | %d avisos | al volver: %s, %d enviado => %s",
 		tostring(sinErrores), tostring(errorLanzado), pagado, tostring(resumen and resumen.dinero), fallidos, contados,
-		estadoTras.errores - estadoAntes.errores, avisos, describir(vuelta),
+		estadoTras.errores - estadoAntes.errores, avisos, describir(vuelta), enviadosVuelta,
 		ok(sinErrores and resumen ~= nil and resumen.dinero > 0 and pagado == resumen.dinero and fallidos >= 5 and contados == fallidos
-			and estadoTras.errores == estadoAntes.errores and avisos <= 1 and vuelta ~= nil and vuelta.ok))
+			and estadoTras.errores == estadoAntes.errores and avisos <= 1 and vuelta ~= nil and vuelta.ok and enviadosVuelta == 1))
 end
 
 -- Un fallo y un acierto de verdad desde 40 studs del general (como
--- brazoLimita): el fallo sabe desde donde se lanzo (al vaciarse la bolsa) y
--- junto a que contenedor cayo; los dos en el tramo 30-44, con su
--- contenedor y la plataforma
+-- brazoLimita, con la bolsa llena: el servidor no lanza una a medias desde
+-- P3): el fallo sabe desde donde se lanzo (al vaciarse la bolsa) y junto a
+-- que contenedor cayo; los dos en el tramo 30-44, con su contenedor y la
+-- plataforma
 function Pruebas.analiticaLanzamiento()
 	local j = jugador()
 	local p = Perfiles.obtener(j)
@@ -458,6 +490,7 @@ function Pruebas.analiticaLanzamiento()
 		return "sin perfil o sin contenedor general => FALLO"
 	end
 	Comunes.yaLanzo(j)
+	Comunes.limpiarBolsasCaidas(j)
 	Analitica.reiniciarLimites()
 	local restaurarPedidos = sinPedidos(p)
 	local tutorialAntes = p.tutorial
@@ -470,8 +503,7 @@ function Pruebas.analiticaLanzamiento()
 		p.mejoras.Brazo = nivel
 		teletransportar(j, zona.Position + Vector3.new(0, 0, -40))
 		task.wait(0.6)
-		Bolsa.vaciar(j)
-		Bolsa.meter(j, papel(6))
+		Comunes.llenarBolsa(j)
 		local desde = Analitica.contador()
 		local lanzo = Botin.lanzarBolsa(j, zona.Position, 1)
 		task.wait(4.3)
@@ -498,6 +530,46 @@ function Pruebas.analiticaLanzamiento()
 		and acierto.campos[1] == "Distancia - 30-44" and acierto.campos[2] == "Contenedor - General" and acierto.campos[3] == "Plataforma - teclado"
 	return string.format("Brazo 0: lanzo=%s, %s | Brazo 10: lanzo=%s, %s => %s",
 		tostring(lanzo0), describir(fallo), tostring(lanzo10), describir(acierto), ok(falloOk and aciertoOk))
+end
+
+-- Movimiento.alSospechar: el primero sale con el exceso de valor y sus
+-- tramos (veces el limite, en el patio, plataforma); otro enseguida no sale
+-- (uno cada SOSPECHA_CADA s por jugador), y pasado ese tiempo si (reloj de
+-- prueba)
+function Pruebas.analiticaSospecha()
+	local j = jugador()
+	Analitica.reiniciarLimites()
+	local previa = Analitica.plataformaDe(j)
+	local relojPrevio = Analitica.reloj
+	local t = 5000
+	Analitica.reloj = function()
+		return t
+	end
+	Analitica.olvidar(j) -- sin sospechas de antes
+	Analitica.fijarPlataforma(j, "tactil")
+	local desde = Analitica.contador()
+	local function datos(velocidad: number, enPatio: boolean)
+		local distancia = velocidad * 0.2
+		return {
+			distancia = distancia, segundos = 0.2, velocidad = velocidad, limite = 40, exceso = distancia - 8,
+			desde = Vector3.zero, hasta = Vector3.new(distancia, 0, 0), enPatio = enPatio,
+		}
+	end
+	Movimiento.alSospechar:Fire(j, datos(600, true)) -- 15 veces el limite: un teletransporte
+	Movimiento.alSospechar:Fire(j, datos(600, true)) -- enseguida: no sale
+	t += Analitica.SOSPECHA_CADA + 1
+	Movimiento.alSospechar:Fire(j, datos(100, false)) -- 2,5 veces
+	local lista = eventos(desde, "personalizado", "Sospecha")
+
+	Analitica.reloj = relojPrevio
+	Analitica.olvidar(j)
+	Analitica.entrada(j)
+	Analitica.fijarPlataforma(j, previa)
+	local primeraOk = lista[1] ~= nil and lista[1].valor == 112 and lista[1].ok and lista[1].campos[1] == "Exceso - 10x+"
+		and lista[1].campos[2] == "EnPatio - si" and lista[1].campos[3] == "Plataforma - tactil"
+	local segundaOk = lista[2] ~= nil and lista[2].valor == 12 and lista[2].campos[1] == "Exceso - 2-5x" and lista[2].campos[2] == "EnPatio - no"
+	return string.format("%d eventos de 3 avisos: %s | %s => %s", #lista, describir(lista[1]), describir(lista[2]),
+		ok(#lista == 2 and primeraOk and segundaOk))
 end
 
 return Pruebas

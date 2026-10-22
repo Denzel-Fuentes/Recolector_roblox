@@ -32,6 +32,7 @@ local Rebirths = require(Servicios:WaitForChild("Rebirths"))
 local Lanzamiento = require(Servicios:WaitForChild("Lanzamiento"))
 local Insignias = require(Servicios:WaitForChild("Insignias"))
 local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
+local Movimiento = require(Servicios:WaitForChild("Movimiento"))
 
 -- Sesion
 Players.PlayerAdded:Connect(Analitica.entrada)
@@ -67,6 +68,9 @@ Lanzamiento.alFallar:Connect(Analitica.fallo)
 Insignias.alConseguir:Connect(Analitica.insignia)
 Monetizacion.alComprarPase:Connect(Analitica.compraPase)
 Monetizacion.alComprarProducto:Connect(Analitica.compraProducto)
+
+-- Anti-trampas: moverse mas de lo que se puede andando
+Movimiento.alSospechar:Connect(Analitica.sospecha)
 
 -- La plataforma del cliente
 Red.evento("AnaliticaEvent").OnServerEvent:Connect(function(jugador: Player, tipo: any, valor: any)

@@ -19,7 +19,8 @@
 	campos: plataforma, rebirths, nivel medio de las mejoras
 	  fuente   Gameplay  Deposito_<General|Papel|Plastico|Metal|Organico>
 	  fuente   Gameplay  Pedido_<facil|medio|dificil>
-	  fuente   Gameplay  Reciclaje_Salida (lo que entra al salir, sin senal)
+	  fuente   Gameplay  Reciclaje_SinBonus (al salir: lo que entro sin
+	                     senal en la sesion, ver "Decisiones")
 	  sumidero Shop      Mejora_<id>_<nivel>
 	  sumidero Gameplay  Rebirth_<n> (todo el dinero que se pierde)
 	Progresion (LogProgressionCompleteEvent): ruta "Rebirth", nivel n;
@@ -33,6 +34,8 @@
 	  CompraProducto  alComprarProducto  minutos jugados  producto, plataforma, rebirths
 	  Sesion          alSalir            minutos sesion   plataforma, rebirths, tutorial
 	  PerfilNoCargado alCargar sin cargar 1               motivo, plataforma
+	  Sospecha        Movimiento.alSospechar (1 cada SOSPECHA_CADA s por jugador)
+	                                     studs de exceso  velocidad / limite (tramo), en el patio, plataforma
 
 	=== AnalyticsService nunca rompe el juego ===
 	Cada llamada va en pcall: si falla se cuenta y se avisa con warn como
@@ -44,10 +47,14 @@
 
 	=== Studio ===
 	Roblox solo recoge eventos del servidor de un juego publicado: desde
-	Studio no llega nada al Creator Dashboard. Aqui se llama igual (si una
-	firma estuviera mal, el pcall lo veria) y ademas cada evento queda en
+	Studio no llega nada al Creator Dashboard. Cada evento queda en
 	Analitica.registro (los ultimos MAX_REGISTRO, solo en Studio) para las
-	pruebas (PruebasDefinidas/Analitica).
+	pruebas (PruebasDefinidas/Analitica). En Studio el AnalyticsService de
+	verdad acepta las llamadas pero escribe una linea por cada una
+	("AnalyticsService: LogEconomyEvent event fired.", medido el 22 oct: 49
+	en una tanda de pruebas): por eso ENVIAR_EN_STUDIO va apagado y la
+	prueba analiticaEmbudo lo enciende para comprobar las cuatro firmas
+	contra el servicio de verdad.
 
 	=== Limites de Roblox (guia "Event types" y la referencia de la clase) ===
 	- 120 + 20 x jugadores peticiones por minuto: se cuentan aqui en ventanas
@@ -65,7 +72,7 @@
 	  que se vean de verdad, muchas menos.
 	- 100 nombres de evento propio, 100 sku, 20 tipos de transaccion y 5-10
 	  monedas: todo sale de Config (un id desconocido va a "otro") y queda
-	  acotado (~70 sku, 8 eventos, 2 tipos, 1 moneda).
+	  acotado (~70 sku, 9 eventos, 2 tipos, 1 moneda).
 
 	=== Decisiones no obvias ===
 	- Roblox desglosa un embudo con los campos de su PRIMER paso: el paso 1
@@ -76,10 +83,15 @@
 	- Rebirths pone el dinero a 0 antes de avisar: lo que se pierde al
 	  renacer es el ultimo saldo visto (cada evento de dinero de aqui y cada
 	  publicacion del perfil, Perfiles.alCambiar), y como poco el requisito.
-	- La bolsa que se recicla al salir no avisa (Bolsa.reciclarSinBonus): se
-	  cuenta como lo que subio dineroGanadoTotal desde el ultimo evento de
-	  dinero, un instante despues de alSalir (task.defer: Bolsa recicla en
-	  su propio callback de la misma senal).
+	- Lo que Bolsa recicla sin bonus no avisa (Bolsa.reciclarSinBonus): la
+	  bolsa en la mano, las caidas y las que estan en el aire al salir (Bolsa
+	  y Lanzamiento.cobrarAlSalir, en alSalir) y la caida mas vieja cuando se
+	  pasa del tope de Lanzamiento. Se cuenta al salir (cuadrar, un instante
+	  despues de alSalir: task.defer, para ir detras de esos callbacks de la
+	  misma senal) como lo que subio dineroGanadoTotal en la sesion menos lo
+	  que ya explicaron los depositos y los pedidos de aqui. Una fuente de
+	  dinero nueva tiene que pasar por una funcion de aqui que la sume a
+	  `contado`; si no, saldra al salir como Reciclaje_SinBonus.
 	- LogProgressionCompleteEvent aun no sale en ningun grafico de Roblox: el
 	  mismo rebirth va tambien como evento propio "Rebirth" con los minutos
 	  jugados de valor (la media por rebirth se ve en Explore).
@@ -97,6 +109,10 @@
 	  un cliente que mienta solo ensucia sus propios datos.
 	- tiempoJugado cuenta los minutos con la sesion abierta (tambien parado):
 	  los "minutos activos" de la economia v4 llegaran con las recompensas.
+	- Sospecha (P3): Movimiento avisa como mucho cada 2 s mientras dura; aqui
+	  sale una cada SOSPECHA_CADA s por jugador (lo que importa es cuantos y
+	  cuanto se pasan, y un tramposo no debe gastar el cupo). La velocidad
+	  va en veces el limite: "<2x" suele ser lag; "10x+", un teletransporte.
 ]]
 
 local AnalyticsService = game:GetService("AnalyticsService")
@@ -122,6 +138,7 @@ local Perfiles = require(Servicios:WaitForChild("Perfiles"))
 local Bolsa = require(Servicios:WaitForChild("Bolsa"))
 local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
 local ObjetosPatio = require(Servicios:WaitForChild("ObjetosPatio"))
+local Movimiento = require(Servicios:WaitForChild("Movimiento"))
 
 type Perfil = Perfiles.Perfil
 type Flujo = "fuente" | "sumidero"
@@ -158,12 +175,14 @@ Analitica.PLATAFORMAS = { teclado = true, tactil = true, gamepad = true } :: { [
 -- Segundos que se recuerda a un jugador despues de salir (AnaliticaHandler)
 Analitica.OLVIDAR_TRAS_SALIR = 30
 Analitica.MAX_REGISTRO = 300
+-- Como mucho un evento Sospecha por jugador cada tantos segundos
+Analitica.SOSPECHA_CADA = 30
 
--- En Studio se llama tambien al servicio de verdad (no envia nada, pero un
--- argumento mal puesto fallaria). Si algun dia eso llenara la consola, con
--- false en Studio solo queda el registro (un servicio sustituto se sigue
--- llamando: las pruebas no cambian).
-Analitica.ENVIAR_EN_STUDIO = true
+-- En Studio, si se llama tambien al AnalyticsService de verdad: no envia
+-- nada y escribe una linea por llamada en la consola (ver cabecera), asi
+-- que apagado; analiticaEmbudo lo enciende para probar las firmas. Un
+-- servicio sustituto (usarServicio) se llama siempre.
+Analitica.ENVIAR_EN_STUDIO = false
 
 -- Sustituibles en pruebas
 Analitica.servicio = AnalyticsService :: any
@@ -217,7 +236,11 @@ local entradas: { [Player]: number } = {} -- reloj() al entrar
 local pasosHechos: { [Player]: { [number]: boolean } } = {}
 local pendientesEntrar: { [Player]: boolean } = {} -- paso 1 esperando a la plataforma
 local saldos: { [Player]: number } = {} -- ultimo saldo visto
-local ganados: { [Player]: number } = {} -- dineroGanadoTotal en el ultimo evento de dinero
+-- dineroGanadoTotal al cargar (o en el ultimo cuadre) y lo que explicaron
+-- desde entonces los eventos de dinero de aqui (ver cuadrar)
+local ganadoInicial: { [Player]: number } = {}
+local contado: { [Player]: number } = {}
+local ultimasSospechas: { [Player]: number } = {}
 local cuentasBolsa: { [Player]: number } = {}
 local vaciados: { [Player]: { posicion: Vector3, t: number } } = {} -- donde se vacio la bolsa
 local ultimosDepositos: { [Player]: { contenedor: string, t: number } } = {}
@@ -585,7 +608,8 @@ Analitica.carga = protegido("carga", function(jugador: Player, perfil: Perfil)
 	end
 	Analitica.entrada(jugador)
 	saldos[jugador] = perfil.dinero
-	ganados[jugador] = perfil.estadisticas.dineroGanadoTotal or 0
+	ganadoInicial[jugador] = perfil.estadisticas.dineroGanadoTotal or 0
+	contado[jugador] = 0
 	if not Perfiles.estaCargado(jugador) then
 		local nueva = (tonumber(perfil.version) or 0) > GameConfig.VERSION_PERFIL
 		Analitica.personalizado(jugador, "PerfilNoCargado", 1, { "Motivo - " .. (if nueva then "versionNueva" else "fallo"), campoPlataforma(jugador) })
@@ -656,9 +680,9 @@ Analitica.deposito = protegido("deposito", function(jugador: Player, resumen: Bo
 	local cantidad = tonumber(resumen.dinero) or 0
 	if cantidad > 0 then
 		Analitica.economia(jugador, "fuente", cantidad, perfil.dinero, TRANSACCION_JUEGO, "Deposito_" .. contenedor, perfil)
+		contado[jugador] = (contado[jugador] or 0) + cantidad
 	end
 	saldos[jugador] = perfil.dinero
-	ganados[jugador] = perfil.estadisticas.dineroGanadoTotal or 0
 end)
 
 -- Pedidos.alCumplir: el pedido ya esta pagado
@@ -675,9 +699,9 @@ Analitica.pedido = protegido("pedido", function(jugador: Player, pedido: Perfile
 		local plantilla = DefinicionesPedidos.POR_ID[if typeof(pedido.id) == "string" then pedido.id else ""]
 		local sku = "Pedido_" .. (if plantilla then plantilla.dificultad else "otro")
 		Analitica.economia(jugador, "fuente", cantidad, perfil.dinero, TRANSACCION_JUEGO, sku, perfil)
+		contado[jugador] = (contado[jugador] or 0) + cantidad
 	end
 	saldos[jugador] = perfil.dinero
-	ganados[jugador] = perfil.estadisticas.dineroGanadoTotal or 0
 end)
 
 -- Mejoras.alComprar(jugador, id, nivelNuevo): ya esta cobrada
@@ -798,15 +822,55 @@ Analitica.compraProducto = protegido("compraProducto", function(jugador: Player,
 	Analitica.personalizado(jugador, "CompraProducto", minutosJugados(perfil), { "Producto - " .. nombre, campoPlataforma(jugador), campoRebirths(perfil) })
 end)
 
--- Lo que entro sin senal desde el ultimo evento de dinero (la bolsa que se
--- recicla al salir). Diferido: Bolsa la recicla en su callback de alSalir.
-local dineroAlSalir = protegido("dineroAlSalir", function(jugador: Player, perfil: Perfil)
-	local total = perfil.estadisticas.dineroGanadoTotal or 0
-	local base = ganados[jugador]
-	if base and total > base then
-		Analitica.economia(jugador, "fuente", total - base, perfil.dinero, TRANSACCION_JUEGO, "Reciclaje_Salida", perfil)
+-- Lo que subio dineroGanadoTotal desde la carga (o el ultimo cuadre) sin
+-- que lo explicara un evento de aqui: lo que Bolsa recicla sin bonus (ver
+-- cabecera). Sale como fuente Reciclaje_SinBonus y empieza otra cuenta. Lo
+-- llama la salida, diferido; las pruebas, para empezar de cero.
+Analitica.cuadrar = protegido("cuadrar", function(jugador: Player, perfil: Perfil)
+	if not esJugador(jugador) or typeof(perfil) ~= "table" then
+		return
 	end
-	ganados[jugador] = total
+	local total = perfil.estadisticas.dineroGanadoTotal or 0
+	local inicial = ganadoInicial[jugador]
+	if inicial then
+		local suelto = total - inicial - (contado[jugador] or 0)
+		if suelto > 0 then
+			Analitica.economia(jugador, "fuente", suelto, perfil.dinero, TRANSACCION_JUEGO, "Reciclaje_SinBonus", perfil)
+		end
+	end
+	ganadoInicial[jugador] = total
+	contado[jugador] = 0
+end)
+
+-- Velocidad de una sospecha en veces el limite (4 tramos)
+local function tramoExceso(velocidad: number, limite: number): string
+	local veces = if limite > 0 then velocidad / limite else math.huge
+	if veces ~= veces then
+		veces = math.huge
+	end
+	return if veces < 2 then "<2x" elseif veces < 5 then "2-5x" elseif veces < 10 then "5-10x" else "10x+"
+end
+
+-- Movimiento.alSospechar(jugador, datos): se movio mas de lo que puede
+-- andando. Una cada SOSPECHA_CADA s por jugador (ver cabecera).
+Analitica.sospecha = protegido("sospecha", function(jugador: Player, datos: Movimiento.DatosSospecha)
+	if not esJugador(jugador) or typeof(datos) ~= "table" then
+		return
+	end
+	local ahora = Analitica.reloj()
+	if ahora - (ultimasSospechas[jugador] or -math.huge) < Analitica.SOSPECHA_CADA then
+		return
+	end
+	ultimasSospechas[jugador] = ahora
+	local exceso = math.floor((tonumber(datos.exceso) or 0) + 0.5)
+	if exceso ~= exceso then
+		exceso = 0
+	end
+	Analitica.personalizado(jugador, "Sospecha", math.clamp(exceso, 0, 100000), {
+		"Exceso - " .. tramoExceso(tonumber(datos.velocidad) or 0, tonumber(datos.limite) or 0),
+		"EnPatio - " .. (if datos.enPatio == true then "si" else "no"),
+		campoPlataforma(jugador),
+	})
 end)
 
 -- Perfiles.alSalir(jugador, perfil o nil si se fue antes de cargar). No
@@ -825,7 +889,8 @@ Analitica.salida = protegido("salida", function(jugador: Player, perfil: Perfil?
 		else "Tutorial - sinPerfil"
 	Analitica.personalizado(jugador, "Sesion", minutos, { campoPlataforma(jugador), rebirths, tutorial })
 	if perfil then
-		task.defer(dineroAlSalir, jugador, perfil)
+		-- Detras de lo que Bolsa y Lanzamiento cobran en esta misma senal
+		task.defer(Analitica.cuadrar, jugador, perfil)
 	end
 end)
 
@@ -841,7 +906,9 @@ function Analitica.olvidar(jugador: Player)
 	pasosHechos[jugador] = nil
 	pendientesEntrar[jugador] = nil
 	saldos[jugador] = nil
-	ganados[jugador] = nil
+	ganadoInicial[jugador] = nil
+	contado[jugador] = nil
+	ultimasSospechas[jugador] = nil
 	cuentasBolsa[jugador] = nil
 	vaciados[jugador] = nil
 	ultimosDepositos[jugador] = nil
