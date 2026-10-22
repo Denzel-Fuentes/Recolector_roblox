@@ -8,11 +8,10 @@
 
 	Usa las mismas cuentas que el servidor (Utilidades/Trayectoria) con la
 	fuerza de la carga y el Brazo del jugador; en el primer lanzamiento, que
-	siempre entra, dibuja el arco al contenedor. Son partes LOCALES (solo las
+	siempre entra, dibuja el arco al contenedor general. Son partes LOCALES (solo las
 	ve este cliente), sin colision ni raycast.
 ]]
 
-local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -22,6 +21,7 @@ local Paleta = require(Config:WaitForChild("Paleta"))
 local DefinicionesMejoras = require(Config:WaitForChild("DefinicionesMejoras"))
 local DefinicionesPunteria = require(Config:WaitForChild("DefinicionesPunteria"))
 local Trayectoria = require(Shared:WaitForChild("Utilidades"):WaitForChild("Trayectoria"))
+local Contenedores = require(Shared:WaitForChild("Utilidades"):WaitForChild("Contenedores"))
 
 local EstadoCliente = require(script.Parent:WaitForChild("EstadoCliente"))
 
@@ -65,16 +65,6 @@ function LineaTrayectoria.activa(): boolean
 	return EstadoCliente.estadistica("lanzamientos") < DefinicionesPunteria.LANZAMIENTOS_CON_LINEA
 end
 
-local function zonaAcierto(): BasePart?
-	for _, cont in CollectionService:GetTagged("Contenedor") do
-		local zona = cont:FindFirstChild("ZonaAcierto")
-		if zona and zona:IsA("BasePart") then
-			return zona
-		end
-	end
-	return nil
-end
-
 function LineaTrayectoria.ocultar()
 	for _, p in bolas do
 		p.Transparency = 1
@@ -91,9 +81,9 @@ function LineaTrayectoria.dibujar(punto: Vector3, carga: number)
 	asegurarBolas()
 	local origen = Trayectoria.origen(root.Position)
 	local objetivo: Vector3
-	local zona = zonaAcierto()
-	if EstadoCliente.estadistica("lanzamientos") == 0 and zona then
-		objetivo = zona.Position
+	local general = Contenedores.general()
+	if EstadoCliente.estadistica("lanzamientos") == 0 and general then
+		objetivo = general.zona.Position
 	else
 		local brazo = DefinicionesMejoras.valor("Brazo", EstadoCliente.nivelMejora("Brazo"))
 		objetivo = Trayectoria.objetivo(origen, punto, math.max(carga, 0.1), brazo)

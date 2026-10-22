@@ -108,23 +108,6 @@ DIBUJOS.billete = function(l, color)
 	forma(l, 0.36, 0.34, 0.28, 0.32, claro(c), 0.5)
 end
 
-DIBUJOS.cartas = function(l, color)
-	local c = color or Paleta.UI_CARTAS
-	forma(l, 0.22, 0.14, 0.42, 0.62, oscuro(c), 0.1, -14)
-	local frente = forma(l, 0.38, 0.22, 0.42, 0.62, c, 0.1, 10)
-	local ventana = Instance.new("Frame")
-	ventana.Size = UDim2.fromScale(0.6, 0.45)
-	ventana.Position = UDim2.fromScale(0.5, 0.42)
-	ventana.AnchorPoint = Vector2.new(0.5, 0.5)
-	ventana.BackgroundColor3 = Paleta.UI_PAPEL
-	ventana.BorderSizePixel = 0
-	ventana.ZIndex = l.z
-	local e = Instance.new("UICorner")
-	e.CornerRadius = UDim.new(0.15, 0)
-	e.Parent = ventana
-	ventana.Parent = frente
-end
-
 DIBUJOS.gema = function(l, color)
 	local c = color or Paleta.UI_GEMAS
 	forma(l, 0.24, 0.24, 0.52, 0.52, c, 0.12, 45)
@@ -283,6 +266,15 @@ DIBUJOS.cinta = function(l, color)
 	forma(l, 0.56, 0.36, 0.26, 0.26, Paleta.UI_PAPEL, 0.5)
 end
 
+-- Camara de fotos: cambiar entre primera y tercera persona en el patio
+DIBUJOS.camara = function(l, color)
+	local c = color or Paleta.UI_CARTAS
+	forma(l, 0.3, 0.16, 0.26, 0.16, c, 0.2)
+	forma(l, 0.08, 0.28, 0.84, 0.56, c, 0.2)
+	forma(l, 0.32, 0.36, 0.36, 0.36, Paleta.UI_PAPEL, 0.5)
+	forma(l, 0.42, 0.46, 0.16, 0.16, Paleta.UI_TINTA, 0.5)
+end
+
 DIBUJOS.engranaje = function(l, color)
 	local c = color or GRIS
 	for i = 0, 3 do
@@ -290,16 +282,6 @@ DIBUJOS.engranaje = function(l, color)
 	end
 	forma(l, 0.2, 0.2, 0.6, 0.6, c, 0.5)
 	forma(l, 0.38, 0.38, 0.24, 0.24, Paleta.UI_PAPEL, 0.5)
-end
-
-DIBUJOS.iman = function(l, color)
-	local c = color or Paleta.UI_PELIGRO
-	forma(l, 0.16, 0.34, 0.68, 0.56, c, 0.4)
-	forma(l, 0.16, 0.1, 0.24, 0.5, c, 0.1)
-	forma(l, 0.6, 0.1, 0.24, 0.5, c, 0.1)
-	forma(l, 0.16, 0.1, 0.24, 0.16, Paleta.UI_PAPEL, 0.1)
-	forma(l, 0.6, 0.1, 0.24, 0.16, Paleta.UI_PAPEL, 0.1)
-	forma(l, 0.38, 0.5, 0.24, 0.28, Paleta.UI_PAPEL, 0.3)
 end
 
 DIBUJOS.bota = function(l, color)
@@ -343,7 +325,6 @@ DIBUJOS.setOrganico = function(l, color)
 	forma(l, 0.46, 0.46, 0.1, 0.44, oscuro(c), 0.5, -35)
 end
 
-DIBUJOS.setRey = DIBUJOS.corona
 
 -- ===========================================================================
 -- API

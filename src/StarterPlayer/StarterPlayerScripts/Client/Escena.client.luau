@@ -22,7 +22,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Textos = require(Shared:WaitForChild("Config"):WaitForChild("Textos"))
+-- El copy en el idioma del jugador (misma forma que Config/Textos)
+local Idioma = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Utilidades"):WaitForChild("Idioma"))
+local Textos = Idioma.textos
 local Paleta = require(Shared:WaitForChild("Config"):WaitForChild("Paleta"))
 local PoseBrazos = require(Shared:WaitForChild("Utilidades"):WaitForChild("PoseBrazos"))
 
@@ -51,7 +53,7 @@ end
 -- va en studs, no en pixeles: asi el cartel se hace pequeno con la distancia,
 -- como un letrero de verdad, y no tapa media pantalla desde lejos. Flota 3,4
 -- studs por encima del tope del modelo, por encima del prompt (1,2).
-local function estilizarCartel(bb: BillboardGui, texto: string?)
+local function estilizarCartel(bb: BillboardGui, texto: string?, colorBorde: Color3?)
 	local tl = bb:WaitForChild("Texto", 10)
 	if not tl or not tl:IsA("TextLabel") then
 		return
@@ -84,8 +86,9 @@ local function estilizarCartel(bb: BillboardGui, texto: string?)
 		contorno.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		contorno.Parent = tl
 	end
-	contorno.Color = Paleta.UI_TINTA
-	contorno.Thickness = Tema.GROSOR
+	-- Los carteles de los contenedores llevan el borde del color de su tipo
+	contorno.Color = colorBorde or Paleta.UI_TINTA
+	contorno.Thickness = if colorBorde then Tema.GROSOR * 2 else Tema.GROSOR
 	local relleno = tl:FindFirstChildOfClass("UIPadding")
 	if not relleno then
 		relleno = Instance.new("UIPadding")
@@ -97,12 +100,17 @@ local function estilizarCartel(bb: BillboardGui, texto: string?)
 	relleno.PaddingBottom = UDim.new(0.12, 0)
 end
 
--- El modelo etiquetado que contiene a un cartel decide su rotulo
-local function rotuloPara(bb: BillboardGui): string?
+-- El modelo etiquetado que contiene a un cartel decide su rotulo (y, en los
+-- contenedores, el color del borde: el de su tipo)
+local function rotuloPara(bb: BillboardGui): (string?, Color3?)
 	local actual: Instance? = bb.Parent
 	while actual and actual ~= workspace do
 		if CollectionService:HasTag(actual, "Contenedor") then
-			return Textos.MUNDO.venderBasura
+			local material = actual:GetAttribute("Material")
+			if typeof(material) == "string" then
+				return Textos.formatear(Textos.MUNDO.contenedorTipo, { tipo = Idioma.mayusculas(Textos.TIPOS[material] or material) }), Paleta.TIPO[material]
+			end
+			return Textos.MUNDO.contenedorGeneral, Paleta.TIPO.General
 		elseif actual:GetAttribute("NPC") ~= nil then
 			return Textos.MUNDO.chatarra
 		end

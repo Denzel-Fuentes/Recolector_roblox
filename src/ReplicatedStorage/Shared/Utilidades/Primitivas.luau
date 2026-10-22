@@ -5,10 +5,10 @@
 	Part (bloque, bola, cilindro), WedgePart (cuna), modelos con el pivote en
 	el suelo, Random con semilla de texto y la etiqueta flotante. Sin texturas.
 
-	Por que es un modulo aparte: ModelosMascota, ModelosObjetos y ModelosMonton
-	comparten exactamente este vocabulario (y el cliente lo usa en los
-	ViewportFrames del album). Cualquier cambio de material, sombra o
-	superficie se hace aqui una vez.
+	Por que es un modulo aparte: ModelosObjetos y ModelosMonton comparten
+	exactamente este vocabulario (y el cliente lo usa en la cinta de la
+	recicladora). Cualquier cambio de material, sombra o superficie se hace
+	aqui una vez.
 
 	Todas las partes salen ANCLADAS y sin colision: quien las necesite con
 	fisica (la basura de las montanas) las cambia despues. El origen de cada
@@ -171,6 +171,7 @@ function Primitivas.etiqueta(modelo: Model, texto: string, color: Color3?, altur
 	bb.StudsOffsetWorldSpace = Vector3.new(0, altura or 2.6, 0)
 	bb.MaxDistance = 45
 	bb.AlwaysOnTop = false
+	bb.AutoLocalize = false -- el idioma lo pone Utilidades/Idioma, no Roblox
 	bb.Parent = base
 	local tl = Instance.new("TextLabel")
 	tl.Size = UDim2.fromScale(1, 1)

@@ -8,7 +8,7 @@
 	Los numeros base viven en Config/DefinicionesMejoras para que la tienda pinte
 	lo mismo que aqui se aplica. La v2 no vende velocidad ni iman (servirian
 	para quitarle piezas a los demas en el patio compartido); el unico pase que
-	toca una mejora sera Bolsa XL (lote 8).
+	toca una mejora es Bolsa XL (lote 8): +10 huecos encima del nivel.
 
 	Comprar cobra y sube de nivel en la misma llamada, o no hace nada. Todas
 	vuelven a 0 al renacer (Rebirths); `todasAlMaximo` es su requisito.
@@ -25,6 +25,10 @@ local Senal = require(Shared:WaitForChild("Utilidades"):WaitForChild("Senal"))
 local Servicios = ServerScriptService:WaitForChild("Services")
 local Perfiles = require(Servicios:WaitForChild("Perfiles"))
 local Economia = require(Servicios:WaitForChild("Economia"))
+local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
+
+-- Huecos que suma el pase Bolsa XL
+local HUECOS_BOLSA_XL = 10
 
 local Mejoras = {}
 
@@ -39,9 +43,14 @@ function Mejoras.nivel(jugador: Player, id: string): number
 	return perfil.mejoras[id] or 0
 end
 
--- Valor efectivo. Es lo que usan Bolsa, ObjetosPatio, Lanzamiento...
+-- Valor efectivo, con los pases. Es lo que usan Bolsa, ObjetosPatio,
+-- Lanzamiento...
 function Mejoras.valor(jugador: Player, id: string): number
-	return DefinicionesMejoras.valor(id, Mejoras.nivel(jugador, id))
+	local valor = DefinicionesMejoras.valor(id, Mejoras.nivel(jugador, id))
+	if id == "Bolsa" and Monetizacion.tienePase(jugador, "BolsaXL") then
+		valor += HUECOS_BOLSA_XL
+	end
+	return valor
 end
 
 function Mejoras.costeSiguiente(jugador: Player, id: string): number?

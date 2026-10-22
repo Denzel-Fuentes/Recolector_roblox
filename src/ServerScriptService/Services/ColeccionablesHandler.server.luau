@@ -1,10 +1,7 @@
 --!strict
 --[[
 	ColeccionablesHandler
-	Cablea los coleccionables:
-
-	  PonerTrajeEvent(idTraje | nil)  ponerse o quitarse un traje. Los de pago
-	                                  se poseen por Game Pass, no por hallazgo.
+	Cablea los coleccionables pospuestos (los trajes se quitaron el 5 oct).
 
 	Figurinas FIJAS del patio (solo con la funcion FIGURINAS, pospuesta en la
 	v2): al arrancar se instancia el modelo de cada una en su marcador (tag
@@ -13,7 +10,7 @@
 	figurina y, si esta a menos de 3 studs y no la tiene, se la da. El cliente
 	la oculta localmente al verla en su perfil.
 
-	Tambien avisa por toast de cintas y trajes nuevos (vengan de donde vengan).
+	Tambien avisa por toast de cintas nuevas (vengan de donde vengan).
 ]]
 
 local Players = game:GetService("Players")
@@ -23,8 +20,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared:WaitForChild("Config"):WaitForChild("GameConfig"))
-local Productos = require(Shared:WaitForChild("Config"):WaitForChild("Productos"))
-local Textos = require(Shared:WaitForChild("Config"):WaitForChild("Textos"))
+local Idioma = require(Shared:WaitForChild("Utilidades"):WaitForChild("Idioma"))
 local DefinicionesColeccionables = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesColeccionables"))
 local ModelosObjetos = require(Shared:WaitForChild("Utilidades"):WaitForChild("ModelosObjetos"))
 local Primitivas = require(Shared:WaitForChild("Utilidades"):WaitForChild("Primitivas"))
@@ -34,36 +30,8 @@ local Servicios = ServerScriptService:WaitForChild("Services")
 local Mundo = require(Servicios:WaitForChild("Mundo"))
 local Perfiles = require(Servicios:WaitForChild("Perfiles"))
 local Coleccionables = require(Servicios:WaitForChild("Coleccionables"))
-local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
 
 local NotificacionEvent = Red.evento("NotificacionEvent")
-local PonerTrajeEvent = Red.evento("PonerTrajeEvent")
-
-local function notificar(jugador: Player, texto: string, tipo: string)
-	NotificacionEvent:FireClient(jugador, texto, tipo)
-end
-
--- === Traje ===
-PonerTrajeEvent.OnServerEvent:Connect(function(jugador, idTraje)
-	if idTraje ~= nil and typeof(idTraje) ~= "string" then
-		return
-	end
-	if idTraje ~= nil and not Coleccionables.tiene(jugador, "traje", idTraje) then
-		local pase = Productos.paseParaTraje(idTraje)
-		if pase and Monetizacion.tienePase(jugador, pase.id) then
-			Coleccionables.agregar(jugador, "traje", idTraje)
-		end
-	end
-	local ok = Coleccionables.ponerTraje(jugador, idTraje)
-	if ok and idTraje then
-		local def = DefinicionesColeccionables.TRAJE_POR_ID[idTraje]
-		if def then
-			notificar(jugador, Textos.formatear(Textos.NOTIFICACIONES.trajePuesto, { nombre = def.nombre }), "exito")
-		end
-	elseif not ok then
-		notificar(jugador, Textos.TIENDA.noEncontrado, "aviso")
-	end
-end)
 
 -- === Figurinas fijas (pospuestas) ===
 
@@ -105,7 +73,7 @@ RunService.Heartbeat:Connect(function(dt)
 				if (root.Position - f.posicion).Magnitude <= 3.5 and not Coleccionables.tiene(jugador, "figurina", f.id) then
 					if Coleccionables.agregar(jugador, "figurina", f.id) then
 						local def = DefinicionesColeccionables.FIGURINA_POR_ID[f.id]
-						NotificacionEvent:FireClient(jugador, Textos.formatear(Textos.PATIO.figurinaEncontrada, { nombre = def.nombre }), "exito")
+						NotificacionEvent:FireClient(jugador, Idioma.mensaje("PATIO.figurinaEncontrada", { nombre = def.nombre }), "exito")
 					end
 				end
 			end
@@ -117,12 +85,7 @@ Coleccionables.alAgregar:Connect(function(jugador, tipo, id)
 	if tipo == "cinta" then
 		local def = DefinicionesColeccionables.CINTA_POR_ID[id]
 		if def then
-			NotificacionEvent:FireClient(jugador, Textos.formatear(Textos.NOTIFICACIONES.cintaEncontrada, { nombre = def.nombre }), "exito")
-		end
-	elseif tipo == "traje" then
-		local def = DefinicionesColeccionables.TRAJE_POR_ID[id]
-		if def then
-			NotificacionEvent:FireClient(jugador, Textos.formatear(Textos.NOTIFICACIONES.trajeEncontrado, { nombre = def.nombre }), "exito")
+			NotificacionEvent:FireClient(jugador, Idioma.mensaje("NOTIFICACIONES.cintaEncontrada", { nombre = def.nombre }), "exito")
 		end
 	end
 end)

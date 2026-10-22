@@ -32,6 +32,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Paleta = require(Shared:WaitForChild("Config"):WaitForChild("Paleta"))
 local Iconos = require(Shared:WaitForChild("Config"):WaitForChild("Iconos"))
 local Textos = require(Shared:WaitForChild("Config"):WaitForChild("Textos"))
+local Idioma = require(Shared:WaitForChild("Utilidades"):WaitForChild("Idioma"))
 local M = Paleta.MUNDO
 local V = Paleta.VARIANTES
 
@@ -176,7 +177,9 @@ function ArteMundo.ocultar(p)
 end
 
 -- Rotulo en estilo pegatina (papel crema, contorno de tinta, FredokaOne),
--- el mismo lenguaje que la UI. En una cara de la parte.
+-- el mismo lenguaje que la UI. En una cara de la parte. opciones.mensaje
+-- (Idioma.mensaje): el texto queda en espanol y el atributo Mensaje deja que
+-- cada cliente lo escriba en su idioma (TraducirMundo.client)
 function ArteMundo.letreroPegatina(parteBase, texto, cara, opciones)
 	opciones = opciones or {}
 	cara = cara or Enum.NormalId.Front
@@ -193,6 +196,7 @@ function ArteMundo.letreroPegatina(parteBase, texto, cara, opciones)
 	sg.PixelsPerStud = 40
 	sg.LightInfluence = 0
 	sg.AlwaysOnTop = false
+	sg.AutoLocalize = false
 	sg.Parent = parteBase
 	local fondo = Instance.new("Frame")
 	fondo.Name = "Papel"
@@ -222,6 +226,9 @@ function ArteMundo.letreroPegatina(parteBase, texto, cara, opciones)
 	tl.TextColor3 = opciones.color or Paleta.UI_TINTA
 	tl.TextScaled = true
 	tl.FontFace = FUENTE_PEGATINA
+	if opciones.mensaje then
+		tl:SetAttribute("Mensaje", Idioma.codificar(opciones.mensaje))
+	end
 	tl.Parent = fondo
 	if opciones.contorno then
 		local contorno = Instance.new("UIStroke")
@@ -244,6 +251,40 @@ local function mallaArte(nombre)
 		end
 	end
 	return nil
+end
+
+-- Colision de la propia malla (decision del usuario, 5 oct: el camion y la
+-- tienda chocan con su forma, sin cajas invisibles) y CanQuery para que la
+-- bolsa lanzada rebote en ellas (Lanzamiento barre lo consultable). Ojo,
+-- probado en Studio: con estas mallas importadas Hull genera una colision
+-- VACIA (todo la atraviesa) y cambiar CollisionFidelity por script no
+-- recalcula la geometria; hay que regenerarla con CreateMeshPartAsync +
+-- ApplyMesh y la descomposicion precisa, que respeta los huecos (la boca del
+-- mostrador). ApplyMesh tambien pisa la textura, el color y el material: se
+-- guardan y se reponen.
+local function colisionDeMalla(m: Instance, nombre: string)
+	local AssetService = game:GetService("AssetService")
+	for _, p in m:GetDescendants() do
+		if p:IsA("BasePart") then
+			p.CanCollide = true
+			p.CanQuery = true
+			if p:IsA("MeshPart") then
+				local ok, nueva = pcall(function()
+					return AssetService:CreateMeshPartAsync(p.MeshId, {
+						CollisionFidelity = Enum.CollisionFidelity.PreciseConvexDecomposition,
+						RenderFidelity = Enum.RenderFidelity.Automatic,
+					})
+				end)
+				if ok and nueva then
+					local textura, color, material, transparencia = p.TextureID, p.Color, p.Material, p.Transparency
+					p:ApplyMesh(nueva)
+					p.TextureID, p.Color, p.Material, p.Transparency = textura, color, material, transparencia
+				else
+					warn("[ArteMundo] " .. nombre .. " sin colision de malla en " .. p.Name .. ": " .. tostring(nueva))
+				end
+			end
+		end
+	end
 end
 
 -- Clona una malla de arte, la deja decorativa y la coloca con el pivote en
@@ -509,6 +550,9 @@ end
 function ArteMundo.camion(padre, cf)
 	local malla = clonarMalla("Camion", padre, cf, 14)
 	if malla then
+		-- Con su propia colision (decision del usuario, 5 oct) en vez de un
+		-- bloque invisible
+		colisionDeMalla(malla, "Camion")
 		return malla
 	end
 	local m = modelo("Camion", padre)
@@ -536,6 +580,13 @@ function ArteMundo.camion(padre, cf)
 	parte({ Name = "Oxido2", Size = Vector3.new(0.1, 1.4, 2.2), CFrame = cf * CFrame.new(-3.05, ry + 1.6, 1.5), Color = M.OXIDO, Material = Enum.Material.CorrodedMetal, Parent = m })
 	for _, x in { -2.2, 2.2 } do
 		cilindroEjeZ({ Name = "Faro", Diametro = 0.9, Largo = 0.2, CFrame = cf * CFrame.new(x, ry + 1.8, -6.5), Color = Paleta.UI_PAPEL, Parent = m })
+	end
+	-- Tambien choca y la bolsa rebota en el, como el de malla
+	for _, p in m:GetDescendants() do
+		if p:IsA("BasePart") then
+			p.CanCollide = true
+			p.CanQuery = true
+		end
 	end
 	return m
 end
@@ -765,6 +816,9 @@ local function tiendaDeMalla(padre, cf)
 	-- El frente de la caseta es +Z local de cf; las ventanas estan en el frente
 	-- del contenedor de arriba
 	colocarImportada(m, TIENDA_ALTO, TIENDA_CENTRO, "Tienda_Coral", "Tienda_Vidrio", cf * CFrame.Angles(0, math.pi, 0))
+	-- Choca con su propia forma y la bolsa rebota en ella (5 oct; antes,
+	-- cajas invisibles a mano en Mundo.Manual que no seguian a la caseta)
+	colisionDeMalla(m, "Tienda")
 	-- Cajas y una bolsa a los lados (la maquina de refrescos queda a x=-13)
 	ArteMundo.caja(m, cf * CFrame.new(11, 1, 1.5), Vector3.new(2.6, 2.2, 2.4))
 	ArteMundo.caja(m, cf * CFrame.new(10.8, 3.2, 1.7) * CFrame.Angles(0, math.rad(15), 0), Vector3.new(2.0, 1.6, 1.9))
@@ -779,13 +833,76 @@ function ArteMundo.caseta(padre, cf)
 end
 
 -- ===========================================================================
--- Contenedor verde y trituradora amarilla
+-- Tablones de ranking (8 oct)
 -- ===========================================================================
 
--- Pinta las paredes del contenedor whitebox como contenedor de obra verde y
--- le anade borde, ruedas y una franja
-function ArteMundo.contenedorVerde(padre, cont)
-	local m = modelo("ArteContenedor", padre)
+-- El modelo del usuario (ServerStorage.Arte.LeaderBoard): marco con la
+-- pantalla en la parte "background wall", cuya cara Front es el frente del
+-- modelo (el LookVector de su pivote). Sin el, uno de partes con las mismas
+-- medidas. EXCEPCION a la regla de este modulo: el tablon choca y es
+-- consultable (no se atraviesa y la bolsa lanzada rebota en el), como la
+-- tienda. La pantalla lleva el tag PantallaRanking y el atributo Ranking:
+-- ahi pinta Client/Tablones.
+local PANTALLA_TABLON = "background wall"
+
+local function tablonDePartes(cf)
+	local m = Instance.new("Model")
+	local function pieza(nombre, tam, desplazamiento, color)
+		local p = Instance.new("Part")
+		p.Name = nombre
+		p.Anchored = true
+		p.Size = tam
+		p.CFrame = cf * desplazamiento
+		p.Color = color
+		p.Material = Enum.Material.SmoothPlastic
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.BottomSurface = Enum.SurfaceType.Smooth
+		p.Parent = m
+		return p
+	end
+	local gris = Color3.fromRGB(79, 79, 79)
+	pieza("Base", Vector3.new(13.5, 0.5, 2.5), CFrame.new(0, 0.25, 0), gris)
+	pieza("PosteIzq", Vector3.new(0.6, 13.8, 0.5), CFrame.new(-6.1, 7.2, 0), gris)
+	pieza("PosteDer", Vector3.new(0.6, 13.8, 0.5), CFrame.new(6.1, 7.2, 0), gris)
+	pieza("Techo", Vector3.new(13.3, 1, 2), CFrame.new(0, 14, 0), gris)
+	pieza("Trasera", Vector3.new(12.6, 13.8, 0.4), CFrame.new(0, 7.2, 0.3), Color3.fromRGB(122, 122, 122))
+	local pantalla = pieza(PANTALLA_TABLON, Vector3.new(11.3, 11.7, 0.1), CFrame.new(0, 7.3, 0.05), gris)
+	m.PrimaryPart = pantalla
+	return m, pantalla
+end
+
+-- cf: pivote en el suelo, frente hacia -Z local. id: DefinicionesRankings
+function ArteMundo.tablonRanking(padre, cf, id)
+	local original = mallaArte("LeaderBoard")
+	local m, pantalla
+	if original and original:IsA("Model") and original:FindFirstChild(PANTALLA_TABLON) then
+		m = original:Clone()
+		m:PivotTo(cf)
+		-- El pivote del modelo esta en el centro de su caja: se baja al suelo
+		local caja, tam = m:GetBoundingBox()
+		m:PivotTo(m:GetPivot() + Vector3.new(0, cf.Position.Y - (caja.Position.Y - tam.Y / 2), 0))
+		pantalla = m:FindFirstChild(PANTALLA_TABLON)
+	else
+		m, pantalla = tablonDePartes(cf)
+	end
+	m.Name = "Tablon_" .. id
+	m:SetAttribute("Ranking", id)
+	pantalla:SetAttribute("Ranking", id)
+	CollectionService:AddTag(pantalla, "PantallaRanking")
+	m.Parent = padre
+	return m
+end
+
+-- ===========================================================================
+-- Contenedores de color y trituradora amarilla
+-- ===========================================================================
+
+-- Pinta las paredes del contenedor whitebox como un contenedor de obra del
+-- color de su tipo (Paleta.TIPO: los 4 de tipo, y el general sin la malla
+-- de la recicladora) y le anade borde, nervios, ruedas y una placa con su
+-- nombre
+function ArteMundo.contenedorColor(padre, cont, color, rotulo, mensaje)
+	local m = modelo("Arte" .. cont.Name, padre)
 	local frente = cont.PrimaryPart or cont:FindFirstChild("ParedFrente")
 	if not frente then
 		return m
@@ -793,14 +910,14 @@ function ArteMundo.contenedorVerde(padre, cont)
 	-- Paredes y piso (todo menos la zona de acierto invisible)
 	for _, p in cont:GetChildren() do
 		if p:IsA("BasePart") and p.Name ~= "ZonaAcierto" then
-			ArteMundo.pintar(p, Enum.Material.Metal, M.VERDE_CONTENEDOR)
+			ArteMundo.pintar(p, Enum.Material.Metal, color)
 		end
 	end
 	local cf = cont:GetBoundingBox()
 	local _, tam = cont:GetBoundingBox()
 	local top = cf.Position.Y + tam.Y / 2
 	-- Borde superior mas oscuro
-	local bordeColor = Paleta.escalar(M.VERDE_CONTENEDOR, 0.75)
+	local bordeColor = Paleta.escalar(color, 0.75)
 	parte({ Name = "BordeN", Size = Vector3.new(tam.X + 0.4, 0.5, 0.9), CFrame = CFrame.new(cf.Position.X, top + 0.1, cf.Position.Z - tam.Z / 2), Color = bordeColor, Material = Enum.Material.Metal, Parent = m })
 	parte({ Name = "BordeS", Size = Vector3.new(tam.X + 0.4, 0.5, 0.9), CFrame = CFrame.new(cf.Position.X, top + 0.1, cf.Position.Z + tam.Z / 2), Color = bordeColor, Material = Enum.Material.Metal, Parent = m })
 	parte({ Name = "BordeO", Size = Vector3.new(0.9, 0.5, tam.Z + 0.4), CFrame = CFrame.new(cf.Position.X - tam.X / 2, top + 0.1, cf.Position.Z), Color = bordeColor, Material = Enum.Material.Metal, Parent = m })
@@ -817,9 +934,9 @@ function ArteMundo.contenedorVerde(padre, cont)
 			cilindroEjeX({ Name = "Rueda", Diametro = 1.1, Largo = 0.5, CFrame = CFrame.new(cf.Position.X + dx, 0.55, cf.Position.Z + dz), Color = M.GOMA, Material = Enum.Material.Rubber, Sombra = true, Parent = m })
 		end
 	end
-	-- Placa pequena con la pegatina de reciclaje (no toda la pared)
-	local placa = parte({ Name = "Placa", Size = Vector3.new(4.2, 1.5, 0.2), CFrame = frente.CFrame * CFrame.new(0, 0.6, frente.Size.Z / 2 + 0.12), Color = Paleta.UI_PAPEL, Material = Enum.Material.SmoothPlastic, Parent = m })
-	ArteMundo.letreroPegatina(placa, "♻ RECICLAJE", CARA_PATIO, { color = M.VERDE_CONTENEDOR })
+	-- Placa pequena con el nombre del tipo (no toda la pared)
+	local placa = parte({ Name = "Placa", Size = Vector3.new(math.min(4.2, tam.X - 1), 1.5, 0.2), CFrame = frente.CFrame * CFrame.new(0, 0.6, frente.Size.Z / 2 + 0.12), Color = Paleta.UI_PAPEL, Material = Enum.Material.SmoothPlastic, Parent = m })
+	ArteMundo.letreroPegatina(placa, rotulo, CARA_PATIO, { color = Paleta.escalar(color, 0.8), mensaje = mensaje })
 	return m
 end
 
@@ -926,6 +1043,12 @@ local function pintarPiezaRecicladora(p)
 	end
 	local clave = nombre:match("_(%a+)$")
 	local prefijo = nombre:match("^(%a+)")
+	if prefijo == "Contenedor" then
+		-- El volquete es el contenedor GENERAL: azul (3 oct; era verde)
+		p.Color = if clave == "VerdeOscuro" then Paleta.escalar(Paleta.TIPO.General, 0.75) else Paleta.TIPO.General
+		p.Material = Enum.Material.Metal
+		return
+	end
 	local pintura = PINTURA_RECICLADORA[PINTURA_MOVILES[prefijo] or clave or nombre]
 	if pintura then
 		p.Color = pintura[1]
@@ -938,12 +1061,20 @@ end
 -- (fija, con Moviles: rodillos, bandas, listones y luces que anima
 -- Recicladora.client) y Bloque (molde del bloque prensado que sale por la
 -- rampa; aqui se deja invisible y el cliente lo clona). Sustituye a
--- contenedorVerde + trituradora; si el place no tiene la malla devuelve nil
+-- contenedorColor + trituradora; si el place no tiene la malla devuelve nil
 -- y ConstructorMundo usa esas dos.
 -- cf = suelo bajo el centro del contenedor funcional, frente a +Z local. El
 -- pivote queda en el suelo bajo el centro del volquete verde con +Z al frente:
 -- es el marco en que Config/Recicladora da la ruta de la basura.
-function ArteMundo.recicladora(padre, cf)
+-- opciones (5 oct, las trituradoras de los contenedores de tipo):
+--   escala         ScaleTo alrededor de ese pivote (la ruta y la colision
+--                  se escalan igual: Recicladora.client lee GetScale())
+--   material       atributo Material del modelo: el cliente anima la del
+--                  contenedor donde se deposita (sin el, la del general)
+--   sinContenedor  quita el volquete (el de tipo lleva su propio contenedor,
+--                  ArteMundo.contenedorMalla, mas grande que el escalado)
+function ArteMundo.recicladora(padre, cf, opciones)
+	opciones = opciones or {}
 	local original = mallaArte("Recicladora")
 	if not original or not original:IsA("Model") then
 		return nil
@@ -996,9 +1127,90 @@ function ArteMundo.recicladora(padre, cf)
 	end
 	decorar(m)
 	CollectionService:AddTag(m, "RecicladoraArte")
-	m.Name = "Recicladora"
+	m.Name = if opciones.material then "Recicladora" .. opciones.material else "Recicladora"
+	if opciones.material then
+		m:SetAttribute("Material", opciones.material)
+	end
+	if opciones.sinContenedor then
+		cont:Destroy()
+	end
+	if opciones.escala and opciones.escala ~= 1 then
+		m:ScaleTo(opciones.escala)
+	end
 	m.Parent = padre
 	m:PivotTo(cf * CFrame.new(0, 1, 0))
+	return m
+end
+
+-- Los 4 contenedores de tipo con la MISMA malla que el volquete general de
+-- la recicladora (decision del usuario, 5 oct), pintada del color de su
+-- tipo y estirada a la caja whitebox (ancho x alto x fondo; escala por eje,
+-- las piezas de la malla van alineadas a los ejes). cf = suelo bajo el
+-- centro de la caja, frente a +Z local. Devuelve nil sin la malla en el
+-- place, y ConstructorMundo usa contenedorColor.
+function ArteMundo.contenedorMalla(padre, cont, cf, ancho, alto, fondo, color, rotulo, mensaje)
+	local original = mallaArte("Recicladora")
+	local fuente = original and original:FindFirstChild("Contenedor")
+	local trit = original and original:FindFirstChild("Trituradora")
+	if not (fuente and trit) then
+		return nil
+	end
+	-- El frente del volquete es el lado contrario a la trituradora (como en
+	-- ArteMundo.recicladora)
+	local ccf, csize = fuente:GetBoundingBox()
+	local d = ccf.Position - trit:GetBoundingBox().Position
+	local frente = if math.abs(d.X) > math.abs(d.Z) then Vector3.new(math.sign(d.X), 0, 0) else Vector3.new(0, 0, math.sign(d.Z))
+	local m = fuente:Clone()
+	m.Name = "Arte" .. cont.Name
+	m.PrimaryPart = nil
+	local suelo = Vector3.new(ccf.Position.X, ccf.Position.Y - csize.Y / 2, ccf.Position.Z)
+	local pivote = CFrame.lookAt(suelo, suelo - frente)
+	m.WorldPivot = pivote
+	local _, tam = m:GetBoundingBox()
+	local escala = Vector3.new(ancho / tam.X, alto / tam.Y, fondo / tam.Z)
+	local function ejeEscala(v)
+		return math.abs(v.X) * escala.X + math.abs(v.Y) * escala.Y + math.abs(v.Z) * escala.Z
+	end
+	local oscuro = Paleta.escalar(color, 0.75)
+	for _, p in m:GetDescendants() do
+		if p:IsA("BasePart") then
+			local rel = pivote:ToObjectSpace(p.CFrame)
+			p.Size = Vector3.new(p.Size.X * ejeEscala(rel.RightVector), p.Size.Y * ejeEscala(rel.UpVector), p.Size.Z * ejeEscala(rel.LookVector))
+			p.CFrame = pivote * (CFrame.new(rel.Position * escala) * rel.Rotation)
+			p.Anchored = true
+			p.CanCollide = false
+			p.CanQuery = false
+			p.CanTouch = false
+			decorar(p)
+			if p:IsA("MeshPart") then
+				p.RenderFidelity = Enum.RenderFidelity.Automatic
+				p.CollisionFidelity = Enum.CollisionFidelity.Box
+			end
+			local clave = p.Name:match("_(%a+)$")
+			if clave == "Verde" then
+				p.Color, p.Material = color, Enum.Material.Metal
+			elseif clave == "VerdeOscuro" then
+				p.Color, p.Material = oscuro, Enum.Material.Metal
+			else
+				-- Base gris y placa blanca: pintarPiezaRecicladora pondria
+				-- todo el volquete del azul del general
+				local pintura = PINTURA_RECICLADORA[clave or ""]
+				if pintura then
+					p.Color, p.Material = pintura[1], pintura[2]
+				end
+			end
+		end
+	end
+	decorar(m)
+	m.Parent = padre
+	m:PivotTo(cf * CFrame.new(0, 1, 0))
+	-- Las paredes whitebox siguen colisionando y llevando el prompt, sin verse
+	for _, p in cont:GetChildren() do
+		ArteMundo.ocultar(p)
+	end
+	-- Placa con el nombre del tipo en el frente
+	local placa = parte({ Name = "Placa", Size = Vector3.new(math.min(4.2, ancho - 1), 1.3, 0.2), CFrame = cf * CFrame.new(0, 1 + alto * 0.55, fondo / 2 + 0.15), Color = Paleta.UI_PAPEL, Material = Enum.Material.SmoothPlastic, Parent = m })
+	ArteMundo.letreroPegatina(placa, rotulo, CARA_PATIO, { color = Paleta.escalar(color, 0.8), mensaje = mensaje })
 	return m
 end
 

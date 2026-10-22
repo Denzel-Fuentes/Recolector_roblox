@@ -14,7 +14,7 @@
 	la HUD, un place anterior al mundo v2).
 
 	Los cuadrantes ya no son de un material (decision del usuario, 29 sep):
-	que set de mascotas esta abierto lo dice DefinicionesMascotas.setAbierto.
+	cada uno tiene una zona con su mezcla de materiales.
 ]]
 
 local GameConfig = require(script.Parent.Parent:WaitForChild("Config"):WaitForChild("GameConfig"))

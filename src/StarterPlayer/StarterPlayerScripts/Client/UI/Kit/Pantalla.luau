@@ -32,6 +32,9 @@ return function(scope: any, p: Props): ScreenGui
 		DisplayOrder = p.Orden or 0,
 		Enabled = if p.Visible == nil then true else p.Visible,
 		IgnoreGuiInset = p.IgnorarInset == true,
+		-- El idioma lo pone Utilidades/Idioma (Idioma.textos), no la traduccion
+		-- automatica de Roblox
+		AutoLocalize = false,
 		Parent = playerGui,
 		[Children] = {
 			scope:New("UIScale")({ Scale = Escala.escala }),

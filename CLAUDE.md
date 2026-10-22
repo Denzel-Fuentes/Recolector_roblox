@@ -2,14 +2,15 @@
 
 Réplica whitebox de KOTAMON para Roblox, rediseñada el 26 sep 2026 como
 **"Diseño v2: recoger y lanzar"** (sin base ni energía; montones de basura
-revuelta con zonas más ricas tras rebirths, mascotas por fragmentos,
-rebirths, pedidos). El 29 sep el usuario cambió dos cosas del documento:
-los montones ya no van separados por material y las mascotas salen de
-fragmentos que se encuentran en los montones, no de cápsulas (CONTEXTO §3).
-El diseño está en
-`docs/GDD.md`; el estado del proyecto, el plan por lotes de la v2 y las
-decisiones no obvias en `CONTEXTO.md`. Léelos antes de tocar balance o
-estructura.
+revuelta con zonas más ricas tras rebirths, rebirths, pedidos). El 3 oct,
+**v3 para lanzar**: cinco contenedores (uno por tipo de basura, del color
+de su tipo, y el general azul; x2 lo bien separado), basura del color de
+su tipo, **sin mascotas**, tienda con barras de 10 cuadros, pedidos,
+insignias, pases, tutorial de 8 pasos y tercera persona (CONTEXTO §3
+"Lanzamiento: v3"). El place está publicado (PlaceId 139915415713937).
+El diseño original está en `docs/GDD.md`; el estado del proyecto, el plan
+por lotes y las decisiones no obvias en `CONTEXTO.md`. Léelos antes de
+tocar balance o estructura.
 
 ## Toolchain
 
@@ -63,17 +64,19 @@ con `init.luau` → ModuleScript con hijos (`PruebasDefinidas/`).
 Capas (la dependencia va siempre hacia abajo, nunca al revés):
 
 ```
-Config            datos puros: números, textos, tablas de probabilidad, definiciones,
+Config            datos puros: números, textos (Textos + Traducciones en/pt), tablas de probabilidad, definiciones,
                   Paleta (grises whitebox + Paleta.MUNDO + VARIANTES), Iconos (ids del arte 2D)
 Utilidades        sin estado de juego, servidor y cliente por igual:
-                  Primitivas → ModelosMascota / ModelosObjetos / ModelosMonton,
-                  Geometria, PoseBrazos, Red, Senal, Formato, Entrada,
-                  Glifos (iconos dibujados de respaldo)
-Services          reglas y estado (Perfiles, Bolsa, Mejoras, Economia…). El patio
-                  es una fachada (Botin) sobre seis módulos de una responsabilidad:
+                  Primitivas → ModelosObjetos / ModelosMonton, Contenedores
+                  (los 5 contenedores, servidor y cliente), Geometria,
+                  PoseBrazos, Red, Senal, Formato, Entrada,
+                  Glifos (iconos dibujados de respaldo), Idioma (traduce el copy)
+Services          reglas y estado (Perfiles, Bolsa, Mejoras, Economia, Turbo,
+                  Cosmeticos, Pedidos, Insignias…). El patio es una fachada
+                  (Botin) sobre cinco módulos de una responsabilidad:
                   GeneradorBotin (qué sale) · ObjetosPatio (registro y reclamo) ·
                   FisicaBasura (cae y se ancla) · Montones (ciclo de vida) ·
-                  Iman · Lanzamiento; tipos comunes en TiposPatio, grupos de
+                  Lanzamiento; tipos comunes en TiposPatio, grupos de
                   colisión en Colisiones
 *Handler.server   cableado: prompts, remotes, cooldowns → llaman a los módulos
 Client            solo intención + presentación; toma Config y Utilidades, nunca Services
@@ -90,6 +93,16 @@ un módulo de solo tipos.
 - `--!strict` (o `--!nonstrict` en constructores de geometría), tabs.
 - Identificadores, archivos y comentarios en **español**. UI en español, todo el
   copy en `Config/Textos.luau`.
+- Idiomas (7 oct, CONTEXTO §3 "Idiomas"): el juego sale en español, inglés
+  y portugués. Toda clave nueva de `Textos` (o nombre nuevo de mejora, pase,
+  producto, insignia o cosmético) va también en `Config/Traducciones/en` y
+  `pt` con los mismos `{marcadores}`; la prueba `idioma` lo comprueba. El
+  cliente lee `Idioma.textos`, nunca `Config/Textos`, y los nombres de Config
+  con `Idioma.nombre/descripcion`. **El servidor no envía texto montado**:
+  envía `Idioma.mensaje("SECCION.clave", valores)` (dinero con
+  `Idioma.dinero`, nombres con `Idioma.mensajeNombre`) y, en instancias, el
+  mensaje en un atributo (`Idioma.codificar`). Mayúsculas con
+  `Idioma.mayusculas`, no `string.upper`.
 - Cabecera de cada archivo: qué hace ("Única responsabilidad") y el **porqué**
   de lo no obvio. Documenta decisiones, no sintaxis.
 - El servidor es la autoridad: el cliente sólo envía intención por RemoteEvent y
@@ -99,8 +112,8 @@ un módulo de solo tipos.
 - Persistencia: todo acceso a DataStore va en `pcall`, un perfil que no cargó
   nunca se guarda (bandera `cargado`).
 - Geometría del runtime se localiza por **tags/atributos** de CollectionService
-  (`RanuraMonton`, `Contenedor`, `PuntoAparicion`, `BarreraCuadrante`…), nunca
-  por listas de nombres. Cuadrantes y sus materiales: `GameConfig.CUADRANTES`
+  (`RanuraMonton`, `Contenedor` + atributo `Material` en los 4 de tipo,
+  `PuntoAparicion`, `BarreraCuadrante`…), nunca por listas de nombres. Cuadrantes y sus materiales: `GameConfig.CUADRANTES`
   + `Utilidades/Cuadrantes` (servidor y cliente).
 - Arte por capas: el whitebox (grises de `Config/Paleta.luau`) sigue siendo
   el esqueleto funcional; el arte son piezas `SoloDecorado` sin colisión de
@@ -109,9 +122,10 @@ un módulo de solo tipos.
   tamaño ni posición de una parte funcional para "mejorar" su aspecto.
 - Lo que la v2 QUITA se borró del código (energía, gemas, Sobre, Contenedor
   Dorado, Pase de la Suerte, Montón extra, reparación, fusión, venta, base,
-  logros con dinero): no se reintroduce sin decisión del usuario. Lo que solo
-  POSPONE (figuritas, cintas, trajes del botín) sigue tras
-  `GameConfig.activa("FIGURINAS" | "CINTAS" | "TRAJES_BOTIN")`; no añadir
+  logros con dinero; el 3 oct las mascotas, sus fragmentos y el imán; el
+  5 oct los trajes del avatar, gratis y de pago): no se reintroduce sin
+  decisión del usuario. Lo que solo POSPONE (figuritas, cintas) sigue tras
+  `GameConfig.activa("FIGURINAS" | "CINTAS")`; no añadir
   dependencias nuevas de ello (ver CONTEXTO §3 "Diseño v2").
 - UI: en **Fusion 0.3** con el Kit (`Client/UI/Kit`, estilo "UI Kit" de
   simulador: contorno marino, colores intensos, barras de título de color,
@@ -128,36 +142,53 @@ un módulo de solo tipos.
 1. Consola de Studio sin errores tras sincronizar (`get_console_output`).
 2. Hornear mundo (`hornear-desde-mcp.luau` devuelve los conteos) → capturas
    con `screen_capture` + `camera_position` (vista aérea desde (-26, 330, 60)
-   mirando a (-26, 0, 30); la caseta desde la plaza (6, 9, 83) → (0, 7, 133);
+   mirando a (-26, 0, 30); la caseta desde la plaza (-29, 9, 83) → (-35, 7, 133);
    la barrera del norte desde (-20, 12, 5) → (-30, 5, -45); una esquina de la
-   valla) → mundo v5: 18 `RanuraMonton` (12 chicos + 6 grandes, con
-   `Cuadrante` y `Zona`), 8 `BarreraCuadrante`, 1 `PuntoAparicion`,
-   1 `Contenedor`, 4 `Limite`, 0 `Parcela`, 0 `MaquinaRefrescos`,
-   0 `FigurinaFija` (con `FIGURINAS` apagada), ~1.000 instancias en `Mundo`.
+   valla; los contenedores de color con su trituradora desde la plaza (8, 12, 100) →
+   (8, 3, 128)) →
+   mundo v6: 18 `RanuraMonton` (12 chicos + 6 grandes, con `Cuadrante` y
+   `Zona`), 0 `BarreraCuadrante`, 1 `PuntoAparicion`, 5 `Contenedor` (4
+   con `Material`: los de tipo; el general sin él), 4 `Limite`,
+   0 `Parcela`, 0 `MaquinaRefrescos`, 0 `FigurinaFija` (con `FIGURINAS`
+   apagada), 5 `RecicladoraArte` (la del general y una por contenedor de
+   color, con atributo `Material`), 3 `PantallaRanking` (los tablones de
+   ranking, con atributo `Ranking`), ~1.050 instancias en `Mundo`.
    El plano está en la cabecera de `ConstructorMundo` (patio 97,5×150 con
-   2x3 cuadrantes; los cuatro del sur, zona "patio" de basura revuelta; los
-   dos del norte, zonas ricas en metal y orgánico tras barreras de Rebirth 1
-   y 2; recicladora al sur, valla a 24 studs del patio).
+   2x3 cuadrantes, los seis zona "patio" abiertos y sin barreras desde el
+   5 oct: los rebirths desbloquean TIPOS de basura, `GameConfig.MATERIAL_REBIRTH`;
+   recicladora al sur, con la caseta en x = `LAYOUT.CASETA_X` (−35) y las 4
+   unidades de color al este de la cabaña; valla a 24 studs del patio).
 3. Play: pruebas de servidor con `EjecutarPrueba:Invoke(nombre)`:
+   - idioma: `idioma` (en/pt cubren todo `Textos` y `DEF`, mismos marcadores,
+     mensajes anidados y con dinero);
+   - rankings: `rankings` (semana desde el lunes, valores semanales de suma
+     y de máximo, stores `_Studio`, un tablón por ranking) y
+     `rankingsDatastore` (ida y vuelta real por los OrderedDataStores de
+     Studio; sin acceso a la API dice SIN API);
    - perfil y progreso: `estado`, `perfilV3`, `mejorasV2`, `brazoLimita`,
-     `aparicion`, `tutorial`, `sinRestos` (nada de lo que la v2 quitó);
+     `aparicion`, `tutorial` (8 pasos), `bolsaManosLlena` (abierta en
+     manos; llena, cerrada con nudo), `sinRestos` (nada de lo quitado,
+     mascotas y trajes incluidos);
    - patio: `excavar`, `reclamoAtomico`, `montonPiezas`, `reacomodo`,
-     `sinRecogidaAutomatica`, `variedadBasura`, `enPatio`, `limiteJugador`,
-     `topePatio`;
+     `sinRecogidaAutomatica`, `variedadBasura`, `coloresBasura` (cada pieza
+     del color de su tipo), `enPatio`, `limiteJugador`, `topePatio`;
    - rebirths: `rebirthTabla`, `renacerRequisitos`, `renacer`;
-   - mascotas y fragmentos: `rarezaOdds`, `siempreNueva`, `primeraMascota`,
-     `montaje`, `fragmentoCerrado`, `fragmentoAlDepositar`,
-     `fragmentosMonton`, `mezclaZonas`, `repetidaNivel`, `huecos`,
-     `bonusMascota`, `imanMaterial`, `reyReciclon`, `simularSet` (y
-     `darFragmentos` set n para ver la revelación en el cliente);
+   - contenedores: `pagoSeparado` (x2 / x0,5 / x1), `lanzarATipo` (la
+     bolsa entra en el contenedor al que se apunta, los cinco), `contenedorBloqueado` (metal/orgánico cerrados sin su
+     rebirth: rebota y a mano se rechaza);
+   - pedidos e insignias: `pedidosDia`, `pedidoSeparadas`, `premioTurbo`,
+     `insignias`;
+   - pases y cosméticos: `paseDineroX2`, `paseBolsaXL`, `turboAcumula`,
+     `cosmeticoBolsa` (usan el modo dev de pases y lo dejan como estaba);
    - puntería: `bonusDistancia`, `racha`, `primeroEntra`, `pagoFormula`
      (y en el cliente `("trayectoria", 0.8)` dibuja la línea de ayuda);
-   - patio por zonas: `cuadrantes`, `variedadPiezas`, `tesoroGrande`,
-     `valoresMaterial`, `prioridadExcavador`, `reposicion`, `bloqueoRebirth`,
-     `barreraColision`, `caminarBarrera` (el personaje anda de verdad hacia
-     el Metal con 0 y con 1 rebirths);
+   - patio por zonas: `cuadrantes`, `materialPorRebirth`, `variedadPiezas`, `tesoroGrande`,
+     `valoresMaterial`, `prioridadExcavador`, `reposicion`,
+     `reclamoMaterialBloqueado` (con 0 rebirths no se recoge el metal que
+     saca otro con R2), `sinBarreras`;
    - bolsa ("el dinero sólo sale del contenedor"): `billeteEnBolsa`,
-     `sinDineroAlRecoger`, `salirRecicla`, `bolsaProtegida`, `lanzarBolsa`,
+     `sinDineroAlRecoger`, `salirRecicla`, `bolsaProtegida`, `bolsaLibre`
+     (a los 30 s la recoge cualquiera), `lanzarBolsa`,
      `lanzarBolsaFallo`, `lanzarContraRecicladora`, `bolsaEnAlto` (la bolsa
      fallada no se recicla sola; en alto se baja junto al contenedor),
      `recicladora` (y luego
@@ -168,8 +199,20 @@ un módulo de solo tipos.
    antes de dar nada por roto.
    En el cliente `EjecutarPruebaCliente:Invoke("reticula")` y `("verme", 8)`
    para capturar el propio personaje desde fuera; `("plataforma", "tactil")`
-   fuerza la disposición táctil y `("hud")` lista los bloques del HUD y avisa
-   de solapes o de que algo se sale del viewport.
+   fuerza la disposición táctil, `("celebracion", "Papel")` y `("mas1")` disparan
+   los efectos de cobro y de recoger (el "+1" va con `AlwaysOnTop` y la
+   captura del MCP no lo pinta; ponerlo a false para verlo), y `("hud")` lista los bloques del HUD y avisa
+   de solapes o de que algo se sale del viewport; `("camara", "tercera")`
+   cambia la vista (vale en todo el mapa desde el 6 oct, como la V); `("abrir", "Tienda", "pases")` y
+   `("abrir", "Pedidos", "insignias")` abren una pestaña.
+   `("avisoMundo", texto, icono)` pinta una burbuja de aviso, `("toast")`
+   toasts del estilo nuevo y `("botones")` dice si se ven RECOGER/LANZAR
+   (solo existen con pantalla táctil), `("record", 32, true)` la tarjeta
+   de récord. `("idioma")` dice el idioma activo y una muestra; para jugar
+   en otro, atributo `IdiomaStudio = "en"` (o `"pt"`) en `ReplicatedStorage`
+   en Edit antes de Play, y quitarlo después. `("tablones")` resume los
+   tablones de ranking (filas visibles y tu fila).
+   `PASES_DEV_EN_STUDIO` está apagado: `/pases on` para ver los pases.
 4. Multijugador: Studio → Test → Clients and Servers (2 jugadores), ver
    `README-pruebas.md`.
 

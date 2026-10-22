@@ -22,7 +22,7 @@
 	grupo de las partes del personaje se replica y el cliente, que simula su
 	propio personaje, lo respeta. Sin script de cliente y valido con
 	streaming. No es la autoridad (un cliente modificado puede atravesar
-	paredes): excavar, reclamar y el iman se validan en el servidor.
+	paredes): excavar y reclamar se validan en el servidor.
 
 	Lo demas (suelo, muros, muebles) queda en Default y choca con todos.
 ]]

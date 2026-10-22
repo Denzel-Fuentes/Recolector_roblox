@@ -1,13 +1,15 @@
 --!nonstrict
 --[[
 	Pruebas del patio: montones, activacion, reclamo atomico, fisica de la
-	basura, recogida solo por clic, variedad de basura, EnPatio.
+	basura, recogida solo por clic, variedad de basura y su color por tipo,
+	EnPatio.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared:WaitForChild("Config"):WaitForChild("GameConfig"))
+local Paleta = require(Shared:WaitForChild("Config"):WaitForChild("Paleta"))
 local ModelosObjetos = require(Shared:WaitForChild("Utilidades"):WaitForChild("ModelosObjetos"))
 local ModelosMonton = require(Shared:WaitForChild("Utilidades"):WaitForChild("ModelosMonton"))
 
@@ -305,8 +307,7 @@ function Pruebas.reacomodo()
 			and altoDespues < altoAntes and m.estado == "agotado" and resto) and "OK" or "FALLO")
 end
 
--- Nada se recoge por pasar al lado: solo el clic (el iman de las mascotas lo
--- prueba "imanMaterial")
+-- Nada se recoge por pasar al lado: solo el clic (o la mira en el movil)
 function Pruebas.sinRecogidaAutomatica()
 	local j = jugador()
 	local m = activarLejos(j)
@@ -374,6 +375,48 @@ function Pruebas.variedadBasura()
 	return string.format("%d modelos, %d formas distintas: %s => %s", total, #lista, table.concat(lista, ", "), (#lista >= 14) and "OK" or "FALLO")
 end
 
+-- La basura es del color de su tipo (3 oct): el cuerpo de cada pieza esta
+-- mas cerca de los tonos de SU tipo que de los de cualquier otro, y sin
+-- textura de paleta (taparia el color)
+function Pruebas.coloresBasura()
+	local rng = Random.new(11)
+	local function distancia(a: Color3, b: Color3): number
+		return (a.R - b.R) ^ 2 + (a.G - b.G) ^ 2 + (a.B - b.B) ^ 2
+	end
+	local function tipoMasCercano(color: Color3): string
+		local mejor, dMejor = "", math.huge
+		for tipo, tonos in Paleta.BASURA do
+			for _, tono in tonos do
+				local d = distancia(color, tono)
+				if d < dMejor then
+					mejor, dMejor = tipo, d
+				end
+			end
+		end
+		return mejor
+	end
+	local mal, conTextura, total = {}, 0, 0
+	for _, material in { "Metal", "Plastico", "Papel", "Organico" } do
+		for _ = 1, 40 do
+			local m = ModelosObjetos.basura(material, rng)
+			local cuerpo = m.PrimaryPart
+			if cuerpo then
+				total += 1
+				if cuerpo:IsA("MeshPart") and cuerpo.TextureID ~= "" then
+					conTextura += 1
+				end
+				local cercano = tipoMasCercano(cuerpo.Color)
+				if cercano ~= material then
+					table.insert(mal, string.format("%s:%s parece %s", material, tostring(m:GetAttribute("Forma")), cercano))
+				end
+			end
+			m:Destroy()
+		end
+	end
+	return string.format("%d piezas | con textura %d | de otro color %d [%s] => %s",
+		total, conTextura, #mal, table.concat(mal, ", ", 1, math.min(#mal, 6)), (total >= 160 and conTextura == 0 and #mal == 0) and "OK" or "FALLO")
+end
+
 -- Depuracion: lista lo que queda en el monton i con su apoyo sobre la colina
 function Pruebas.verMonton(indice)
 	local m = Botin.montones()[tonumber(indice) or 1]
@@ -423,6 +466,33 @@ function Pruebas.enPatio()
 	return string.format("dentro: EnPatio=%s bolsa=%s abierta=%s delante=%s brazoElevado=%s | fuera: EnPatio=%s bolsa=%s => %s",
 		tostring(dentro), tostring(bolsa ~= nil), tostring(abierta), tostring(delante), tostring(elevado), tostring(fuera), tostring(bolsaFuera),
 		(dentro == true and bolsa and abierta and delante and elevado and fuera == false and not bolsaFuera) and "OK" or "FALLO")
+end
+
+-- La bolsa en las manos: abierta (Boca) mientras cabe algo; llena, cerrada
+-- con su nudo (Nudo, sin Boca), como el dibujo de primera persona
+function Pruebas.bolsaManosLlena()
+	local j = jugador()
+	teletransportar(j, Vector3.new(-26.25, 0, 0))
+	Bolsa.vaciar(j)
+	task.wait(0.6)
+	local ch = j.Character
+	local vacia = ch and ch:FindFirstChild("BolsaEnManos")
+	local abiertaVacia = vacia and vacia:FindFirstChild("Boca") ~= nil
+	for _ = 1, Bolsa.capacidad(j) do
+		Bolsa.meter(j, { tipo = "basura", nombre = "Papel", material = "Papel", valor = 1 })
+	end
+	task.wait(0.6)
+	local llena = ch and ch:FindFirstChild("BolsaEnManos")
+	local cerrada = llena and llena:FindFirstChild("Nudo") ~= nil and llena:FindFirstChild("Boca") == nil
+	local hijos = {}
+	for _, c in (llena and llena:GetChildren() or {}) do
+		table.insert(hijos, c.Name)
+	end
+	Bolsa.vaciar(j)
+	teletransportar(j, Comunes.fueraDelPatio())
+	return string.format("vacia: abierta=%s | llena (%d/%d): cerrada=%s hijos=%s => %s",
+		tostring(abiertaVacia), Bolsa.capacidad(j), Bolsa.capacidad(j), tostring(cerrada), table.concat(hijos, ","),
+		(abiertaVacia and cerrada) and "OK" or "FALLO")
 end
 
 -- ===========================================================================

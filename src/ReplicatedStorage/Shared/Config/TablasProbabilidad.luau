@@ -3,11 +3,10 @@
 	TablasProbabilidad (OddsTables en el GDD)
 	UNICA fuente de probabilidades del juego.
 
-	La usa el servidor para otorgar (GeneradorBotin, Fragmentos) y el cliente
-	para pintar las probabilidades en el album de mascotas. Que sea el mismo
-	modulo en ReplicatedStorage garantiza que el numero mostrado y el real no
-	puedan desincronizarse. En la v2 nada aleatorio se vende con Robux, pero
-	las probabilidades de la mascota se ensenan igual ("aunque sea gratis").
+	La usa el servidor para otorgar (GeneradorBotin). Vive en
+	ReplicatedStorage para que cualquier numero que se ensene al jugador sea
+	el mismo que se usa de verdad. Nada aleatorio se vende con Robux (las
+	mascotas, lo unico que se ensenaba, se quitaron el 3 oct).
 
 	Cada tabla es una lista ORDENADA de { id, peso } cuyos pesos suman 100. El
 	orden importa: es el orden en que se muestran en la UI. verificar() falla al
@@ -21,29 +20,30 @@ export type Tabla = { Entrada }
 local TablasProbabilidad = {}
 
 -- === Contenido de un monton: que es cada pieza ===
--- Una tirada por pieza (diseno v2): 5 % billetes, 1 % tesoros y 2,5 %
--- fragmentos de mascota (decision del usuario, 29 sep: las mascotas se
--- consiguen juntando fragmentos que salen entre la basura). El grande trae
--- ademas un tesoro y un fragmento garantizados (GameConfig.TAMANOS_MONTON).
+-- Una tirada por pieza (diseno v2): 5 % billetes y 1 % tesoros. El grande
+-- trae ademas un tesoro garantizado (GameConfig.TAMANOS_MONTON). El 2,5 %
+-- de fragmentos de mascota volvio a la basura al quitar las mascotas (3 oct).
 TablasProbabilidad.TIPO_PIEZA = {
-	{ id = "basura", peso = 91.5 },
+	{ id = "basura", peso = 94 },
 	{ id = "billete", peso = 5 },
 	{ id = "tesoro", peso = 1 },
-	{ id = "fragmento", peso = 2.5 },
 }
 
 -- === Material de cada pieza, segun la zona del patio ===
 -- Decision del usuario (29 sep): los montones NO van separados por
 -- material; todos traen los cuatro revueltos. Las zonas del norte, tras las
 -- barreras de Rebirth 1 y 2, son mas ricas: mas metal y organico, que pagan
--- mas (GameConfig.VALOR_MATERIAL). Una pieza del patio vale ~$7,8 de media;
--- de la zona de metal ~$13,8; de la de organico ~$18,7.
+-- mas (GameConfig.VALOR_MATERIAL).
+-- 5 oct: ya no hay zonas cerradas (todos los cuadrantes son "patio"); los
+-- materiales se abren con rebirths (GameConfig.MATERIAL_REBIRTH) y
+-- GeneradorBotin quita de esta tabla los que el excavador no tiene (elegir
+-- normaliza por el total). Con 0 rebirths: 53 % papel, 47 % plastico.
 TablasProbabilidad.MEZCLA = {
 	patio = {
-		{ id = "Papel", peso = 45 },
-		{ id = "Plastico", peso = 40 },
-		{ id = "Metal", peso = 10 },
-		{ id = "Organico", peso = 5 },
+		{ id = "Papel", peso = 40 },
+		{ id = "Plastico", peso = 35 },
+		{ id = "Metal", peso = 15 },
+		{ id = "Organico", peso = 10 },
 	},
 	metal = {
 		{ id = "Papel", peso = 15 },
@@ -59,22 +59,11 @@ TablasProbabilidad.MEZCLA = {
 	},
 } :: { [string]: Tabla }
 
--- === Rareza de la mascota que empieza a montar un set ===
--- Al llegar el primer fragmento de un set sin mascota a medias, se decide
--- cual sera: esta rareza (con el pity de DefinicionesMascotas.PITY) y, dentro
--- de ella, una que no tengas (Services/Fragmentos). Se ensena en el album.
-TablasProbabilidad.RAREZA_MASCOTA = {
-	{ id = "Comun", peso = 67 },
-	{ id = "Rara", peso = 28 },
-	{ id = "Epica", peso = 5 },
-}
-
 -- Coleccionables pospuestos (GameConfig.FUNCIONES): con alguna de sus
 -- funciones encendida, un monton trae uno de vez en cuando, de este tipo
 TablasProbabilidad.COLECCIONABLE = {
-	{ id = "figurina", peso = 50 },
-	{ id = "cinta", peso = 35 },
-	{ id = "traje", peso = 15 },
+	{ id = "figurina", peso = 60 },
+	{ id = "cinta", peso = 40 },
 }
 
 -- === Utilidades ===
@@ -105,7 +94,6 @@ end
 function TablasProbabilidad.verificar()
 	local tablas: { [string]: Tabla } = {
 		TIPO_PIEZA = TablasProbabilidad.TIPO_PIEZA,
-		RAREZA_MASCOTA = TablasProbabilidad.RAREZA_MASCOTA,
 		COLECCIONABLE = TablasProbabilidad.COLECCIONABLE,
 	}
 	for zona, tabla in TablasProbabilidad.MEZCLA do

@@ -16,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config")
 local Paleta = require(Config:WaitForChild("Paleta"))
 local Iconos = require(Config:WaitForChild("Iconos"))
+local Idioma = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Utilidades"):WaitForChild("Idioma"))
 
 local Tema = {}
 
@@ -88,15 +89,9 @@ function Tema.colorBoton(clave: string, color: Color3?): Color3
 	return Paleta.UI_KIT[hashTexto(clave) % #Paleta.UI_KIT + 1]
 end
 
--- string.upper solo sabe ASCII: "montón" saldria "MONTóN". Las letras
--- acentuadas del espanol son dos bytes (C3 xx) y la mayuscula esta 0x20 antes.
-local MAYUSCULAS_UTF8 = { ["á"] = "Á", ["é"] = "É", ["í"] = "Í", ["ó"] = "Ó", ["ú"] = "Ú", ["ñ"] = "Ñ", ["ü"] = "Ü" }
-function Tema.mayusculas(texto: string): string
-	local resultado = string.upper(texto):gsub("\xC3[\xA0-\xBF]", function(letra: string)
-		return MAYUSCULAS_UTF8[letra] or letra
-	end)
-	return resultado
-end
+-- string.upper solo sabe ASCII ("montón" saldria "MONTóN"): la version que
+-- sabe de tildes (y de las del portugues) vive en Utilidades/Idioma
+Tema.mayusculas = Idioma.mayusculas
 
 function Tema.cabecera(nombrePanel: string): Color3
 	return Paleta.CABECERA_PANEL[nombrePanel] or Paleta.CABECERA_DEFECTO

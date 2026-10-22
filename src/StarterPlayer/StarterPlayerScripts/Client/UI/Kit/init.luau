@@ -32,6 +32,7 @@ return {
 	Pildora = require(script:WaitForChild("Pildora")),
 	Insignia = require(script:WaitForChild("Insignia")),
 	Barra = require(script:WaitForChild("Barra")),
+	Segmentos = require(script:WaitForChild("Segmentos")),
 	Scroll = require(script:WaitForChild("Scroll")),
 	Viewport = require(script:WaitForChild("Viewport")),
 	Lista = Maquetas.Lista,

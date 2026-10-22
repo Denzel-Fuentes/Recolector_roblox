@@ -5,8 +5,7 @@
 	moneda premium) y sus reglas.
 
 	El dinero lo paga Dona Chatarra al DEPOSITAR en el contenedor (recoger
-	nunca paga); tambien las mascotas repetidas por encima del nivel 5 y los
-	pedidos. Se gasta en mejoras y rebirths, nada mas.
+	nunca paga); tambien los pedidos. Se gasta en mejoras y rebirths, nada mas.
 
 	Nunca se resta sin comprobar antes: gastar() devuelve false y no toca nada si
 	no alcanza. Las estadisticas de Ahorro (dineroMaximo) y de ganancia total se

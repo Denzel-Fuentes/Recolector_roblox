@@ -8,13 +8,14 @@
 	Para renacer hace falta tener las 4 mejoras al maximo y el dinero del
 	requisito en mano. Los cinco primeros estan a mano (el primero hacia la
 	hora de juego abre el metal; el segundo, hacia la hora y media, el
-	organico; el tercero da la segunda mascota equipada); desde el sexto el
+	organico; el tercero regala la Bolsa plateada); desde el sexto el
 	requisito se multiplica por 4 y el multiplicador sube 0,5 cada vez.
 	Aviso del diseno: desde el Rebirth 4 no se abre nada nuevo; es el hueco
 	que deberan llenar las actualizaciones.
 
-	Lo que abre cada rebirth no se repite aqui: las zonas las dice
-	GameConfig.CUADRANTES y los sets de mascotas DefinicionesMascotas.SETS.
+	El Rebirth 3 daba la segunda mascota equipada; al quitar las mascotas
+	(3 oct) regala un diseno de bolsa (DefinicionesCosmeticos). Lo que abre
+	cada rebirth no se repite aqui: las zonas las dice GameConfig.CUADRANTES.
 ]]
 
 export type Rebirth = {
@@ -28,7 +29,7 @@ local DefinicionesRebirths = {}
 DefinicionesRebirths.TABLA = {
 	{ requisito = 50000, multiplicador = 1.5, desbloquea = "metal" },
 	{ requisito = 200000, multiplicador = 2, desbloquea = "organico" },
-	{ requisito = 800000, multiplicador = 2.5, desbloquea = "segundaMascota" },
+	{ requisito = 800000, multiplicador = 2.5, desbloquea = "bolsaPlateada" },
 	{ requisito = 3200000, multiplicador = 3, desbloquea = "insignia" },
 	{ requisito = 12800000, multiplicador = 3.5, desbloquea = "insignia" },
 } :: { Rebirth }
@@ -36,9 +37,6 @@ DefinicionesRebirths.TABLA = {
 -- Pasado el ultimo de la tabla: requisito x4 y multiplicador +0,5 por rebirth
 DefinicionesRebirths.FACTOR_REQUISITO = 4
 DefinicionesRebirths.PASO_MULTIPLICADOR = 0.5
--- Rebirths con los que se equipa una mascota mas (diseno v2: 2 huecos desde
--- el Rebirth 3; el pase Tercera mascota da otro)
-DefinicionesRebirths.REBIRTH_SEGUNDA_MASCOTA = 3
 
 -- El rebirth numero n (1 = el primero): requisito, multiplicador y que abre
 function DefinicionesRebirths.rebirth(n: number): Rebirth
@@ -61,11 +59,6 @@ function DefinicionesRebirths.multiplicador(rebirths: number): number
 		return 1
 	end
 	return DefinicionesRebirths.rebirth(rebirths).multiplicador
-end
-
--- Huecos de mascota equipada que dan los rebirths (sin contar pases)
-function DefinicionesRebirths.huecosMascota(rebirths: number): number
-	return if rebirths >= DefinicionesRebirths.REBIRTH_SEGUNDA_MASCOTA then 2 else 1
 end
 
 return DefinicionesRebirths

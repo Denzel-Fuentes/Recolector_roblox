@@ -1,18 +1,17 @@
 --!nonstrict
 --[[
-	Pruebas del patio por zonas (diseno v2, lote 3; zonas revueltas desde el
-	29 sep): cuadrantes y sus zonas, lo que sale de un monton, precios por
-	material, prioridad del excavador, reposicion a los 45 s y bloqueo por
-	rebirth (servidor y grupos de colision). La mezcla de cada zona y los
-	fragmentos se prueban en Mascotas (mezclaZonas, fragmentosMonton).
+	Pruebas del patio (diseno v2, lote 3): cuadrantes y sus zonas, lo que
+	sale de un monton, precios por material, prioridad del excavador,
+	reposicion, y el desbloqueo por TIPO de basura del 5 oct
+	(materialPorRebirth, reclamoMaterialBloqueado, sinBarreras).
 ]]
 
 local CollectionService = game:GetService("CollectionService")
-local PhysicsService = game:GetService("PhysicsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared:WaitForChild("Config"):WaitForChild("GameConfig"))
+local TablasProbabilidad = require(Shared:WaitForChild("Config"):WaitForChild("TablasProbabilidad"))
 local Cuadrantes = require(Shared:WaitForChild("Utilidades"):WaitForChild("Cuadrantes"))
 
 local Servicios = script.Parent.Parent
@@ -20,7 +19,6 @@ local Perfiles = require(Servicios:WaitForChild("Perfiles"))
 local Bolsa = require(Servicios:WaitForChild("Bolsa"))
 local Botin = require(Servicios:WaitForChild("Botin"))
 local GeneradorBotin = require(Servicios:WaitForChild("GeneradorBotin"))
-local Colisiones = require(Servicios:WaitForChild("Colisiones"))
 
 local Comunes = require(script.Parent:WaitForChild("Comunes"))
 local jugador, teletransportar = Comunes.jugador, Comunes.teletransportar
@@ -29,6 +27,43 @@ local Pruebas = {}
 
 local function ok(cond: boolean): string
 	return if cond then "OK" else "FALLO"
+end
+
+-- Lo que sale depende de los rebirths del excavador (5 oct): con 0 solo
+-- papel y plastico, con 1 tambien metal, con 2 los cuatro con los pesos de
+-- MEZCLA.patio (8.000 piezas por nivel)
+function Pruebas.materialPorRebirth()
+	local j = jugador()
+	local p = Perfiles.obtener(j)
+	local antes = p.rebirths
+	local partes, bien = {}, true
+	for _, rebirths in { 0, 1, 2 } do
+		p.rebirths = rebirths
+		local lista = GeneradorBotin.generar(j, "chico", "patio", 8000)
+		local cuenta, n = {}, 0
+		for _, item in lista do
+			if item.material then
+				cuenta[item.material] = (cuenta[item.material] or 0) + 1
+				n += 1
+			end
+		end
+		local total = 0
+		for _, e in TablasProbabilidad.MEZCLA.patio do
+			if GameConfig.materialAbierto(e.id, rebirths) then
+				total += e.peso
+			end
+		end
+		local texto = {}
+		for _, e in TablasProbabilidad.MEZCLA.patio do
+			local pct = (cuenta[e.id] or 0) / n * 100
+			local esperado = if GameConfig.materialAbierto(e.id, rebirths) then e.peso / total * 100 else 0
+			bien = bien and math.abs(pct - esperado) < 2.5 and (esperado > 0 or (cuenta[e.id] or 0) == 0)
+			table.insert(texto, string.format("%s %.0f/%.0f", e.id, pct, esperado))
+		end
+		table.insert(partes, "R" .. rebirths .. ": " .. table.concat(texto, " "))
+	end
+	p.rebirths = antes
+	return table.concat(partes, " | ") .. " => " .. ok(bien)
 end
 
 -- Cada monton sabe su cuadrante y zona, coherentes con donde esta; tres
@@ -188,114 +223,56 @@ function Pruebas.reposicion()
 		ok(restos > 0 and m.estado == "lleno" and quedan == 0 and lomas > 0))
 end
 
--- Sin el rebirth no se excava ni se recoge en un cuadrante cerrado; con el, si
-function Pruebas.bloqueoRebirth()
+-- Un jugador con Rebirth 2 excava (salen los cuatro tipos); otro con 0 no
+-- puede llevarse el metal ni el organico de ese monton, pero si el papel y
+-- el plastico. Ningun monton esta cerrado.
+function Pruebas.reclamoMaterialBloqueado()
 	local j = jugador()
 	local p = Perfiles.obtener(j)
 	local antes = p.rebirths
-	local m = nil
-	for _, monton in Botin.montones() do
-		if monton.estado == "lleno" and GameConfig.CUADRANTES[monton.cuadrante].rebirth == 1 then
-			m = monton
-			break
-		end
-	end
-	if not m then
-		Botin.repoblarAhora()
-		return "no habia monton lleno en un cuadrante de Rebirth 1 (repuesto; repite) => FALLO"
-	end
+	local m = Comunes.montonesLlenos(1)[1]
 	teletransportar(j, m.ranura.Position + Vector3.new(GameConfig.TAMANOS_MONTON[m.tamano].radio + 4, 0, 0))
 	task.wait(0.2)
-	p.rebirths = 0
+	p.rebirths = 2
 	Botin.liberarMontones(j)
-	local ok0, motivo0 = Botin.excavar(j, m)
-	p.rebirths = 1
-	local ok1 = Comunes.excavar(j, m)
+	local excavo = Comunes.excavar(j, m)
 	task.wait(1.6)
-	local id = nil
+	local bloqueado, abierto = nil, nil
 	for oid, obj in Botin.objetos() do
 		if obj.monton == m then
-			id = oid
-			break
+			if not GameConfig.materialAbierto(obj.item.material, 0) then
+				bloqueado = bloqueado or oid
+			else
+				abierto = abierto or oid
+			end
 		end
 	end
+	Bolsa.vaciar(j)
 	p.rebirths = 0
-	local recoge0, motivoRecoge = Botin.reclamar(j, id, "toque")
-	p.rebirths = 1
-	local recoge1 = Botin.reclamar(j, id, "toque")
+	local okB, motivoB = Botin.reclamar(j, bloqueado, "toque")
+	local okA = Botin.reclamar(j, abierto, "toque")
+	p.rebirths = 2
+	local okB2 = Botin.reclamar(j, bloqueado, "toque")
 	p.rebirths = antes
 	Perfiles.marcarSucio(j)
 	Bolsa.vaciar(j)
 	teletransportar(j, Comunes.fueraDelPatio())
-	return string.format("%s con 0 rebirths: excavar=%s (%s) recoger=%s (%s) | con 1: excavar=%s recoger=%s => %s",
-		m.zona, tostring(ok0), tostring(motivo0), tostring(recoge0), tostring(motivoRecoge), tostring(ok1), tostring(recoge1),
-		ok(not ok0 and motivo0 == "bloqueado" and not recoge0 and motivoRecoge == "bloqueado" and ok1 and recoge1))
+	return string.format("excavo con R2=%s | con 0: tipo cerrado=%s (%s) tipo abierto=%s | con 2: tipo cerrado=%s => %s",
+		tostring(excavo), tostring(okB), tostring(motivoB), tostring(okA), tostring(okB2),
+		ok(excavo and bloqueado ~= nil and not okB and motivoB == "materialBloqueado" and okA and okB2))
 end
 
--- Grupos de colision: cada nivel de rebirth atraviesa sus barreras y no las
--- de mas arriba; las barreras horneadas llevan su grupo; el personaje cambia
--- de grupo al cambiar sus rebirths
-function Pruebas.barreraColision()
-	local j = jugador()
-	local p = Perfiles.obtener(j)
-	local antes = p.rebirths
-	local function choca(a, b)
-		return PhysicsService:CollisionGroupsAreCollidable(a, b)
-	end
-	local matriz = choca("Personaje", "BarreraR1") and choca("Personaje", "BarreraR2")
-		and not choca("PersonajeR1", "BarreraR1") and choca("PersonajeR1", "BarreraR2")
-		and not choca("PersonajeR2", "BarreraR1") and not choca("PersonajeR2", "BarreraR2")
-		and not choca("Basura", "PersonajeR1") and choca("Basura", "BarreraR1")
-	local barreras, malas = 0, 0
-	for _, pared in CollectionService:GetTagged("BarreraCuadrante") do
-		barreras += 1
-		if pared.CollisionGroup ~= "BarreraR" .. tostring(pared:GetAttribute("Rebirth")) or not pared.CanCollide then
-			malas += 1
+-- Sin secciones bloqueadas: todos los cuadrantes abiertos con 0 rebirths y
+-- ninguna barrera horneada
+function Pruebas.sinBarreras()
+	local cerrados = 0
+	for i = 1, #GameConfig.CUADRANTES do
+		if not Cuadrantes.abierto(i, 0) then
+			cerrados += 1
 		end
 	end
-	local grupos = {}
-	for _, n in { 0, 1, 2, 3 } do
-		p.rebirths = n
-		Perfiles.marcarSucio(j)
-		task.wait(0.4)
-		local torso = j.Character and j.Character:FindFirstChild("HumanoidRootPart")
-		table.insert(grupos, tostring(torso and torso.CollisionGroup))
-	end
-	p.rebirths = antes
-	Perfiles.marcarSucio(j)
-	local serie = table.concat(grupos, ",")
-	return string.format("matriz=%s | %d paredes, %d mal agrupadas | personaje con 0..3 rebirths: %s => %s",
-		tostring(matriz), barreras, malas, serie,
-		ok(matriz and barreras > 0 and malas == 0 and serie == "Personaje,PersonajeR1,PersonajeR2,PersonajeR2" and Colisiones.grupoPersonaje(j) ~= nil))
-end
-
--- De verdad: el personaje anda hacia el cuadrante de Metal. Con 0 rebirths
--- se queda en la pared; con 1 entra.
-function Pruebas.caminarBarrera()
-	local j = jugador()
-	local p = Perfiles.obtener(j)
-	local antes = p.rebirths
-	local humanoide = j.Character and j.Character:FindFirstChildOfClass("Humanoid")
-	local root = j.Character and j.Character:FindFirstChild("HumanoidRootPart")
-	if not humanoide or not root then
-		return "sin personaje => FALLO"
-	end
-	local function intentar(rebirths)
-		p.rebirths = rebirths
-		Perfiles.marcarSucio(j)
-		task.wait(0.5)
-		j.Character:PivotTo(CFrame.lookAt(Vector3.new(-50, 4, -18), Vector3.new(-50, 4, -60)))
-		task.wait(0.3)
-		humanoide:MoveTo(Vector3.new(-50, 1, -45))
-		task.wait(3)
-		return root.Position.Z
-	end
-	local z0 = intentar(0)
-	local z1 = intentar(1)
-	p.rebirths = antes
-	Perfiles.marcarSucio(j)
-	teletransportar(j, Comunes.fueraDelPatio())
-	return string.format("pared sur del Metal en z=-25,6 | con 0 rebirths llega a z=%.1f | con 1 a z=%.1f => %s", z0, z1, ok(z0 > -26 and z1 < -40))
+	local barreras = #CollectionService:GetTagged("BarreraCuadrante")
+	return string.format("cuadrantes cerrados con 0 rebirths: %d | barreras: %d => %s", cerrados, barreras, ok(cerrados == 0 and barreras == 0))
 end
 
 return Pruebas

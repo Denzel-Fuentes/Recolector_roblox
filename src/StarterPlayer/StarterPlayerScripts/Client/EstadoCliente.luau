@@ -23,7 +23,6 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Utilidades = Shared:WaitForChild("Utilidades")
 local Senal = require(Utilidades:WaitForChild("Senal"))
 local Red = require(Utilidades:WaitForChild("Red"))
-local Productos = require(Shared:WaitForChild("Config"):WaitForChild("Productos"))
 local Fusion = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Fusion"))
 
 local EstadoCliente = {}
@@ -39,6 +38,10 @@ EstadoCliente.alCambiarBolsa = Senal.nueva() :: Senal.Senal<any>
 -- ControlPatio y la pintan el HUD (barra derecha) y las manos.
 EstadoCliente.cargaLanzamiento = 0
 EstadoCliente.alCambiarCarga = Senal.nueva() :: Senal.Senal<number>
+-- Se intento recoger con la bolsa llena (ControlPatio): el HUD sacude la
+-- barra de bolsa en vez de un toast (6 oct)
+EstadoCliente.alRecogerConBolsaLlena = Senal.nueva() :: Senal.Senal<>
+
 
 -- Scope del modulo: vive lo que dure la sesion, nunca se limpia
 local scope = Fusion.scoped(Fusion)
@@ -89,15 +92,6 @@ function EstadoCliente.tienePase(idPase: string): boolean
 	end
 	local p = EstadoCliente.perfil
 	return p ~= nil and p.pasesCache ~= nil and p.pasesCache[idPase] == true
-end
-
-function EstadoCliente.tieneTraje(id: string): boolean
-	local p = EstadoCliente.perfil
-	if p and p.trajes and p.trajes[id] then
-		return true
-	end
-	local pase = Productos.paseParaTraje(id)
-	return pase ~= nil and EstadoCliente.tienePase(pase.id)
 end
 
 function EstadoCliente.nivelMejora(id: string): number

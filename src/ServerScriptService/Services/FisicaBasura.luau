@@ -70,8 +70,8 @@ function FisicaBasura.darFisica(obj: Objeto)
 	-- Colisionan TODAS las partes de cada pieza, tambien los detalles. Se probo
 	-- dejar solo el Cuerpo (menos contactos) y salio caro: las piezas redondas
 	-- sin aros ni tapones que las frenen ruedan segundos y la montana tarda en
-	-- asentarse (reacomodo bajaba del 90 % anclado a los 5 s), y en mascotas y
-	-- tesoros el "cuerpo" solo es el torso y se hundian hasta la cabeza.
+	-- asentarse (reacomodo bajaba del 90 % anclado a los 5 s), y en los
+	-- tesoros el "cuerpo" no es todo el modelo y se hundian.
 	local partes: { BasePart } = {}
 	for _, p in modelo:GetDescendants() do
 		if p:IsA("BasePart") then
@@ -109,23 +109,6 @@ local function anclar(obj: Objeto)
 	end
 	obj.asentado = true
 	caidas[obj] = nil
-end
-
--- El iman se lo lleva: se ancla (lo arrastra PivotTo) y deja de chocar
-function FisicaBasura.soltar(obj: Objeto)
-	if obj.suelto then
-		return
-	end
-	obj.suelto = true
-	anclar(obj)
-	for _, p in obj.modelo:GetDescendants() do
-		if p:IsA("BasePart") then
-			p.CanCollide = false
-		end
-	end
-	if obj.monton then
-		FisicaBasura.despertarVecinos(obj.monton, obj.modelo:GetPivot().Position)
-	end
 end
 
 -- ===========================================================================

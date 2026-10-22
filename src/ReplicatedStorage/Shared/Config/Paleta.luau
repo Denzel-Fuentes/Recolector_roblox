@@ -7,7 +7,6 @@
 	que en Fly_Roblox: minimo 30 puntos entre escalones contiguos que se vean
 	juntos, nada por debajo de ~80 para no aplastar el volumen):
 
-	    82   silueta "no la tienes" en el album
 	    110  suelo del patio (lo mas oscuro: es donde esta la basura)
 	    140  montones y decorado del patio
 	    165  caminos, muros, montones agotados (referencia neutra)
@@ -15,8 +14,12 @@
 	    215  muebles y NPC
 	    240  caseta de Dona Chatarra (el hub es lo mas claro)
 
-	Los OBJETOS y MASCOTAS llevan color plano por MATERIAL y un disco de RAREZA:
-	set y rareza son informacion de juego y necesitan leerse a distancia.
+	La BASURA lleva el color de su TIPO (Paleta.TIPO, decision del usuario,
+	3 oct): papel celeste (era carton suave hasta el 6 oct), plastico
+	amarillo, metal plomo, organico verde; y el contenedor general, azul. Cada pieza toma uno de varios
+	tonos de su color (Paleta.BASURA) para que la montana no sea plana pero
+	el tipo se lea de un vistazo: es lo que decide a que contenedor va.
+	Contenedores, suelo de las zonas, barreras e iconos usan el mismo color.
 
 	Sin NEON en el mapa (el usuario quito el anillo amarillo del monton activado):
 	la senal de "aqui hay basura" es la propia montana, que pasa de gris a los
@@ -43,32 +46,35 @@ Paleta.MUEBLE = gris(215)
 Paleta.NPC = gris(215)
 Paleta.CASETA = gris(240)
 
--- Materiales (sets de mascotas y basura)
-Paleta.MATERIAL = {
-	Metal = Color3.fromRGB(150, 165, 185),
-	Plastico = Color3.fromRGB(70, 190, 200),
-	Papel = Color3.fromRGB(214, 196, 150),
-	Organico = Color3.fromRGB(120, 150, 80),
-	Mixto = Color3.fromRGB(230, 190, 60),
+-- Tipos de basura y sus contenedores (3 oct). General = el contenedor que
+-- acepta de todo (el volquete de la recicladora)
+Paleta.TIPO = {
+	-- celeste (6 oct, peticion del usuario: el carton suave se confundia con
+	-- el amarillo del plastico, sobre todo en sus tonos oscuros); claro y
+	-- cian para no confundirse con el azul fuerte del general ni la bolsa
+	Papel = Color3.fromRGB(110, 200, 240),
+	Plastico = Color3.fromRGB(246, 202, 36), -- amarillo
+	Metal = Color3.fromRGB(118, 127, 139), -- plomo (con material Metal brilla)
+	Organico = Color3.fromRGB(78, 172, 70), -- verde
+	General = Color3.fromRGB(44, 110, 216), -- azul
 }
-
--- Rareza (disco bajo la mascota / borde de la tarjeta)
-Paleta.RAREZA = {
-	Comun = gris(165),
-	Rara = Color3.fromRGB(90, 150, 230),
-	Epica = Color3.fromRGB(200, 80, 200),
-	Mitica = Color3.fromRGB(255, 210, 40),
-}
+-- El color de cada material es el de su tipo (un solo sitio que cambiar)
+Paleta.MATERIAL = Paleta.TIPO
 
 -- Objetos sueltos
 Paleta.BILLETE = Color3.fromRGB(90, 180, 90)
-Paleta.TESORO = Color3.fromRGB(230, 190, 60)
+-- Violeta "epico" (7 oct, peticion del usuario: dorado se confundia con la
+-- basura de plastico, amarilla). Ningun tipo de basura usa este color
+Paleta.TESORO = Color3.fromRGB(170, 85, 235)
 Paleta.DORADO = Color3.fromRGB(230, 190, 60)
 Paleta.FIGURINA = gris(215)
 Paleta.CINTA = gris(50)
 -- La bolsa de basura (azul oscuro, como en KOTAMON): proyectil, objeto caido,
 -- bolsa en manos y la "imagen" de manos del cliente
 Paleta.BOLSA = Color3.fromRGB(52, 74, 128)
+-- El cincho del atado de la bolsa cerrada: amarillo, como el cordon de las
+-- bolsas de basura; contrasta con el azul y no cambia con los disenos
+Paleta.CINCHO_BOLSA = Color3.fromRGB(242, 183, 5)
 Paleta.PIEL = Color3.fromRGB(232, 196, 160)
 
 -- UI: estilo "UI Kit" de simulador (referencia del usuario, 23 sep): blanco
@@ -114,18 +120,20 @@ Paleta.UI_KIT_EXITO = Paleta.UI_EXITO
 -- Barra de titulo de cada ventana (por nombre de panel); el resto, marino
 Paleta.CABECERA_PANEL = {
 	Tienda = Color3.fromRGB(240, 52, 64),
-	Mascotas = Color3.fromRGB(42, 140, 255),
 	Rebirth = Color3.fromRGB(146, 70, 245),
 	Pedidos = Color3.fromRGB(255, 142, 20),
-	Revelacion = Color3.fromRGB(255, 176, 20),
 }
 Paleta.CABECERA_DEFECTO = Color3.fromRGB(38, 42, 86)
+-- Los tres primeros puestos de los tablones de ranking (Client/Tablones)
+Paleta.UI_ORO = Color3.fromRGB(255, 196, 28)
+Paleta.UI_PLATA = Color3.fromRGB(196, 204, 220)
+Paleta.UI_BRONCE = Color3.fromRGB(214, 130, 64)
 
 -- ===========================================================================
 -- Arte del mundo (pasada de color sobre el whitebox, referencia KOTAMON)
 -- ===========================================================================
--- Los grises de arriba siguen siendo el respaldo y el vocabulario de las
--- mascotas; esto es lo que pinta ConstructorMundo/ArteMundo por encima.
+-- Los grises de arriba siguen siendo el respaldo; esto es lo que pinta
+-- ConstructorMundo/ArteMundo por encima.
 Paleta.MUNDO = {
 	CESPED = Color3.fromRGB(127, 198, 75),
 	CESPED_OSCURO = Color3.fromRGB(96, 168, 58),
@@ -179,16 +187,6 @@ Paleta.VARIANTES = {
 	madera = nil :: string?,
 }
 
--- Colores vivos de la basura real, por material: cada pieza elige uno con
--- su rng (latas rojas/azules/plata, botellas cian/verdes...). El color del
--- set (Paleta.MATERIAL) sigue mandando en las mascotas y en el album.
-Paleta.BASURA = {
-	Metal = { Color3.fromRGB(210, 60, 60), Color3.fromRGB(60, 110, 200), Color3.fromRGB(190, 195, 205), Color3.fromRGB(230, 190, 60) },
-	Plastico = { Color3.fromRGB(70, 190, 200), Color3.fromRGB(90, 200, 110), Color3.fromRGB(240, 240, 240), Color3.fromRGB(240, 120, 60) },
-	Papel = { Color3.fromRGB(214, 176, 120), Color3.fromRGB(230, 220, 190), Color3.fromRGB(180, 140, 95), Color3.fromRGB(240, 200, 120) },
-	Organico = { Color3.fromRGB(230, 200, 60), Color3.fromRGB(120, 170, 70), Color3.fromRGB(200, 90, 70), Color3.fromRGB(170, 120, 70) },
-}
-
 -- Aclara u oscurece un color multiplicando sus canales
 function Paleta.escalar(color: Color3, factor: number): Color3
 	return Color3.new(
@@ -197,5 +195,29 @@ function Paleta.escalar(color: Color3, factor: number): Color3
 		math.clamp(color.B * factor, 0, 1)
 	)
 end
+
+-- Tonos de un color, del mas oscuro al mas claro: hacia negro y hacia
+-- blanco (multiplicar no aclara un color ya saturado, como el amarillo)
+local NEGRO, BLANCO = Color3.new(0, 0, 0), Color3.new(1, 1, 1)
+function Paleta.tonos(color: Color3): { Color3 }
+	return {
+		color:Lerp(NEGRO, 0.32),
+		color:Lerp(NEGRO, 0.16),
+		color,
+		color:Lerp(BLANCO, 0.2),
+		color:Lerp(BLANCO, 0.38),
+	}
+end
+
+-- La basura real: cada pieza elige con su rng uno de los tonos del color de
+-- su tipo (peticion del usuario, 3 oct: "diferentes tonalidades de su
+-- color"). Antes eran colores vivos sueltos (latas rojas, botellas cian) y el
+-- tipo no se distinguia.
+Paleta.BASURA = {
+	Papel = Paleta.tonos(Paleta.TIPO.Papel),
+	Plastico = Paleta.tonos(Paleta.TIPO.Plastico),
+	Metal = Paleta.tonos(Paleta.TIPO.Metal),
+	Organico = Paleta.tonos(Paleta.TIPO.Organico),
+}
 
 return Paleta

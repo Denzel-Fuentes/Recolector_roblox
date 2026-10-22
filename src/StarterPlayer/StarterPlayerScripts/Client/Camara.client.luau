@@ -1,18 +1,20 @@
 --!strict
 --[[
 	Camara
-	Primera persona automatica dentro del patio (como en KOTAMON), la reticula
-	(un punto en el centro en vez de la flecha del raton) y el arreglo del bug
-	de los modales.
+	La vista del jugador en TODO el mapa (peticion del usuario, 6 oct: antes
+	solo en el patio): primera persona, o tercera persona sobre el hombro
+	(lote 9); la V o el boton del HUD cambian entre las dos, dentro o fuera
+	del patio. Ademas la reticula (un punto en el centro en vez de la flecha
+	del raton) y el arreglo del bug de los modales.
 
-	  EnPatio = true   -> CameraMode LockFirstPerson, flecha oculta, punto visible
-	  EnPatio = false  -> CameraMode Classic, flecha normal, y el zoom que
-	                      tenia al entrar (peticion del usuario: si entro en
-	                      primera persona sale en primera; si entro a 20
-	                      studs, vuelve a 20). Roblox, al pasar de
-	                      LockFirstPerson a Classic, pone el zoom a su
-	                      gusto; se fuerza fijando min = max = esa distancia
-	                      un par de frames y devolviendo los limites.
+	  primera  -> CameraMode LockFirstPerson, flecha oculta, punto visible
+	  tercera  -> CameraMode Classic a DISTANCIA_TERCERA sobre el hombro,
+	              raton bloqueado al centro, el personaje girando con la
+	              camara y el punto visible
+
+	(Hasta el 6 oct, fuera del patio la camara era la Classic libre de
+	Roblox y al salir se restauraba el zoom con que se entro; ya no hay
+	camara libre, asi que eso se quito.)
 
 	=== El bug ===
 	En primera persona el script de camara de Roblox bloquea el raton en el
@@ -30,7 +32,7 @@
 
 	=== La reticula ===
 	Con el raton bloqueado en el centro, Roblox sigue pintando la flecha ahi,
-	que no parece una mira. En el patio (sin panel abierto) se oculta la
+	que no parece una mira. Sin panel abierto (en todo el mapa) se oculta la
 	flecha (MouseIconEnabled) y se dibuja un punto en el centro de la
 	pantalla: es donde sale el rayo de recoger y de lanzar. Un anillo fino
 	alrededor crece cuando hay un objeto al alcance bajo la mira (el Highlight
@@ -38,6 +40,16 @@
 	Tambien en tactil (29 sep: antes se ocultaba porque en el movil se recoge
 	tocando la basura, y el usuario echaba de menos la mira para apuntar;
 	ahora lanzar apunta a ella y recoge lo que tiene debajo, ver ControlPatio).
+
+	=== Tercera persona (lote 9) ===
+	Se cambia con la V o con el boton del HUD, y se guarda en el perfil
+	(perfil.camara, CamaraEvent). La eleccion vive en el atributo LOCAL
+	"Vista" del jugador ("primera" | "tercera"): el HUD y las manos 2D (que
+	solo se ven en primera) lo leen sin depender de este script. En tercera
+	la mira sigue siendo el centro de la pantalla, asi que recoger y lanzar
+	funcionan igual (ControlPatio ya excluye al propio personaje del rayo).
+	Es un "shift lock" propio: raton al centro y el personaje mirando hacia
+	donde mira la camara, para que la bolsa y los brazos queden delante.
 ]]
 
 local Players = game:GetService("Players")
@@ -48,13 +60,22 @@ local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Paleta = require(Shared:WaitForChild("Config"):WaitForChild("Paleta"))
+local Red = require(Shared:WaitForChild("Utilidades"):WaitForChild("Red"))
 
 local UI = script.Parent:WaitForChild("UI")
 local Menu = require(UI:WaitForChild("Menu"))
+local EstadoCliente = require(script.Parent:WaitForChild("EstadoCliente"))
+
+local CamaraEvent = Red.evento("CamaraEvent")
 
 local jugador = Players.LocalPlayer
 local NOMBRE_PASO = "ReciclatasLiberarRaton"
+local NOMBRE_TERCERA = "ReciclatasTerceraPersona"
 local liberando = false
+
+-- Tercera persona: distancia de la camara y desplazamiento sobre el hombro
+local DISTANCIA_TERCERA = 11
+local HOMBRO = Vector3.new(1.8, 0.6, 0)
 
 -- === Reticula ===
 local pantalla = Instance.new("ScreenGui")
@@ -115,12 +136,17 @@ else
 	end)
 end
 
-local function enPatio(): boolean
-	return jugador:GetAttribute("EnPatio") == true
+local function vistaTercera(): boolean
+	return jugador:GetAttribute("Vista") == "tercera"
+end
+
+local function humanoide(): Humanoid?
+	local personaje = jugador.Character
+	return if personaje then personaje:FindFirstChildOfClass("Humanoid") else nil
 end
 
 local function actualizarReticula()
-	local mostrar = enPatio() and not Menu.hayAbierto()
+	local mostrar = not Menu.hayAbierto()
 	pantalla.Enabled = mostrar
 	if not liberando then
 		UserInputService.MouseIconEnabled = not mostrar
@@ -143,57 +169,99 @@ local function liberarRaton(activo: boolean)
 	actualizarReticula()
 end
 
--- Los limites de zoom del juego (StarterPlayer): se restauran siempre a
--- estos, aunque se cambie de estado a mitad de un forzado
+-- Los limites de zoom del juego (StarterPlayer): se devuelven al salir de
+-- tercera persona
 local ZOOM_MIN, ZOOM_MAX = jugador.CameraMinZoomDistance, jugador.CameraMaxZoomDistance
-local zoomAlEntrar: number? = nil
-local estabaDentro = false
-local forzado = 0
 
-local function distanciaZoom(): number
-	local camara = workspace.CurrentCamera
-	return (camara.CFrame.Position - camara.Focus.Position).Magnitude
-end
-
-local function fijarZoom(distancia: number)
-	local d = math.clamp(distancia, ZOOM_MIN, ZOOM_MAX)
-	forzado += 1
-	local este = forzado
-	jugador.CameraMinZoomDistance = d
-	jugador.CameraMaxZoomDistance = d
-	-- El script de camara aplica los limites en su paso de render: se le
-	-- dejan dos frames y se devuelven (si no llego otro forzado entretanto)
-	task.spawn(function()
-		RunService.RenderStepped:Wait()
-		RunService.RenderStepped:Wait()
-		if forzado == este then
-			jugador.CameraMinZoomDistance = ZOOM_MIN
-			jugador.CameraMaxZoomDistance = ZOOM_MAX
-		end
-	end)
-end
-
-local function aplicarCamara()
-	local dentro = enPatio()
-	if dentro then
-		if not estabaDentro then
-			zoomAlEntrar = distanciaZoom()
-		end
-		jugador.CameraMode = Enum.CameraMode.LockFirstPerson
-	else
-		jugador.CameraMode = Enum.CameraMode.Classic
-		if estabaDentro and zoomAlEntrar then
-			fijarZoom(zoomAlEntrar)
-		end
-		zoomAlEntrar = nil
+-- En tercera persona, despues del script de camara: raton al centro (sin
+-- panel) y el personaje girado hacia donde mira la camara
+local function pasoTercera()
+	if Menu.hayAbierto() then
+		return
 	end
-	estabaDentro = dentro
-	actualizarReticula()
+	if UserInputService.MouseEnabled then
+		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+	end
+	local personaje = jugador.Character
+	local root = personaje and personaje:FindFirstChild("HumanoidRootPart")
+	if root and root:IsA("BasePart") then
+		local mira = workspace.CurrentCamera.CFrame.LookVector
+		local plano = Vector3.new(mira.X, 0, mira.Z)
+		if plano.Magnitude > 0.1 then
+			root.CFrame = CFrame.lookAt(root.Position, root.Position + plano)
+		end
+	end
 end
 
-jugador:GetAttributeChangedSignal("EnPatio"):Connect(aplicarCamara)
+local enTercera = false
+local function fijarTercera(activa: boolean)
+	local hum = humanoide()
+	if hum then
+		hum.CameraOffset = if activa then HOMBRO else Vector3.zero
+		hum.AutoRotate = not activa
+	end
+	if activa == enTercera then
+		return
+	end
+	enTercera = activa
+	-- Siempre se desengancha antes: BindToRenderStep con el mismo nombre no
+	-- sustituye, acumula (al reaparecer se fuerza enTercera = false)
+	RunService:UnbindFromRenderStep(NOMBRE_TERCERA)
+	if activa then
+		RunService:BindToRenderStep(NOMBRE_TERCERA, Enum.RenderPriority.Camera.Value + 2, pasoTercera)
+		jugador.CameraMinZoomDistance = DISTANCIA_TERCERA
+		jugador.CameraMaxZoomDistance = DISTANCIA_TERCERA
+	else
+		jugador.CameraMinZoomDistance = ZOOM_MIN
+		jugador.CameraMaxZoomDistance = ZOOM_MAX
+	end
+end
+
+local esperandoHumanoide = false
+local function aplicarCamara()
+	local tercera = vistaTercera()
+	jugador.CameraMode = if tercera then Enum.CameraMode.Classic else Enum.CameraMode.LockFirstPerson
+	fijarTercera(tercera)
+	actualizarReticula()
+	-- La vista guardada suele llegar (con el perfil) antes que el personaje:
+	-- sin Humanoid no hay hombro ni giro, asi que se reaplica cuando exista
+	-- (hasta el 6 oct lo tapaba que entrar al patio volvia a aplicarla)
+	if not humanoide() and not esperandoHumanoide then
+		esperandoHumanoide = true
+		task.spawn(function()
+			local personaje = jugador.Character or jugador.CharacterAdded:Wait()
+			personaje:WaitForChild("Humanoid", 10)
+			esperandoHumanoide = false
+			aplicarCamara()
+		end)
+	end
+end
+
+-- Cambia de vista (V o el boton del HUD, que solo tocan el atributo) y la
+-- guarda en el perfil
+local function alternarVista()
+	jugador:SetAttribute("Vista", if vistaTercera() then "primera" else "tercera")
+end
+
+jugador:GetAttributeChangedSignal("Vista"):Connect(function()
+	aplicarCamara()
+	CamaraEvent:FireServer(if vistaTercera() then "tercera" else "primera")
+end)
 jugador.CharacterAdded:Connect(function()
+	enTercera = false
 	task.defer(aplicarCamara)
+end)
+UserInputService.InputBegan:Connect(function(input, procesado)
+	if not procesado and input.KeyCode == Enum.KeyCode.V then
+		alternarVista()
+	end
+end)
+-- La vista guardada en el perfil (primera la primera vez)
+task.spawn(function()
+	local perfil = EstadoCliente.esperar()
+	if jugador:GetAttribute("Vista") == nil then
+		jugador:SetAttribute("Vista", if perfil and perfil.camara == "tercera" then "tercera" else "primera")
+	end
 end)
 Menu.alCambiar:Connect(function(nombre)
 	liberarRaton(nombre ~= nil)

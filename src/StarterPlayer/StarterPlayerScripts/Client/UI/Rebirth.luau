@@ -18,7 +18,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Paleta = require(Config:WaitForChild("Paleta"))
-local Textos = require(Config:WaitForChild("Textos"))
+-- El copy en el idioma del jugador (misma forma que Config/Textos)
+local Idioma = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Utilidades"):WaitForChild("Idioma"))
+local Textos = Idioma.textos
 local DefinicionesMejoras = require(Config:WaitForChild("DefinicionesMejoras"))
 local DefinicionesRebirths = require(Config:WaitForChild("DefinicionesRebirths"))
 local Utilidades = Shared:WaitForChild("Utilidades")
@@ -101,7 +103,7 @@ local function filaMejora(orden: number, def: DefinicionesMejoras.Mejora)
 			}),
 			scope:Texto({
 				Texto = scope:Computed(function(use)
-					return Textos.formatear(Textos.REBIRTH.mejora, { nombre = def.nombre, n = use(nivel) })
+					return Textos.formatear(Textos.REBIRTH.mejora, { nombre = Idioma.nombre("Mejoras", def), n = use(nivel) })
 				end),
 				Size = UDim2.new(1, -34, 1, 0),
 				Position = UDim2.fromOffset(34, 0),

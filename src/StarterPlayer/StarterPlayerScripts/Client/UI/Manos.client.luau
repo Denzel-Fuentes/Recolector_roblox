@@ -14,7 +14,8 @@
 	    se sustituye por la bolsa cerrada y atada (nudo).
 
 	La bolsa NO cambia de tamano con el llenado (decision del usuario).
-	Se ve solo con EnPatio y sin panel abierto. Se mueve un poco:
+	Se ve solo con EnPatio, en primera persona (en tercera ya se ve la bolsa
+	de verdad) y sin panel abierto. Se mueve un poco:
 	  - balanceo lento continuo (seno),
 	  - sacudida corta cada vez que entra algo en la bolsa,
 	  - sube/vibra al cargar el lanzamiento.
@@ -31,6 +32,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Paleta = require(Shared:WaitForChild("Config"):WaitForChild("Paleta"))
 local Iconos = require(Shared:WaitForChild("Config"):WaitForChild("Iconos"))
+local DefinicionesCosmeticos = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesCosmeticos"))
 local Fusion = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Fusion"))
 
 local Cliente = script.Parent.Parent
@@ -82,14 +84,12 @@ local AJUSTES = {
 	nudoOrejaAlto = 110,
 	nudoOrejaSeparacion = 40, -- px del centro a cada oreja
 	nudoOrejaInclinacion = 35, -- grados hacia fuera
-	colorAtadura = Paleta.escalar(Paleta.BOLSA, 0.55),
 
 	-- La boca (el ovalo abierto)
 	bocaAlto = 170, -- alto del ovalo
 	bocaAncho = 0.85, -- fraccion del ancho de la bolsa
 	bocaDesplazamiento = 30, -- centro del ovalo respecto al borde superior del saco (+ = mas abajo)
 	bocaGrosorBorde = 28, -- px del borde claro alrededor del agujero
-	colorBorde = Paleta.escalar(Paleta.BOLSA, 1.35),
 	colorInterior = Paleta.escalar(Paleta.BOLSA, 0.22), -- el agujero (mas bajo = mas oscuro)
 
 	-- Las manos (dibujadas)
@@ -115,8 +115,21 @@ local llena = scope:Computed(function(use)
 	return use(llenado) >= 1
 end)
 
+-- El color del saco: el del diseno de bolsa puesto (lote 8; el servidor ya
+-- valida que lo tiene al ponerlo) o el azul de siempre
+local colorBolsa = scope:Computed(function(use)
+	local p = use(EstadoCliente.reactivo.perfil)
+	local diseno = p and p.disenoBolsa and DefinicionesCosmeticos.BOLSA_POR_ID[p.disenoBolsa]
+	return if diseno then diseno.color else AJUSTES.colorBolsa
+end)
+local function tonoBolsa(factor: number)
+	return scope:Computed(function(use)
+		return Paleta.escalar(use(colorBolsa), factor)
+	end)
+end
+
 -- Un Frame redondeado (con contorno marino si se pide)
-local function forma(props: { Nombre: string, Size: UDim2, Position: UDim2, AnchorPoint: Vector2?, Color: Color3, Radio: UDim?, ZIndex: number, Rotacion: number?, Contorno: boolean?, Hijos: any? })
+local function forma(props: { Nombre: string, Size: UDim2, Position: UDim2, AnchorPoint: Vector2?, Color: any, Radio: UDim?, ZIndex: number, Rotacion: number?, Contorno: boolean?, Hijos: any? })
 	return scope:New("Frame")({
 		Name = props.Nombre,
 		Size = props.Size,
@@ -187,10 +200,10 @@ end
 -- distintas centradas: su union se lee como un ovalo. El contorno no puede
 -- ser un UIStroke por pastilla (cruzaria el dibujo): es la MISMA union en
 -- marino, unos px mas grande, pintada debajo.
-local function ovalo(nombre: string, ancho: UDim, alto: number, color: Color3, zindex: number, conContorno: boolean)
+local function ovalo(nombre: string, ancho: UDim, alto: number, color: any, zindex: number, conContorno: boolean)
 	local capas = { { 1, 0.55 }, { 0.88, 0.8 }, { 0.66, 1 } }
 	local piezas = {}
-	local function union(colorCapa: Color3, extra: number, z: number)
+	local function union(colorCapa: any, extra: number, z: number)
 		for _, capa in capas do
 			table.insert(piezas, forma({
 				Nombre = "Capa",
@@ -250,7 +263,7 @@ end
 -- Bolsa llena: la boca desaparece y en su lugar la bolsa esta cerrada y atada
 -- (cuello fruncido, cinta y las dos "orejas" del nudo)
 local function nudo()
-	local color = AJUSTES.colorBolsa
+	local color = colorBolsa
 	local function oreja(lado: number)
 		return forma({
 			Nombre = if lado < 0 then "OrejaIzq" else "OrejaDer",
@@ -289,7 +302,7 @@ local function nudo()
 				Nombre = "Atadura",
 				Size = UDim2.fromOffset(AJUSTES.nudoCuelloAncho + 24, 26),
 				Position = UDim2.new(0.5, 0, 0, -AJUSTES.nudoCuelloAlto + 12),
-				Color = AJUSTES.colorAtadura,
+				Color = tonoBolsa(0.55),
 				Radio = UDim.new(0, 13),
 				ZIndex = 7,
 				Contorno = true,
@@ -307,7 +320,7 @@ local function dibujo(): { Instance }
 		Size = UDim2.fromOffset(AJUSTES.bolsaAncho, AJUSTES.bolsaAlto),
 		Position = UDim2.new(0.5, 0, 1, -AJUSTES.bolsaSubida),
 		AnchorPoint = Vector2.new(0.5, 1),
-		Color = AJUSTES.colorBolsa,
+		Color = colorBolsa,
 		Radio = UDim.new(0, AJUSTES.bolsaRedondeo),
 		ZIndex = 4,
 		Contorno = true,
@@ -324,7 +337,7 @@ local function dibujo(): { Instance }
 				end),
 				ZIndex = 5,
 				[Children] = {
-					ovalo("Borde", UDim.new(AJUSTES.bocaAncho, 0), AJUSTES.bocaAlto, AJUSTES.colorBorde, 5, true),
+					ovalo("Borde", UDim.new(AJUSTES.bocaAncho, 0), AJUSTES.bocaAlto, tonoBolsa(1.35), 5, true),
 					ovalo("Interior", UDim.new(AJUSTES.bocaAncho, -AJUSTES.bocaGrosorBorde), AJUSTES.bocaAlto - AJUSTES.bocaGrosorBorde, AJUSTES.colorInterior, 6, false),
 				},
 			}),
@@ -333,7 +346,7 @@ local function dibujo(): { Instance }
 				Nombre = "Pliegue",
 				Size = UDim2.new(0.7, 0, 0, 18),
 				Position = UDim2.fromScale(0.5, 0.7),
-				Color = Paleta.escalar(AJUSTES.colorBolsa, 0.8),
+				Color = tonoBolsa(0.8),
 				Radio = UDim.new(0, 9),
 				Rotacion = -6,
 				ZIndex = 5,
@@ -373,8 +386,12 @@ local enPatio = scope:Value(jugador:GetAttribute("EnPatio") == true)
 jugador:GetAttributeChangedSignal("EnPatio"):Connect(function()
 	enPatio:set(jugador:GetAttribute("EnPatio") == true)
 end)
+local tercera = scope:Value(jugador:GetAttribute("Vista") == "tercera")
+jugador:GetAttributeChangedSignal("Vista"):Connect(function()
+	tercera:set(jugador:GetAttribute("Vista") == "tercera")
+end)
 local visible = scope:Computed(function(use)
-	return use(enPatio) and use(Menu.abiertoR) == nil
+	return use(enPatio) and not use(tercera) and use(Menu.abiertoR) == nil
 end)
 
 scope:Pantalla({ Nombre = "Manos", Orden = 0, Visible = visible, Hijos = raiz })

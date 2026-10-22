@@ -1,7 +1,7 @@
 --!strict
 --[[
 	Viewport (constructor del Kit)
-	Unica responsabilidad: el ViewportFrame para ensenar modelos (mascotas,
+	Unica responsabilidad: el ViewportFrame para ensenar modelos (bolsas,
 	objetos) con la luz y el marco del kit. Colocar el modelo y encuadrar la
 	camara lo hace Encuadre.mostrar.
 

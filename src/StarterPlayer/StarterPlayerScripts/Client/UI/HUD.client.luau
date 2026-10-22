@@ -3,22 +3,24 @@
 	HUD
 	Distribucion del "UI Kit" de simulador (referencia del usuario), en Fusion.
 	Diseno v2: en el patio la pantalla muestra solo lo que se usa al jugar
-	(bolsa, dinero, fuerza, fragmentos de mascota y el feed); el resto va a
-	4 botones.
+	(bolsa, dinero, fuerza y el feed); el resto va a los botones.
 
-	  izquierda      botonera de 4: Tienda (Q), Mascotas, Rebirth y Pedidos.
-	                 Cada boton aparece cuando su panel existe (UI/<Nombre>),
-	                 asi cada lote que trae un panel trae su boton
-	  arriba-dcha    "Contadores": la pildora verde grande del dinero y, debajo,
-	                 la mascota mas cerca de completarse con fragmentos
-	                 ("Latita 3/5"), o una pista para buscarlos
+	  izquierda      botonera: Tienda (Q), Rebirth (R), Pedidos (P) y Camara
+	                 (V: primera/tercera persona en el patio, lote 9). Cada
+	                 boton de panel aparece cuando su panel existe
+	                 (UI/<Nombre>), asi cada lote que trae un panel trae su
+	                 boton
+	  arriba-dcha    "Contadores": la pildora verde grande del dinero, el
+	                 Turbo si esta en marcha (x2 y lo que le queda) y, debajo,
+	                 el pedido del dia mas avanzado ("Separa 12/40")
 	  derecha        barra de FUERZA de lanzamiento (mantener F; encima, el bonus
 	                 que daria acertar desde donde estas) y, a su lado,
 	                 la de BOLSA: cuanto llevas, sin numeros (decision del
 	                 usuario: se ve llenarse, y "LLENA" en rojo avisa de que
 	                 toca volver al contenedor)
-	  abajo-dcha     "MANTEN [F] PARA LANZAR" con la bolsa, y encima la pista
-	                 de recoger (se retira sola tras 20 recogidas)
+	  abajo-dcha     "MANTEN [F] PARA LANZAR" con la bolsa llena
+	  abajo-izq      la pista de recoger (se retira sola tras 20 recogidas;
+	                 en tactil, bajo los contadores: abajo va el thumbstick)
 
 	Tactil: el thumbstick y el boton de salto de Roblox ocupan las esquinas de
 	abajo, asi que la botonera sube arriba-izquierda y las pistas se apartan; la de lanzar la sustituye el boton de ContextActionService
@@ -38,11 +40,14 @@ local StarterGui = game:GetService("StarterGui")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Paleta = require(Config:WaitForChild("Paleta"))
-local Textos = require(Config:WaitForChild("Textos"))
+-- El copy en el idioma del jugador (misma forma que Config/Textos)
+local Idioma = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Utilidades"):WaitForChild("Idioma"))
+local Textos = Idioma.textos
 local DefinicionesPunteria = require(Config:WaitForChild("DefinicionesPunteria"))
-local DefinicionesMascotas = require(Config:WaitForChild("DefinicionesMascotas"))
+local DefinicionesPedidos = require(Config:WaitForChild("DefinicionesPedidos"))
 local Utilidades = Shared:WaitForChild("Utilidades")
 local Formato = require(Utilidades:WaitForChild("Formato"))
+local Contenedores = require(Utilidades:WaitForChild("Contenedores"))
 local Fusion = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Fusion"))
 
 local Cliente = script.Parent.Parent
@@ -222,12 +227,19 @@ local function barraRebirth()
 	})
 end
 
--- Panel, texto, icono y atajo de cada boton. Solo sale si su panel existe.
-local BOTONES = {
+-- Cambia la vista (en todo el mapa, 6 oct): el atributo local "Vista" lo aplica Camara
+-- (y lo guarda en el perfil); la V hace lo mismo
+local function alternarVista()
+	jugador:SetAttribute("Vista", if jugador:GetAttribute("Vista") == "tercera" then "primera" else "tercera")
+end
+
+-- Panel (o accion), texto, icono y atajo de cada boton. Los de panel solo
+-- salen si su panel existe.
+local BOTONES: { { panel: string?, accion: (() -> ())?, texto: string, icono: string, tecla: string } } = {
 	{ panel = "Tienda", texto = Textos.HUD.tienda, icono = "telefono", tecla = "Q" },
-	{ panel = "Mascotas", texto = Textos.HUD.mascotas, icono = "libreta", tecla = "J" },
 	{ panel = "Rebirth", texto = Textos.HUD.rebirth, icono = "estrella", tecla = "R" },
-	{ panel = "Pedidos", texto = Textos.HUD.pedidos, icono = "nota", tecla = "P" },
+	{ panel = "Pedidos", texto = Textos.HUD.pedidos, icono = "libreta", tecla = "P" },
+	{ accion = alternarVista, texto = Textos.HUD.camara, icono = "camara", tecla = "V" },
 }
 
 local hijosBotonera: { any } = {
@@ -239,10 +251,13 @@ local hijosBotonera: { any } = {
 	scope:Rejilla({ Celda = UDim2.fromOffset(LADO_ICONO, LADO_ICONO), Espacio = 10 }),
 }
 for orden, b in BOTONES do
-	if script.Parent:FindFirstChild(b.panel) then
-		local extra = if b.panel == "Rebirth" then barraRebirth() else nil
-		table.insert(hijosBotonera, botonIcono(b.panel, b.texto, b.icono, b.tecla, orden, function()
-			Menu.alternar(b.panel)
+	local panel = b.panel
+	if b.accion then
+		table.insert(hijosBotonera, botonIcono("Camara", b.texto, b.icono, b.tecla, orden, b.accion))
+	elseif panel and script.Parent:FindFirstChild(panel) then
+		local extra = if panel == "Rebirth" then barraRebirth() else nil
+		table.insert(hijosBotonera, botonIcono(panel, b.texto, b.icono, b.tecla, orden, function()
+			Menu.alternar(panel)
 		end, extra))
 	end
 end
@@ -270,27 +285,37 @@ local ANCHO_CENTRO = 330
 local DIAMETRO_BASE = 48
 local SEPARACION_BARRAS = 28
 
--- La mascota que se esta montando mas cerca de completarse, como texto
--- "set|id|n|total" (un primitivo: el perfil llega como tablas nuevas) o ""
-local montajeHud = scope:Computed(function(use)
+-- El pedido sin cobrar mas avanzado como texto plano "etiqueta|n|total"
+-- (un primitivo: el perfil llega como tablas nuevas), o ""
+local pedidoHud = scope:Computed(function(use)
 	local p = use(reactivo.perfil)
 	local mejor, fraccion = "", -1
-	for _, set in DefinicionesMascotas.SETS do
-		local m = p and p.fragmentos and p.fragmentos[set.id]
-		if m and m.total > 0 and m.n / m.total > fraccion then
-			mejor, fraccion = string.format("%s|%s|%d|%d", set.id, m.id, m.n, m.total), m.n / m.total
+	for _, pedido in (p and p.pedidos and p.pedidos.lista) or {} do
+		if not pedido.cobrado and pedido.objetivo > 0 and pedido.progreso / pedido.objetivo > fraccion then
+			local parametro = pedido.parametro
+			if typeof(parametro) == "string" then
+				parametro = Textos.TIPOS[parametro] or parametro
+			end
+			local etiqueta = Textos.formatear((Textos.PEDIDOS_HUD :: any)[pedido.id] or pedido.id, { parametro = parametro })
+			mejor, fraccion = string.format("%s|%d|%d", etiqueta, pedido.progreso, pedido.objetivo), pedido.progreso / pedido.objetivo
 		end
 	end
 	return mejor
 end)
-local function partesMontaje(texto: string): (DefinicionesMascotas.Set?, DefinicionesMascotas.Mascota?, number, number)
-	local p = string.split(texto, "|")
-	if #p < 4 then
-		return nil, nil, 0, 0
+
+-- Turbo: segundos que le quedan (un reloj de 1 s; el perfil solo trae la
+-- hora de fin)
+local ahora = scope:Value(os.time())
+task.spawn(function()
+	while true do
+		task.wait(1)
+		ahora:set(os.time())
 	end
-	return DefinicionesMascotas.SET_POR_ID[p[1]], DefinicionesMascotas.obtener(p[2]), tonumber(p[3]) or 0, tonumber(p[4]) or 0
-end
-local ICONO_SET = { Papel = "setPapel", Plastico = "setPlastico", Metal = "setMetal", Organico = "setOrganico" }
+end)
+local turboRestante = scope:Computed(function(use)
+	local p = use(reactivo.perfil)
+	return math.max(0, ((p and p.turboHasta) or 0) - use(ahora))
+end)
 
 local contadores = scope:New("Frame")({
 	Name = "Contadores",
@@ -319,32 +344,38 @@ local contadores = scope:New("Frame")({
 			Position = UDim2.new(1, 0, 0, 0),
 			AnchorPoint = Vector2.new(1, 0),
 		}),
-		-- Fragmentos de la mascota mas cerca de completarse
-		scope:Icono({
-			Clave = scope:Computed(function(use)
-				local set = partesMontaje(use(montajeHud))
-				return if set then (ICONO_SET[set.material] or "estrella") else "estrella"
+		-- Turbo en marcha: a la izquierda del dinero
+		scope:Pildora({
+			Nombre = "Turbo",
+			Icono = "rayo",
+			Texto = scope:Computed(function(use)
+				return Textos.formatear(Textos.TURBO.activo, { tiempo = Formato.tiempo(use(turboRestante)) })
 			end),
-			Tamano = 34,
-			Position = UDim2.new(1, -250, 0, 66),
-			ZIndex = 3,
+			Color = Paleta.UI_ENERGIA,
+			Ancho = 124,
+			Alto = 44,
+			TamanoTexto = 20,
+			Position = UDim2.new(1, -258, 0, 7),
+			AnchorPoint = Vector2.new(1, 0),
+			Visible = scope:Computed(function(use)
+				return use(turboRestante) > 0
+			end),
 		}),
+		-- El pedido del dia mas avanzado (abre el panel al pulsar la P)
 		scope:Barra({
-			Nombre = "Fragmentos",
+			Nombre = "Pedido",
 			Fraccion = scope:Computed(function(use)
-				local _, _, n, total = partesMontaje(use(montajeHud))
-				return if total > 0 then math.clamp(n / total, 0, 1) else 0
+				local t = string.split(use(pedidoHud), "|")
+				local total = tonumber(t[3]) or 0
+				return if total > 0 then math.clamp((tonumber(t[2]) or 0) / total, 0, 1) else 0
 			end),
 			Texto = scope:Computed(function(use)
-				local _, def, n, total = partesMontaje(use(montajeHud))
-				if not def then
-					return Textos.MASCOTAS.sinFragmentosHud
-				end
-				return Textos.formatear(Textos.MASCOTAS.fragmentosHud, { nombre = def.nombre, n = n, total = total })
+				local t = string.split(use(pedidoHud), "|")
+				return Textos.formatear(Textos.PEDIDOS_HUD.formato, { etiqueta = t[1] or "", n = t[2] or 0, total = t[3] or 0 })
 			end),
-			Color = scope:Computed(function(use)
-				local set = partesMontaje(use(montajeHud))
-				return if set then (Paleta.MATERIAL[set.material] or Paleta.UI_DINERO) else Paleta.UI_DINERO
+			Color = Paleta.CABECERA_PANEL.Pedidos,
+			Visible = scope:Computed(function(use)
+				return use(pedidoHud) ~= ""
 			end),
 			Size = UDim2.fromOffset(214, 26),
 			Position = UDim2.new(1, 0, 0, 68),
@@ -414,19 +445,18 @@ local function barraVertical(nombre: string, columna: number, props: { Fraccion:
 	})
 end
 
--- Bonus por distancia si acertara desde aqui (5 veces por segundo: la
--- distancia al contenedor cambia al andar, no cada frame)
+-- Bonus por distancia si acertara desde aqui en el contenedor mas cercano
+-- (5 veces por segundo: la distancia cambia al andar, no cada frame)
 local bonusAqui = scope:Value(0)
 task.spawn(function()
-	local CollectionService = game:GetService("CollectionService")
 	while true do
 		task.wait(0.2)
 		local root = jugador.Character and jugador.Character:FindFirstChild("HumanoidRootPart")
-		local contenedor = CollectionService:GetTagged("Contenedor")[1]
-		local zona = contenedor and contenedor:FindFirstChild("ZonaAcierto")
-		if root and root:IsA("BasePart") and zona and zona:IsA("BasePart") then
-			local d = Vector3.new(zona.Position.X - root.Position.X, 0, zona.Position.Z - root.Position.Z).Magnitude
-			bonusAqui:set(DefinicionesPunteria.bonusDistancia(d))
+		if root and root:IsA("BasePart") then
+			local cercano, d = Contenedores.masCercano(root.Position)
+			if cercano then
+				bonusAqui:set(DefinicionesPunteria.bonusDistancia(d))
+			end
 		end
 	end
 end)
@@ -440,7 +470,8 @@ local barraFuerza = barraVertical("Fuerza", 0, {
 		local b = use(bonusAqui)
 		return if b > 0 then Textos.formatear(Textos.HUD.bonusAqui, { pct = math.floor(b * 100 + 0.5) }) else Textos.HUD.fuerza
 	end),
-	Visible = enPatio,
+	-- Siempre a la vista (peticion del usuario, 6 oct): se lanza desde fuera
+	-- del patio, que es donde estan los contenedores
 	Icono = "flecha",
 })
 
@@ -461,18 +492,35 @@ local barraBolsa = barraVertical("Bolsa", 1, {
 	Icono = "bolsa",
 })
 
+-- Recoger con la bolsa llena: la barra tiembla (sustituye al toast "¡Bolsa
+-- llena!", 6 oct). Una sacudida no se pisa con otra
+local sacudiendo = false
+EstadoCliente.alRecogerConBolsaLlena:Connect(function()
+	if sacudiendo then
+		return
+	end
+	sacudiendo = true
+	task.spawn(function()
+		for _, angulo in { 12, -10, 8, -6, 3, 0 } do
+			barraBolsa.Rotation = angulo
+			task.wait(0.045)
+		end
+		sacudiendo = false
+	end)
+end)
+
 -- ===========================================================================
 -- Abajo-dcha: pistas
 -- ===========================================================================
 
 -- Pastilla [insignia] TEXTO [icono]; el ancho sigue al contenido
-local function pista(nombre: string, alto: number, teclado: string, gamepad: Enum.KeyCode, texto: any, icono: string, posicion: any, visible: any)
+local function pista(nombre: string, alto: number, teclado: string, gamepad: Enum.KeyCode, texto: any, icono: string, posicion: any, visible: any, ancla: any?)
 	return scope:New("Frame")({
 		Name = nombre,
 		Size = UDim2.fromOffset(0, alto),
 		AutomaticSize = Enum.AutomaticSize.X,
 		Position = posicion,
-		AnchorPoint = Vector2.new(1, 1),
+		AnchorPoint = ancla or Vector2.new(1, 1),
 		Visible = visible,
 		BackgroundColor3 = Paleta.UI_PAPEL,
 		[Children] = {
@@ -513,12 +561,18 @@ local pistaRecoger = pista(
 		return if use(Escala.plataforma) == "tactil" then Textos.HUD.tocarRecoger else Textos.HUD.mantenerRecoger
 	end),
 	"mano",
+	-- Lejos de las barras de la derecha (las pisaba, lo avisaba ("hud")):
+	-- en PC abajo a la izquierda, libre; en tactil ahi va el thumbstick,
+	-- asi que va bajo los contadores, a la izquierda de las barras
 	scope:Computed(function(use)
-		return if use(tactil) then UDim2.new(1, -MARGEN, 1, -184) else UDim2.new(1, -MARGEN, 1, -MARGEN - 56)
+		return if use(tactil) then UDim2.new(1, -(MARGEN + 2 * (DIAMETRO_BASE + SEPARACION_BARRAS)), 0, 94) else UDim2.new(0, MARGEN, 1, -MARGEN)
 	end),
 	-- Solo en el patio y mientras se aprende
 	scope:Computed(function(use)
 		return use(enPatio) and use(sinPanel) and use(recogidas) < RECOGIDAS_PARA_APRENDER
+	end),
+	scope:Computed(function(use)
+		return if use(tactil) then Vector2.new(1, 0) else Vector2.new(0, 1)
 	end)
 )
 

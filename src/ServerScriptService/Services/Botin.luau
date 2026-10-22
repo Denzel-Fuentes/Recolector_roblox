@@ -9,7 +9,6 @@
 	  ObjetosPatio    registro de objetos y reclamo atomico
 	  FisicaBasura    la basura cae, se amontona y se ancla
 	  Montones        colina -> montana de basura -> agotado -> repoblado
-	  Iman            la unica recogida sin clic (mascotas Raras y Epicas)
 	  Lanzamiento     la punteria (lanzar la bolsa al contenedor)
 
 	Tipos compartidos en TiposPatio. Este modulo no tiene logica propia: solo
@@ -25,7 +24,6 @@ local GeneradorBotin = require(Servicios:WaitForChild("GeneradorBotin"))
 local ObjetosPatio = require(Servicios:WaitForChild("ObjetosPatio"))
 local FisicaBasura = require(Servicios:WaitForChild("FisicaBasura"))
 local Montones = require(Servicios:WaitForChild("Montones"))
-local Iman = require(Servicios:WaitForChild("Iman"))
 local Lanzamiento = require(Servicios:WaitForChild("Lanzamiento"))
 
 export type Item = TiposPatio.Item
@@ -41,6 +39,7 @@ Botin.montones = Montones.todos
 Botin.montonDe = Montones.de
 Botin.excavar = Montones.excavar
 Botin.montonesActivosDe = Montones.activosDe
+Botin.montonPendienteDe = Montones.pendienteDe
 Botin.liberarMontones = Montones.liberar
 Botin.repoblarAhora = Montones.repoblarAhora
 Botin.lanzarBolsa = Lanzamiento.lanzarBolsa
@@ -56,7 +55,6 @@ function Botin.iniciar()
 	ObjetosPatio.iniciar()
 	FisicaBasura.iniciar()
 	Montones.iniciar()
-	Iman.iniciar()
 	Lanzamiento.iniciar()
 end
 

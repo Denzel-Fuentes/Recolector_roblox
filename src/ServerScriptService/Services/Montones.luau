@@ -21,9 +21,10 @@
 	             cuadrante decide la mezcla (GameConfig.CUADRANTES; el
 	             cuadrante es el atributo de la ranura horneada o, en un place
 	             anterior al mundo v2, se deduce de la posicion).
-	  Bloqueo    no se excava un cuadrante que el jugador no tiene abierto
-	             (Rebirth 1 el metal, 2 el organico): "bloqueado". Las piezas
-	             de un cuadrante cerrado tampoco se reclaman (ObjetosPatio).
+	  Bloqueo    (5 oct) ya no hay cuadrantes cerrados: todo monton se
+	             excava. Los rebirths abren TIPOS de basura: el monton solo
+	             trae los del excavador (GeneradorBotin) y nadie recoge un tipo
+	             que no tiene (ObjetosPatio, "materialBloqueado").
 	  Prioridad  se anota quien lo excavo y cuando: ObjetosPatio no deja a
 	             nadie mas recoger sus piezas durante PRIORIDAD_EXCAVADOR s.
 	  Reposicion un monton que baja del 25 % (terminado) o se vacia vuelve a
@@ -55,6 +56,7 @@ local Utilidades = Shared:WaitForChild("Utilidades")
 local ModelosMonton = require(Utilidades:WaitForChild("ModelosMonton"))
 local Cuadrantes = require(Utilidades:WaitForChild("Cuadrantes"))
 local Red = require(Utilidades:WaitForChild("Red"))
+local Idioma = require(Utilidades:WaitForChild("Idioma"))
 local Senal = require(Utilidades:WaitForChild("Senal"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
@@ -107,7 +109,12 @@ local function crearModelo(monton: Monton)
 		local prompt = Instance.new("ProximityPrompt")
 		prompt.Name = "PromptExcavar"
 		prompt.ActionText = Textos.PATIO.excavar
-		prompt.ObjectText = if destaca then Textos.formatear(Textos.PATIO.montonRico, { material = Textos.MATERIALES[destaca] or destaca }) else Textos.PATIO.monton
+		local objeto = if destaca
+			then Idioma.mensaje("PATIO.montonRico", { material = Idioma.mensaje("MATERIALES." .. destaca) })
+			else Idioma.mensaje("PATIO.monton")
+		-- El texto en espanol es el respaldo; el cliente usa el atributo (Prompts)
+		prompt.ObjectText = Idioma.resolver(objeto)
+		prompt:SetAttribute("MensajeObjeto", Idioma.codificar(objeto))
 		prompt.HoldDuration = GameConfig.DURACION_EXCAVAR
 		prompt.MaxActivationDistance = ModelosMonton.radioMonton(monton.tamano) + 8
 		prompt.RequiresLineOfSight = false
@@ -188,6 +195,17 @@ function Montones.activosDe(jugador: Player): number
 	return n
 end
 
+-- El monton que el jugador tiene a medias (el que le impide abrir otro), o
+-- nil. El aviso de "termina tu montón" lo hace latir para que lo encuentre
+function Montones.pendienteDe(jugador: Player): Monton?
+	for _, monton in montones do
+		if monton.activadoPor == jugador and monton.estado == "activo" and estaDisponible(monton) then
+			return monton
+		end
+	end
+	return nil
+end
+
 -- Deja de contar sus montones contra el limite (sale del servidor, o pruebas)
 function Montones.liberar(jugador: Player)
 	for _, monton in montones do
@@ -236,7 +254,7 @@ function Montones.repoblarAhora()
 	for _, monton in montones do
 		reponer(monton)
 	end
-	FeedEvent:FireAllClients(Textos.FEED.repoblacion)
+	FeedEvent:FireAllClients(Idioma.mensaje("FEED.repoblacion"))
 end
 
 -- ===========================================================================
@@ -276,22 +294,14 @@ end
 
 local function anunciar(jugador: Player, monton: Monton)
 	if monton.tamano == "grande" then
-		FeedEvent:FireAllClients(Textos.formatear(Textos.FEED.montonGrande, { jugador = jugador.DisplayName }))
+		FeedEvent:FireAllClients(Idioma.mensaje("FEED.montonGrande", { jugador = jugador.DisplayName }))
 	end
 end
 
--- Rebirths del jugador (0 sin perfil)
-local function rebirthsDe(jugador: Player): number
-	local perfil = Perfiles.obtener(jugador)
-	return if perfil then perfil.rebirths else 0
-end
 
 function Montones.excavar(jugador: Player, monton: Monton): (boolean, string)
 	if monton.estado ~= "lleno" then
 		return false, "agotado"
-	end
-	if not Cuadrantes.abierto(monton.cuadrante, rebirthsDe(jugador)) then
-		return false, "bloqueado"
 	end
 	local d = distanciaAlCentro(jugador, monton)
 	if not d or d > ModelosMonton.radioMonton(monton.tamano) + MARGEN_EXCAVAR then

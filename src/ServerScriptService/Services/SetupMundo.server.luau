@@ -58,12 +58,14 @@ for _, tag in { "Parcela", "MaquinaRefrescos" } do
 	end
 end
 
--- El prompt de Dona Chatarra de un place horneado antes del 29 sep
+-- El prompt del tendero de un place horneado antes (29 sep: abre la tienda;
+-- 5 oct: ya no se llama "Dona Chatarra")
 local chatarra = Mundo.npc("DonaChatarra")
 if chatarra then
 	for _, d in chatarra:GetDescendants() do
 		if d:IsA("ProximityPrompt") then
 			d.ActionText = Textos.PATIO.tienda
+			d.ObjectText = Textos.MUNDO.tendero
 		end
 	end
 end

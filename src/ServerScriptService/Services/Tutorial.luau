@@ -28,6 +28,8 @@ local Montones = require(Servicios:WaitForChild("Montones"))
 local Bolsa = require(Servicios:WaitForChild("Bolsa"))
 local Lanzamiento = require(Servicios:WaitForChild("Lanzamiento"))
 local Mejoras = require(Servicios:WaitForChild("Mejoras"))
+local Pedidos = require(Servicios:WaitForChild("Pedidos"))
+local Rebirths = require(Servicios:WaitForChild("Rebirths"))
 
 local Tutorial = {}
 
@@ -46,6 +48,10 @@ local function yaCumple(jugador: Player, id: string): boolean
 		return Patio.estaDentro(jugador)
 	elseif id == "llenar" then
 		return Bolsa.estaLlena(jugador)
+	elseif id == "pedido" then
+		return Perfiles.leerEstadistica(jugador, "pedidosCompletados") >= 1
+	elseif id == "rebirth" then
+		return Rebirths.cuantos(jugador) >= 1
 	end
 	return false
 end
@@ -104,6 +110,17 @@ function Tutorial.iniciar()
 	end)
 	Mejoras.alComprar:Connect(function(jugador)
 		Tutorial.completar(jugador, "mejora")
+	end)
+	Bolsa.alResumen:Connect(function(jugador, resumen)
+		if resumen.separadas >= DefinicionesTutorial.SEPARADAS_PARA_PASO and resumen.separadas > resumen.malSeparadas then
+			Tutorial.completar(jugador, "separar")
+		end
+	end)
+	Pedidos.alCumplir:Connect(function(jugador)
+		Tutorial.completar(jugador, "pedido")
+	end)
+	Rebirths.alRenacer:Connect(function(jugador)
+		Tutorial.completar(jugador, "rebirth")
 	end)
 end
 

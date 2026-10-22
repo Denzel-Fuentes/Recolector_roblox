@@ -3,12 +3,11 @@
 	ModelosObjetos
 	Los modelos whitebox de lo que se recoge y se lleva: basura real (mallas
 	low-poly de ReplicatedStorage.Arte.Basura si el place las tiene; si no,
-	16 formas de primitivas, 4 por material), billetes, tesoros, fragmentos
-	de mascota, figurinas, cintas, trajes y
-	las dos bolsas (cerrada con nudo para lanzar, que usa la malla IA
-	ServerStorage.Arte.Bolsa si el place la tiene; abierta para las manos).
-	Las mascotas van en ModelosMascota; la colina de los
-	montones en ModelosMonton. Primitivas pone los ladrillos.
+	16 formas de primitivas, 4 por material), billetes, tesoros, figurinas,
+	cintas y las dos bolsas (cerrada con nudo para lanzar; abierta para las
+	manos, que se cierra al llenarse), con las mallas de Blender
+	ServerStorage.Arte.Bolsa / .BolsaAbierta si el place las tiene. La colina
+	de los montones va en ModelosMonton. Primitivas pone los ladrillos.
 
 	Regla de lectura a distancia (Config/Paleta): el color del cuerpo es el del
 	material; los detalles son tonos del mismo color (Paleta.escalar).
@@ -195,15 +194,25 @@ local MATERIAL_BASURA = {
 -- ColorVivo). Viven solo en el place, como Arte.Bolsa, pero en
 -- ReplicatedStorage y no en ServerStorage: la cinta de la recicladora
 -- construye basura en el cliente. El importador de Roblox ignora los colores
--- de material de Blender: los colores van en una textura de paleta
--- (assets/modelos/basura/Basura_Paleta.png, cada cara mapeada a su cuadro).
--- Sin textura la malla es de un solo color y las de ColorVivo toman uno de
--- Paleta.BASURA como las primitivas.
+-- de material de Blender: los colores iban en una textura de paleta
+-- (assets/modelos/basura/Basura_Paleta.png). Desde el 3 oct la basura es del
+-- color de su TIPO (decision del usuario: decide a que contenedor va), asi
+-- que al clonar se le quita la textura y toma un tono de Paleta.BASURA, como
+-- las primitivas. TextureID se puede escribir en runtime (medido en Studio).
 -- Las rarezas (Material = "Rareza") no son un set: salen de vez en cuando
 -- dentro del material que dice RAREZA_EN.
 local RAREZA_EN = { Televisor = "Metal", PatoGoma = "Plastico" }
 local PROB_RAREZA = 0.04
 local TAMANO_MALLA = 1.6 -- lado mayor antes de ESCALA_BASURA (las formas de primitivas miden 1.2-2.4)
+
+-- Uno de los tonos del color del tipo de basura (Paleta.BASURA)
+function ModelosObjetos.tonoBasura(material: string, r: Random): Color3
+	local tonos = Paleta.BASURA[material]
+	if not tonos then
+		return Paleta.MATERIAL[material] or Paleta.MUEBLE
+	end
+	return tonos[r:NextInteger(1, #tonos)]
+end
 
 local function mallasBasura(material: string): ({ MeshPart }, { MeshPart })
 	local comunes, rarezas = {}, {}
@@ -243,12 +252,13 @@ local function basuraDeMalla(material: string, r: Random): Model?
 	local mayor = math.max(c.Size.X, c.Size.Y, c.Size.Z)
 	c.Size *= TAMANO_MALLA / mayor
 	c.CFrame = CFrame.new(0, c.Size.Y / 2, 0) * CFrame.Angles(0, r:NextNumber(0, math.pi * 2), 0)
-	local vivos = Paleta.BASURA[material]
-	-- Con textura de paleta los colores ya vienen en la malla (y Color no se ve)
-	local texturizada = c.TextureID ~= "" or c:FindFirstChildOfClass("SurfaceAppearance") ~= nil
-	if malla:GetAttribute("ColorVivo") and vivos and not texturizada then
-		c.Color = vivos[r:NextInteger(1, #vivos)]
+	c.TextureID = ""
+	local apariencia = c:FindFirstChildOfClass("SurfaceAppearance")
+	if apariencia then
+		apariencia:Destroy()
 	end
+	c.Color = ModelosObjetos.tonoBasura(material, r)
+	c.Material = MATERIAL_BASURA[material] or Enum.Material.SmoothPlastic
 	c.CastShadow = false
 	c.Parent = m
 	m.PrimaryPart = c
@@ -260,10 +270,9 @@ end
 -- Una pieza de basura de un material, con forma al azar (rng opcional para
 -- pruebas deterministas). Atributo Forma = nombre de la forma. Usa las
 -- mallas de Arte.Basura si el place las tiene; si no, las formas de
--- primitivas de arriba. Con primitivas el color es uno vivo de
--- Paleta.BASURA (latas rojas y azules, botellas cian...), como la montana
--- de la referencia; el material del set sigue en el atributo y en la
--- bolsa/album.
+-- primitivas de arriba. El color es uno de los tonos del de su tipo
+-- (Paleta.BASURA), sea malla o primitivas, y el material de Roblox el de su
+-- tipo (latas de Metal, carton de Cardboard).
 function ModelosObjetos.basura(material: string, rng: Random?): Model
 	local r = rng or rngBasura
 	local deMalla = basuraDeMalla(material, r)
@@ -274,9 +283,7 @@ function ModelosObjetos.basura(material: string, rng: Random?): Model
 	local forma = formas[r:NextInteger(1, #formas)]
 	local m = nuevoModelo("Basura_" .. forma.nombre)
 	m:SetAttribute("Forma", forma.nombre)
-	local vivos = Paleta.BASURA[material]
-	local color = if vivos then vivos[r:NextInteger(1, #vivos)] else (Paleta.MATERIAL[material] or Paleta.MUEBLE)
-	local c = forma.construir(color, m, r)
+	local c = forma.construir(ModelosObjetos.tonoBasura(material, r), m, r)
 	local materialRoblox = MATERIAL_BASURA[material] or Enum.Material.SmoothPlastic
 	for _, parte in m:GetDescendants() do
 		if parte:IsA("BasePart") then
@@ -287,11 +294,6 @@ function ModelosObjetos.basura(material: string, rng: Random?): Model
 			parte.CastShadow = false
 		end
 	end
-	if forma.nombre == "Llanta" then
-		-- Los neumaticos son de goma negra, no del color de la lata
-		c.Material = Enum.Material.Rubber
-		c.Color = Paleta.MUNDO.GOMA
-	end
 	m.PrimaryPart = c
 	pivoteEnSuelo(m)
 	-- Un poco mas grandes que a escala real: sobre la colina, 14-44 piezas de
@@ -300,36 +302,37 @@ function ModelosObjetos.basura(material: string, rng: Random?): Model
 	return m
 end
 
+-- Brillo de lo valioso (peticion del usuario, 6 oct: tesoros y billetes
+-- "parecian simple plastico"): destellos que suben alrededor y, en el
+-- tesoro, una luz dorada que lo ilumina desde dentro. Va en el propio
+-- modelo (lo construye el servidor y replica solo). El efecto de
+-- recogerlos esta en EfectoRecogida.client.
+local DESTELLO = "rbxasset://textures/particles/sparkles_main.dds"
+
+local function destellos(parte: BasePart, color: Color3, cuantos: number, tamano: number)
+	local e = Instance.new("ParticleEmitter")
+	e.Name = "Brillo"
+	e.Texture = DESTELLO
+	e.Color = ColorSequence.new(color, Color3.new(1, 1, 1))
+	e.LightEmission = 1
+	e.LightInfluence = 0
+	e.Rate = cuantos
+	e.Lifetime = NumberRange.new(0.6, 1.2)
+	e.Speed = NumberRange.new(0.4, 1.2)
+	e.SpreadAngle = Vector2.new(180, 180)
+	e.Acceleration = Vector3.new(0, 1.5, 0)
+	e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.3, tamano), NumberSequenceKeypoint.new(1, 0) })
+	e.Rotation = NumberRange.new(0, 360)
+	e.RotSpeed = NumberRange.new(-90, 90)
+	e.Parent = parte
+end
+
 function ModelosObjetos.billete(): Model
 	local m = nuevoModelo("Billete")
 	local c = bloque("Cuerpo", Vector3.new(1.3, 0.06, 0.65), CFrame.new(0, 0.05, 0) * CFrame.Angles(0, math.rad(20), 0), Paleta.BILLETE, m)
 	bloque("Sello", Vector3.new(0.4, 0.07, 0.4), c.CFrame * CFrame.new(0, 0.01, 0), Paleta.escalar(Paleta.BILLETE, 0.75), m)
-	m.PrimaryPart = c
-	pivoteEnSuelo(m)
-	return m
-end
-
--- Fragmento de mascota (29 sep): una esquirla del color del set de su
--- material con un rombo de neon encima y luz propia, para que asome entre
--- la basura de la montana (es lo que el jugador busca con la vista).
-function ModelosObjetos.fragmento(material: string): Model
-	local m = nuevoModelo("Fragmento")
-	local color = Paleta.MATERIAL[material] or Paleta.TESORO
-	local c = cuna({
-		Nombre = "Cuerpo",
-		Size = Vector3.new(1.4, 0.9, 1.2),
-		CFrame = CFrame.new(0, 0.45, 0),
-		Color = color,
-		Parent = m,
-	})
-	bloque("Borde", Vector3.new(1.46, 0.12, 1.26), CFrame.new(0, 0.06, 0), Primitivas.aclarar(color, 0.5), m).Material = Enum.Material.Neon
-	local rombo = bloque("Rombo", Vector3.new(0.5, 0.5, 0.5), CFrame.new(0, 1.25, 0) * CFrame.Angles(math.rad(45), 0, math.rad(45)), Primitivas.aclarar(color, 0.6), m)
-	rombo.Material = Enum.Material.Neon
-	local luz = Instance.new("PointLight")
-	luz.Color = Primitivas.aclarar(color, 0.5)
-	luz.Range = 7
-	luz.Brightness = 2
-	luz.Parent = rombo
+	-- Destello verde suave, sin luz: hay muchos billetes en una montana
+	destellos(c, Paleta.UI_DINERO, 2.5, 0.35)
 	m.PrimaryPart = c
 	pivoteEnSuelo(m)
 	return m
@@ -338,8 +341,22 @@ end
 function ModelosObjetos.tesoro(): Model
 	local m = nuevoModelo("Tesoro")
 	local c = bloque("Cuerpo", Vector3.new(1.1, 0.8, 0.8), CFrame.new(0, 0.4, 0), Paleta.TESORO, m)
-	bloque("Tapa", Vector3.new(1.15, 0.2, 0.85), CFrame.new(0, 0.9, 0), Paleta.escalar(Paleta.TESORO, 0.8), m)
-	bloque("Cierre", Vector3.new(0.2, 0.3, 0.1), CFrame.new(0, 0.75, -0.42), Paleta.gris(60), m)
+	local tapa = bloque("Tapa", Vector3.new(1.15, 0.2, 0.85), CFrame.new(0, 0.9, 0), Paleta.escalar(Paleta.TESORO, 0.8), m)
+	bloque("Cierre", Vector3.new(0.2, 0.3, 0.1), CFrame.new(0, 0.75, -0.42), Paleta.DORADO, m)
+	-- Metalico y brillante, no plastico (violeta desde el 7 oct: el dorado se
+	-- confundia con la basura de plastico)
+	c.Material = Enum.Material.Foil
+	tapa.Material = Enum.Material.Foil
+	c.Reflectance = 0.15
+	tapa.Reflectance = 0.15
+	local luz = Instance.new("PointLight")
+	luz.Name = "Aura"
+	luz.Color = Paleta.TESORO
+	luz.Range = 7
+	luz.Brightness = 2
+	luz.Shadows = false
+	luz.Parent = c
+	destellos(c, Paleta.TESORO, 7, 0.6)
 	m.PrimaryPart = c
 	pivoteEnSuelo(m)
 	return m
@@ -375,17 +392,6 @@ function ModelosObjetos.cinta(def: DefinicionesColeccionables.Cinta): Model
 	return m
 end
 
-function ModelosObjetos.traje(def: DefinicionesColeccionables.Traje): Model
-	local m = nuevoModelo(def.nombre)
-	m:SetAttribute("TrajeId", def.id)
-	local c = bloque("Cuerpo", Vector3.new(1.3, 0.25, 1.2), CFrame.new(0, 0.125, 0), def.colorCuerpo, m)
-	bloque("Pliegue", Vector3.new(1.3, 0.2, 0.5), CFrame.new(0, 0.35, -0.2), def.colorBrazos, m)
-	bloque("Pliegue2", Vector3.new(0.6, 0.15, 1.2), CFrame.new(0.3, 0.32, 0.1), def.colorPiernas, m)
-	m.PrimaryPart = c
-	pivoteEnSuelo(m)
-	return m
-end
-
 -- Pliegues y bultos de una bolsa de basura: bolas pequenas medio metidas en
 -- el cuerpo (lo que hay dentro marca la bolsa) y un tono por bulto para que
 -- no se lea como una sola bola lisa. rng con semilla fija: la misma bolsa
@@ -402,43 +408,85 @@ local function bultosBolsa(m: Model, d: number, centroY: number, cuantos: number
 	end
 end
 
--- Malla de la bolsa generada por IA (ServerStorage.Arte.Bolsa: saco
--- facetado low-poly atado con banda amarilla, referencia del usuario). Vive
--- solo en el place, como el camion; sin ella se construye con partes. Solo
--- el servidor construye bolsas (Lanzamiento, ObjetosPatio), y el clon
--- replica con su MeshId, asi que en el cliente no hace falta buscarla.
-local function mallaBolsa(): MeshPart?
+-- Mallas de la bolsa modeladas en Blender (assets/3d/Bolsa.fbx y
+-- BolsaAbierta.fbx, importadas como ServerStorage.Arte.Bolsa y
+-- .BolsaAbierta: un Model con un MeshPart por color). El mismo saco azul
+-- facetado en dos estados: cerrada con nudo (Cuerpo, Nudo y el Cincho
+-- amarillo del atado, Paleta.CINCHO_BOLSA) y abierta
+-- (Cuerpo, Boca, Interior). Viven solo en el place; sin ellas se construye
+-- con partes. Solo el servidor construye bolsas (Lanzamiento, ObjetosPatio,
+-- Patio) y el clon replica con su MeshId: en el cliente no se buscan.
+--
+-- El importador de Roblox pierde los colores de Blender: cada parte se
+-- pinta por su nombre con un tono de Paleta.BOLSA, y el factor queda en el
+-- atributo Tono para que vestirBolsa conserve el claroscuro con otro color.
+-- La escala se calcula del alto real del clon (no se fia de la escala con
+-- la que importe Studio): ALTO_MALLA_BOLSA es lo que mide al 100 %.
+-- La abierta es un saco casi recto y arrugado, abierto de par en par: la
+-- Boca es solo el canto fino del plastico (un borde grueso parecia jarra).
+local ALTO_MALLA_BOLSA: { [string]: number } = { Bolsa = 3.6, BolsaAbierta = 2.6 }
+local TONO_BOLSA: { [string]: number } = { Cuerpo = 1, Nudo = 1, Boca = 1.12, Interior = 0.5 }
+
+local function mallaBolsa(nombre: string): Model?
 	if not RunService:IsServer() then
 		return nil
 	end
 	local arte = ServerStorage:FindFirstChild("Arte")
-	local b = arte and arte:FindFirstChild("Bolsa")
-	return if b and b:IsA("MeshPart") then b else nil
+	local b = arte and arte:FindFirstChild(nombre)
+	return if b and b:IsA("Model") and b:FindFirstChild("Cuerpo") then b else nil
+end
+
+-- Clon de una malla de bolsa pintado, escalado a `escala` de su alto de
+-- diseno y con el pivote en el suelo bajo el centro
+local function clonarMallaBolsa(original: Model, nombre: string, escala: number): Model
+	local m = original:Clone()
+	m.Name = nombre
+	m.PrimaryPart = nil
+	for _, p in m:GetDescendants() do
+		if p:IsA("BasePart") then
+			if p:IsA("MeshPart") then
+				p.TextureID = ""
+			end
+			local apariencia = p:FindFirstChildOfClass("SurfaceAppearance")
+			if apariencia then
+				apariencia:Destroy()
+			end
+			if p.Name == "Cincho" then
+				-- Sin Tono: vestirBolsa no lo repinta
+				p.Color = Paleta.CINCHO_BOLSA
+			else
+				local tono = TONO_BOLSA[p.Name] or 1
+				p:SetAttribute("Tono", tono)
+				p.Color = Paleta.escalar(Paleta.BOLSA, tono)
+			end
+			p.Material = Enum.Material.SmoothPlastic
+			p.Anchored = true
+			p.CanCollide = false
+			p.CanTouch = false
+			p.CanQuery = true
+			p.CastShadow = false
+		end
+	end
+	m:ScaleTo(m:GetScale() * ALTO_MALLA_BOLSA[original.Name] * escala / m:GetExtentsSize().Y)
+	-- Base de la caja envolvente en el origen: pivoteEnSuelo cuenta con ello
+	local cf, size = m:GetBoundingBox()
+	m:TranslateBy(Vector3.new(-cf.X, size.Y / 2 - cf.Y, -cf.Z))
+	m.PrimaryPart = m:FindFirstChild("Cuerpo") :: BasePart
+	pivoteEnSuelo(m)
+	return m
 end
 
 -- La bolsa de basura cerrada (con nudo): proyectil y objeto caido. fraccion
--- 0..1 de llenado escala el tamano. Con malla: el saco facetado escalado
--- (al 100 % mide ~2,6 x 3,2). Sin malla: saco abombado con bultos, base
--- achatada (apoya, no rueda), cuello fruncido y las dos orejas del nudo.
+-- 0..1 de llenado escala el tamano. Con malla: la de Blender, saco ancho
+-- atado arriba con pliegues hacia el nudo (al 100 % mide ~2,7 x 3,6). Sin
+-- malla: saco abombado con bultos, base achatada (apoya, no
+-- rueda), cuello fruncido y las dos orejas del nudo.
 function ModelosObjetos.bolsaLlena(fraccion: number): Model
-	local m = nuevoModelo("Bolsa")
-	local malla = mallaBolsa()
+	local malla = mallaBolsa("Bolsa")
 	if malla then
-		local c = malla:Clone()
-		c.Name = "Cuerpo"
-		local s = 0.55 + 0.32 * math.clamp(fraccion, 0, 1)
-		c.Size = malla.Size * s
-		c.CFrame = CFrame.new(0, c.Size.Y / 2, 0)
-		c.Anchored = true
-		c.CanCollide = false
-		c.CanTouch = false
-		c.CanQuery = true
-		c.CastShadow = false
-		c.Parent = m
-		m.PrimaryPart = c
-		pivoteEnSuelo(m)
-		return m
+		return clonarMallaBolsa(malla, "Bolsa", 0.55 + 0.32 * math.clamp(fraccion, 0, 1))
 	end
+	local m = nuevoModelo("Bolsa")
 	local rng = semilla("bolsa" .. tostring(math.floor(fraccion * 10)))
 	local d = 1.5 * (0.8 + 0.6 * math.clamp(fraccion, 0, 1))
 	local claro = Paleta.escalar(Paleta.BOLSA, 1.3)
@@ -467,11 +515,76 @@ function ModelosObjetos.bolsaLlena(fraccion: number): Model
 	return m
 end
 
--- La bolsa ABIERTA que se lleva en las manos dentro del patio: un saco que
--- se abomba con el llenado, con la boca abierta arriba (borde claro e
--- interior oscuro) para que se lea como "bolsa en la que cae la basura".
--- Pivote en el fondo del saco. Devuelve (modelo, altura total).
+-- Pinta una bolsa (cerrada o abierta) con un diseno de bolsa
+-- (DefinicionesCosmeticos.BOLSAS: color y material). Mantiene el claroscuro
+-- de cada parte respecto al azul de siempre (atributo Tono en las mallas,
+-- el brillo en las partes). El agujero gris de la bolsa de partes y el
+-- cincho amarillo de la malla no se tocan; el Interior de la malla es el
+-- mismo plastico por dentro y si.
+function ModelosObjetos.vestirBolsa(modelo: Model, diseno: { color: Color3, material: Enum.Material }?)
+	if not diseno then
+		return
+	end
+	local _, _, brilloBase = Paleta.BOLSA:ToHSV()
+	for _, p in modelo:GetDescendants() do
+		local tono = p:GetAttribute("Tono")
+		if p:IsA("BasePart") and p.Name ~= "Cincho" and (p.Name ~= "Interior" or tono ~= nil) then
+			local _, _, brillo = p.Color:ToHSV()
+			local factor = if typeof(tono) == "number" then tono elseif brilloBase > 0 then brillo / brilloBase else 1
+			if p:IsA("MeshPart") then
+				p.TextureID = ""
+			end
+			p.Color = Paleta.escalar(diseno.color, math.clamp(factor, 0.5, 1.4))
+			p.Material = diseno.material
+		end
+	end
+end
+
+-- Estela de una bolsa lanzada (DefinicionesCosmeticos.ESTELAS): un Trail
+-- entre dos attachments que cruzan la bolsa
+function ModelosObjetos.estelaBolsa(modelo: Model, estela: { colores: ColorSequence }?)
+	local cuerpo = modelo.PrimaryPart
+	if not estela or not cuerpo then
+		return
+	end
+	local mitad = cuerpo.Size.Y * 0.35
+	local a0 = Instance.new("Attachment")
+	a0.Name = "Estela0"
+	a0.Position = Vector3.new(0, mitad, 0)
+	a0.Parent = cuerpo
+	local a1 = Instance.new("Attachment")
+	a1.Name = "Estela1"
+	a1.Position = Vector3.new(0, -mitad, 0)
+	a1.Parent = cuerpo
+	local trail = Instance.new("Trail")
+	trail.Attachment0 = a0
+	trail.Attachment1 = a1
+	trail.Color = estela.colores
+	trail.Lifetime = 0.6
+	trail.LightEmission = 0.4
+	trail.FaceCamera = true
+	trail.Transparency = NumberSequence.new(0.1, 1)
+	trail.Parent = cuerpo
+end
+
+-- La bolsa que se lleva en las manos dentro del patio, crece con el
+-- llenado. Abierta (boca con interior oscuro: "bolsa en la que cae la
+-- basura") mientras cabe algo; llena, cerrada y atada, como el dibujo
+-- de primera persona (Manos.client). Pivote en el fondo del saco. Devuelve
+-- (modelo, altura total): Patio la cuelga de las manos por arriba.
 function ModelosObjetos.bolsaAbierta(fraccion: number): (Model, number)
+	local f = math.clamp(fraccion, 0, 1)
+	local cerrada = if f >= 1 then mallaBolsa("Bolsa") else nil
+	local abierta = if cerrada then nil else mallaBolsa("BolsaAbierta")
+	if cerrada or abierta then
+		-- La cerrada mide mas por el nudo: x0,81 para que el saco no cambie
+		-- de ancho al atarla (medido sobre las dos mallas de Blender)
+		local escala = 0.85 + 0.35 * f
+		local m = if cerrada
+			then clonarMallaBolsa(cerrada, "BolsaAbierta", escala * 0.81)
+			else clonarMallaBolsa(abierta :: Model, "BolsaAbierta", escala)
+		return m, m:GetExtentsSize().Y
+	end
 	local m = nuevoModelo("BolsaAbierta")
 	-- Ball siempre es una esfera (Roblox iguala los tres ejes): el saco es una
 	-- bola y la boca un cilindro que le corta la coronilla.

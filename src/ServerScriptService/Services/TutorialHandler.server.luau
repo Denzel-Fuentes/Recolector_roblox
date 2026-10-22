@@ -9,7 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Textos = require(Shared:WaitForChild("Config"):WaitForChild("Textos"))
+local Idioma = require(Shared:WaitForChild("Utilidades"):WaitForChild("Idioma"))
 local Red = require(Shared:WaitForChild("Utilidades"):WaitForChild("Red"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
@@ -25,7 +25,7 @@ Perfiles.alCargar:Connect(function(jugador, perfil)
 		-- El cliente puede no tener aun la UI montada
 		task.delay(2, function()
 			if jugador.Parent then
-				NotificacionEvent:FireClient(jugador, Textos.NOTIFICACIONES.bienvenida, "exito")
+				NotificacionEvent:FireClient(jugador, Idioma.mensaje("NOTIFICACIONES.bienvenida"), "exito")
 			end
 		end)
 	end

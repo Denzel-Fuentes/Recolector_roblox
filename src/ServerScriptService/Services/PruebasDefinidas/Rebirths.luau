@@ -53,10 +53,10 @@ function Pruebas.rebirthTabla()
 		table.insert(mults, tostring(r.multiplicador))
 	end
 	local req, mul = table.concat(requisitos, ","), table.concat(mults, ",")
-	return string.format("requisitos %s | multiplicadores %s | x%s sin rebirths | huecos con 2/3: %d/%d => %s",
-		req, mul, tostring(DefinicionesRebirths.multiplicador(0)), DefinicionesRebirths.huecosMascota(2), DefinicionesRebirths.huecosMascota(3),
+	return string.format("requisitos %s | multiplicadores %s | x%s sin rebirths | el 3 abre %s => %s",
+		req, mul, tostring(DefinicionesRebirths.multiplicador(0)), DefinicionesRebirths.rebirth(3).desbloquea,
 		ok(req == "50000,200000,800000,3200000,12800000,51200000,204800000" and mul == "1.5,2,2.5,3,3.5,4,4.5"
-			and DefinicionesRebirths.multiplicador(0) == 1 and DefinicionesRebirths.huecosMascota(2) == 1 and DefinicionesRebirths.huecosMascota(3) == 2))
+			and DefinicionesRebirths.multiplicador(0) == 1 and DefinicionesRebirths.rebirth(3).desbloquea == "bolsaPlateada"))
 end
 
 -- Sin mejoras al maximo, o sin el dinero, no se renace
@@ -85,8 +85,7 @@ function Pruebas.renacer()
 	local j = jugador()
 	local p = Perfiles.obtener(j)
 	local copia = copiar(p)
-	local trajeAntes = p.trajes.TP1
-	p.trajes.TP1 = true
+	p.estela = "Arcoiris"
 	local aciertos = p.estadisticas.aciertos or 0
 	p.rebirths = 0
 	maxear(p)
@@ -106,10 +105,9 @@ function Pruebas.renacer()
 	local antesPago = Economia.dinero(j)
 	local resumen = Bolsa.depositarItems(j, { { tipo = "basura", nombre = "Papel", material = "Papel" } }, 0)
 	local cobrado = Economia.dinero(j) - antesPago
-	local conserva = p.trajes.TP1 == true and (p.estadisticas.aciertos or 0) == aciertos
-	p.trajes.TP1 = trajeAntes
+	local conserva = p.estela == "Arcoiris" and (p.estadisticas.aciertos or 0) == aciertos
 	restaurar(j, p, copia)
-	return string.format("renacer=%s | dinero tras renacer=%d mejoras a 0=%s rebirths=%d | conserva traje y estadisticas=%s | velocidad=%s grupo=%s | papel paga $%d (resumen %d) => %s",
+	return string.format("renacer=%s | dinero tras renacer=%d mejoras a 0=%s rebirths=%d | conserva estela y estadisticas=%s | velocidad=%s grupo=%s | papel paga $%d (resumen %d) => %s",
 		tostring(exito), antesPago, tostring(mejorasCero), rebirthsTras, tostring(conserva), tostring(velocidad), tostring(grupo), cobrado, resumen.dinero,
 		ok(exito and antesPago == 0 and mejorasCero and rebirthsTras == 1 and conserva and velocidad == 16 and grupo == "PersonajeR1" and cobrado == 8))
 end

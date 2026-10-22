@@ -1,0 +1,72 @@
+--!strict
+--[[
+	RankingsHandler
+	Cableado de los rankings (Services/Rankings): cada INTERVALO_ESCRITURA
+	publica los valores de cada jugador (y al salir), cada INTERVALO_LECTURA
+	lee los primeros puestos y los manda a todos (RankingsEvent). Un cliente
+	que acaba de entrar pide la ultima lectura con RankingsEvent:FireServer().
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local DefinicionesRankings = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesRankings"))
+local Red = require(Shared:WaitForChild("Utilidades"):WaitForChild("Red"))
+
+local Rankings = require(script.Parent:WaitForChild("Rankings"))
+
+local RankingsEvent = Red.evento("RankingsEvent")
+
+local PEDIR_COOLDOWN = 5
+local ultimoPedido: { [Player]: number } = {}
+
+RankingsEvent.OnServerEvent:Connect(function(jugador)
+	local ahora = os.clock()
+	if ahora - (ultimoPedido[jugador] or -math.huge) < PEDIR_COOLDOWN then
+		return
+	end
+	ultimoPedido[jugador] = ahora
+	local datos = Rankings.ultimos()
+	if datos then
+		RankingsEvent:FireClient(jugador, datos)
+	end
+end)
+
+Players.PlayerRemoving:Connect(function(jugador)
+	ultimoPedido[jugador] = nil
+	-- Rankings.publicar calcula antes de esperar: el perfil todavia esta
+	-- (DataService lo quita despues de guardar)
+	Rankings.publicar(jugador)
+	Rankings.olvidar(jugador)
+end)
+
+-- Escritura: cada jugador por su lado, repartidos en el intervalo para no
+-- gastar el presupuesto de golpe
+task.spawn(function()
+	while true do
+		task.wait(DefinicionesRankings.INTERVALO_ESCRITURA)
+		local jugadores = Players:GetPlayers()
+		local paso = DefinicionesRankings.INTERVALO_ESCRITURA / math.max(1, #jugadores) / 2
+		for _, jugador in jugadores do
+			if jugador.Parent then
+				task.spawn(Rankings.publicar, jugador)
+			end
+			task.wait(paso)
+		end
+	end
+end)
+
+-- Lectura: la primera poco despues de arrancar (los perfiles ya cargados
+-- escriben antes, para que el propio jugador salga si ya tenia valores)
+task.spawn(function()
+	task.wait(8)
+	for _, jugador in Players:GetPlayers() do
+		Rankings.publicar(jugador)
+	end
+	while true do
+		local datos = Rankings.leer()
+		RankingsEvent:FireAllClients(datos)
+		task.wait(DefinicionesRankings.INTERVALO_LECTURA)
+	end
+end)

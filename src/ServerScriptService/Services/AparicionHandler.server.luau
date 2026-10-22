@@ -9,8 +9,8 @@
 	CharacterAutoLoads esta apagado (aqui y en default.project.json, para que
 	no haya un primer personaje antes de que corra este script): el primer
 	personaje se carga cuando el perfil ya esta registrado. Asi nada que
-	dependa del perfil (velocidad, grupo de colision por rebirth, mascotas que
-	te siguen) ve un personaje sin perfil. Si el perfil no llega nunca, a los
+	dependa del perfil (velocidad, grupo de colision por rebirth) ve
+	un personaje sin perfil. Si el perfil no llega nunca, a los
 	15 s se carga igual: un jugador sin personaje es peor que uno sin guardar.
 ]]
 

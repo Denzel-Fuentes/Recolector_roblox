@@ -16,6 +16,14 @@
 	    Invoke("hud")                         rectangulos del HUD y avisos de solape / fuera de pantalla
 	    Invoke("recicladora")                 estado de la animacion de la recicladora (Recicladora.client)
 	    Invoke("trayectoria", 0.8)            dibuja la linea de ayuda como si se cargara el tiro (0 la quita)
+	    Invoke("celebracion", "Papel")        la celebracion de un acierto (UI/Celebraciones) con datos de ejemplo
+	    Invoke("mas1")                        los "+1" de recoger (EfectoRecogida) delante del personaje
+	    Invoke("avisoMundo", texto, icono)    una burbuja de AvisosMundo delante del personaje
+	    Invoke("toast", tipo?)                toasts con el estilo nuevo (sin tipo: exito, dinero, aviso)
+	    Invoke("botones")                     botones tactiles RECOGER / LANZAR y si se ven
+	    Invoke("record", 32, true)            la tarjeta grande de record de distancia (true = del servidor)
+	    Invoke("idioma")                      idioma activo, separadores y una muestra de cada seccion
+	    Invoke("tablones")                    los tablones de ranking montados, sus filas visibles y tu fila
 	Fuera de Studio no crea nada.
 ]]
 
@@ -32,6 +40,8 @@ local UI = script.Parent:WaitForChild("UI")
 local Menu = require(UI:WaitForChild("Menu"))
 local Escala = require(UI:WaitForChild("Kit"):WaitForChild("Escala"))
 local EstadoCliente = require(script.Parent:WaitForChild("EstadoCliente"))
+local Idioma = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Utilidades"):WaitForChild("Idioma"))
+local Formato = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Utilidades"):WaitForChild("Formato"))
 
 local gancho = Instance.new("BindableFunction")
 gancho.Name = "EjecutarPruebaCliente"
@@ -156,13 +166,30 @@ function acciones.camaraNormal()
 		hum.AutoRotate = true
 	end
 	workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
-	if Players.LocalPlayer:GetAttribute("EnPatio") == true then
+	-- La vista vale en todo el mapa (6 oct): primera = LockFirstPerson
+	if Players.LocalPlayer:GetAttribute("Vista") ~= "tercera" then
 		Players.LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
 	end
 	return "camara custom"
 end
 
 -- Disposicion forzada para capturas sin dispositivo
+-- ("camara", "tercera" | "primera"): cambia la vista (en todo el mapa) como la V y
+-- dice como quedo la camara
+function acciones.camara(vista)
+	local jugador = Players.LocalPlayer
+	jugador:SetAttribute("Vista", if vista == "tercera" then "tercera" else "primera")
+	task.wait(0.5)
+	local camara = workspace.CurrentCamera
+	local personaje = jugador.Character
+	local cabeza = personaje and personaje:FindFirstChild("Head")
+	local hum = personaje and personaje:FindFirstChildOfClass("Humanoid")
+	local distancia = if cabeza and cabeza:IsA("BasePart") then (camara.CFrame.Position - cabeza.Position).Magnitude else -1
+	return string.format("vista=%s modo=%s distancia a la cabeza=%.1f offset=%s autoRotate=%s",
+		tostring(jugador:GetAttribute("Vista")), tostring(jugador.CameraMode), distancia,
+		if hum then tostring(hum.CameraOffset) else "?", if hum then tostring(hum.AutoRotate) else "?")
+end
+
 function acciones.plataforma(p)
 	if p == nil or p == "" or p == "real" then
 		Escala.forzarPlataforma(nil)
@@ -229,13 +256,147 @@ function acciones.recicladora()
 	if not efectos then
 		return "sin RecicladoraEfectos (no corre Recicladora.client)"
 	end
-	local modelo = nil
+	local modelo, total = nil, 0
 	for _, m in game:GetService("CollectionService"):GetTagged("RecicladoraArte") do
-		modelo = m
+		total += 1
+		if m:GetAttribute("Material") == nil then
+			modelo = m
+		end
 	end
-	return string.format("modelo=%s lista=%s enCinta=%s bloques=%s objetos=%d",
+	return string.format("modelo=%s lista=%s enCinta=%s bloques=%s objetos=%d | recicladoras=%d animadas=%s",
 		modelo and modelo:GetFullName() or "nil", tostring(efectos:GetAttribute("Lista")), tostring(efectos:GetAttribute("EnCinta")),
-		tostring(efectos:GetAttribute("Bloques")), #efectos:GetChildren())
+		tostring(efectos:GetAttribute("Bloques")), #efectos:GetChildren(), total, tostring(efectos:GetAttribute("Vistas")))
+end
+
+-- La celebracion de un acierto con datos de ejemplo, sobre la boca del
+-- contenedor de ese tipo (o del general)
+function acciones.celebracion(contenedor)
+	local cel = UI:FindFirstChild("Celebraciones")
+	local evento = cel and cel:FindFirstChild("CelebracionPrueba")
+	if not evento then
+		return "sin UI/Celebraciones"
+	end
+	contenedor = contenedor or "Papel"
+	local posicion = nil
+	for _, c in game:GetService("CollectionService"):GetTagged("Contenedor") do
+		local material = c:GetAttribute("Material")
+		if (material or "General") == contenedor then
+			local zona = c:FindFirstChild("ZonaAcierto")
+			posicion = zona and zona.Position
+		end
+	end
+	evento:Fire({ tipo = "acierto", contenedor = contenedor, dinero = 1260, distancia = 24, bonusPct = 40, racha = 3, separadas = 9, malSeparadas = 2, posicion = posicion })
+	return "celebracion de " .. contenedor .. " en " .. tostring(posicion)
+end
+
+-- Un "+1" de cada clase (basura de cada tipo, billete, tesoro, bolsa) en
+-- fila delante del personaje
+function acciones.mas1()
+	local efecto = script.Parent:FindFirstChild("EfectoRecogida")
+	local evento = efecto and efecto:FindFirstChild("RecogidaPrueba")
+	local root = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if not evento or not root then
+		return "sin EfectoRecogida o sin personaje"
+	end
+	local casos = { { "basura", "Papel", 1 }, { "basura", "Plastico", 1 }, { "basura", "Metal", 1 }, { "basura", "Organico", 1 }, { "billete", "Metal", 1, 90 }, { "tesoro", "Metal", 1 }, { "bolsa", "", 12 } }
+	for i, c in casos do
+		evento:Fire(root.CFrame:PointToWorldSpace(Vector3.new((i - 4) * 2.2, 0, -9)), c[1], c[2], c[3], c[4] or 0)
+	end
+	return #casos .. " efectos"
+end
+
+-- Una burbuja de aviso en el mundo (AvisosMundo.client) delante del personaje
+function acciones.avisoMundo(texto, icono)
+	local avisos = script.Parent:FindFirstChild("AvisosMundo")
+	local evento = avisos and avisos:FindFirstChild("AvisoPrueba")
+	local root = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if not evento or not root then
+		return "sin AvisosMundo o sin personaje"
+	end
+	evento:Fire(root.CFrame:PointToWorldSpace(Vector3.new(0, 2, -8)), texto or "Termina tu montón primero", icono)
+	return "burbuja delante del personaje"
+end
+
+-- El idioma con el que arranco el cliente (Utilidades/Idioma) y una muestra:
+-- para forzar otro, atributo IdiomaStudio = "en" en ReplicatedStorage en Edit,
+-- antes de Play (o Test > Player Emulator > Locale)
+function acciones.idioma()
+	local t = Idioma.textos
+	local mensaje = Idioma.mensaje("REBIRTH.faltaDinero", { dinero = Idioma.dinero(12500) })
+	return string.format("idioma=%s (LocaleId=%s) | %s | %s | %s | %s | %s | %s | %s",
+		Idioma.codigo, Players.LocalPlayer.LocaleId, t.HUD.bolsaLlena, t.TIENDA.titulo, t.PEDIDOS.pestanaInsignias,
+		Idioma.resolver(mensaje), Formato.multiplicador(1.5), Idioma.literal("Excavar"), Idioma.mayusculas(t.TIPOS.Organico))
+end
+
+-- Los tablones de ranking de la plaza (Tablones.client): por cada pantalla,
+-- cuantas filas se ven en cada columna, el aviso y tu fila
+function acciones.tablones()
+	local partes = {}
+	for _, pantalla in game:GetService("CollectionService"):GetTagged("PantallaRanking") do
+		local gui = pantalla:FindFirstChild("TablonRanking")
+		if not gui then
+			table.insert(partes, tostring(pantalla:GetAttribute("Ranking")) .. ": sin SurfaceGui")
+			continue
+		end
+		local columnas = {}
+		for _, periodo in { "historico", "semanal" } do
+			local col = gui:FindFirstChild("Columna_" .. periodo, true)
+			local visibles = 0
+			for _, f in (col and col.Filas:GetChildren()) or {} do
+				if f:IsA("Frame") and f.Visible then
+					visibles += 1
+				end
+			end
+			local aviso = col and col:FindFirstChild("Aviso")
+			local tu = col and col.Tu:FindFirstChildWhichIsA("TextLabel")
+			table.insert(columnas, string.format("%s %d filas%s, '%s'", periodo, visibles,
+				if aviso and aviso.Visible then " (" .. aviso.Text .. ")" else "", if tu then tu.Text else "?"))
+		end
+		table.insert(partes, tostring(pantalla:GetAttribute("Ranking")) .. ": " .. table.concat(columnas, "; "))
+	end
+	return if #partes > 0 then table.concat(partes, "\n") else "no hay tablones (tag PantallaRanking)"
+end
+
+-- Un toast de cada tipo (UI/Notificaciones) para ver el estilo
+function acciones.toast(tipo)
+	local Notificaciones = require(UI:WaitForChild("Notificaciones"))
+	local tipos = if tipo then { tipo } else { "exito", "dinero", "aviso" }
+	for _, t in tipos do
+		Notificaciones.mostrar("Toast de prueba (" .. t .. ")", t)
+	end
+	local gui = Players.LocalPlayer.PlayerGui:FindFirstChild("Notificaciones")
+	local pila = gui and gui:FindFirstChild("Toasts", true)
+	return #tipos .. " toasts; en pila: " .. (if pila then #pila:GetChildren() else -1)
+end
+
+-- La tarjeta grande de record de distancia (UI/Notificaciones)
+function acciones.record(distancia, delServidor)
+	local Notificaciones = require(UI:WaitForChild("Notificaciones"))
+	Notificaciones.record(tostring(distancia or 32), delServidor == true)
+	task.wait(0.6)
+	local gui = Players.LocalPlayer.PlayerGui:FindFirstChild("Notificaciones")
+	local tarjeta = gui and gui:FindFirstChild("Logro", true)
+	if not tarjeta then
+		return "sin tarjeta"
+	end
+	local textos = {}
+	for _, d in tarjeta:GetDescendants() do
+		if d:IsA("TextLabel") then
+			table.insert(textos, string.format("%q@%dpx", d.Text, d.TextSize))
+		end
+	end
+	return string.format("tarjeta %dx%d en y=%d: %s", tarjeta.AbsoluteSize.X, tarjeta.AbsoluteSize.Y, tarjeta.AbsolutePosition.Y, table.concat(textos, ", "))
+end
+
+-- Los botones tactiles de ControlPatio (RECOGER y LANZAR) y si se ven
+function acciones.botones()
+	local ContextActionService = game:GetService("ContextActionService")
+	local partes = {}
+	for _, nombre in { "Recoger", "Lanzar" } do
+		local boton = ContextActionService:GetButton(nombre)
+		table.insert(partes, string.format("%s: %s", nombre, if boton then (if boton.Visible then "visible" else "oculto") else "sin boton"))
+	end
+	return table.concat(partes, " | ")
 end
 
 local function ejecutar(nombre, ...)

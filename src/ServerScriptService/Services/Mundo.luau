@@ -15,7 +15,12 @@
 ]]
 
 local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
+
+local Contenedores = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Utilidades"):WaitForChild("Contenedores"))
+
+export type Contenedor = Contenedores.Contenedor
 
 local Mundo = {}
 
@@ -70,22 +75,27 @@ function Mundo.figurinasFijas(): { BasePart }
 	return lista
 end
 
+-- Los cinco contenedores (uno por tipo + el general; Utilidades/Contenedores)
+function Mundo.contenedores(): { Contenedor }
+	Mundo.asegurar()
+	return Contenedores.listar()
+end
+
+-- El de un tipo de basura, o el general con material nil
+function Mundo.contenedorDe(material: string?): Contenedor?
+	Mundo.asegurar()
+	return Contenedores.de(material)
+end
+
+-- El GENERAL (el volquete de la recicladora): el del primer lanzamiento
 function Mundo.contenedor(): Model?
-	for _, inst in conTag("Contenedor") do
-		if inst:IsA("Model") then
-			return inst
-		end
-	end
-	return nil
+	local c = Mundo.contenedorDe(nil)
+	return if c then c.modelo else nil
 end
 
 function Mundo.zonaAcierto(): BasePart?
-	local cont = Mundo.contenedor()
-	if not cont then
-		return nil
-	end
-	local zona = cont:FindFirstChild("ZonaAcierto")
-	return if zona and zona:IsA("BasePart") then zona else nil
+	local c = Mundo.contenedorDe(nil)
+	return if c then c.zona else nil
 end
 
 function Mundo.npc(nombre: string): Model?

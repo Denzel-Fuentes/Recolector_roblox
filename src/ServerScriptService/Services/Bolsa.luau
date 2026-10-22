@@ -6,23 +6,27 @@
 
 	=== El dinero SOLO sale del contenedor (decision del usuario) ===
 	Recoger nunca paga. Todo lo que se levanta del patio (basura, billetes,
-	tesoros, fragmentos) ocupa un hueco de la bolsa y solo se convierte en $ al
-	depositarlo: con el prompt del Contenedor ("entregar a mano", sin bonus)
-	o lanzando la bolsa (Lanzamiento, con el bonus del tiro). Las dos vias
-	pasan por depositarItems, que es la unica formula de pago.
+	tesoros) ocupa un hueco de la bolsa y solo se convierte en $ al
+	depositarlo: con el prompt de un contenedor ("entregar a mano", sin
+	bonus) o lanzando la bolsa (Lanzamiento, con el bonus del tiro). Las dos
+	vias pasan por depositarItems, que es la unica formula de pago.
+
+	=== Cinco contenedores: premio por separar (decision del usuario, 3 oct) ===
+	Uno por tipo de basura y uno general. Cada pieza de BASURA paga
+	GameConfig.MULT_SEPARADO (x2) en el contenedor de su tipo y
+	MULT_MAL_SEPARADO (x0,5) en el de otro tipo; en el general, x1. Billetes,
+	tesoros y lo demas no son de ningun contenedor: x1 en todos. La bolsa
+	entera va al contenedor donde cae (no se reparte): separar es recoger por
+	colores antes de lanzar.
 
 	Capacidad = mejora Bolsa. Cada objeto ocupa un hueco.
 
 	Depositar:
-	  basura, billetes, tesoros -> $ (cada pieza x (1 + bonus de las mascotas
-	                               de su material), el total x el bonus del
-	                               lanzamiento, si lo hubo, x el multiplicador
-	                               de los rebirths)
-	  fragmentos                -> a la mascota que monta su set (Fragmentos);
-	                               uno de un set que el jugador aun no tiene
-	                               abierto (lo excavo otro) se paga como un
-	                               billete de su material
-	  figurinas/cintas/trajes   -> perfil (pospuestos en la v2: solo aparecen
+	  basura, billetes, tesoros -> $ (cada pieza x el factor del contenedor,
+	                               el total x el bonus del lanzamiento, si
+	                               lo hubo, x multiplicadorDinero: rebirths,
+	                               pase Dinero x2 y Turbo)
+	  figurinas/cintas          -> perfil (pospuestos en la v2: solo aparecen
 	                               con su funcion encendida)
 	El bonus +25 % por bolsa llena se fue con la v2: el riesgo y el premio
 	estan en la distancia del tiro.
@@ -46,20 +50,21 @@ local Economia = require(Servicios:WaitForChild("Economia"))
 local Mejoras = require(Servicios:WaitForChild("Mejoras"))
 local Coleccionables = require(Servicios:WaitForChild("Coleccionables"))
 local Rebirths = require(Servicios:WaitForChild("Rebirths"))
-local Mascotas = require(Servicios:WaitForChild("Mascotas"))
-local Fragmentos = require(Servicios:WaitForChild("Fragmentos"))
+local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
+local Turbo = require(Servicios:WaitForChild("Turbo"))
 
 local BolsaEvent = Red.evento("BolsaEvent")
 
 export type Item = {
-	tipo: string, -- basura | billete | tesoro | fragmento | figurina | cinta | traje | bolsa (solo en el mundo)
+	tipo: string, -- basura | billete | tesoro | figurina | cinta | bolsa (solo en el mundo)
 	contenido: { any }?, -- bolsa caida: lo que llevaba
 	dueno: string?, -- nombre visible del dueno de una bolsa caida
-	duenoId: number?, -- UserId: el unico que puede recogerla
+	duenoId: number?, -- UserId: el unico que puede recogerla hasta libreEn
+	libreEn: number?, -- workspace:GetServerTimeNow() desde el que la recoge cualquiera
 	nombre: string,
 	material: string?,
 	valor: number?,
-	id: string?, -- coleccionables; el set de un fragmento
+	id: string?, -- coleccionables
 }
 
 export type ResumenDeposito = {
@@ -67,8 +72,10 @@ export type ResumenDeposito = {
 	dinero: number,
 	bonus: number, -- bonus del lanzamiento aplicado (0 = entregado a mano)
 	porMaterial: { [string]: number }, -- piezas pagadas de cada material
-	fragmentos: number, -- fragmentos que contaron para una mascota
-	cerrados: { string }, -- sets de los fragmentos pagados por no tenerlos abiertos
+	contenedor: string, -- "General" o el tipo del contenedor
+	separadas: number, -- basura en el contenedor de su tipo (x2)
+	malSeparadas: number, -- basura en el contenedor de otro tipo (x0,5)
+	llena: boolean, -- la bolsa iba llena (pedidos)
 }
 
 local Bolsa = {}
@@ -133,7 +140,23 @@ function Bolsa.valorDeposito(_jugador: Player, item: Item): number
 end
 
 function Bolsa.resumenVacio(): ResumenDeposito
-	return { objetos = 0, dinero = 0, bonus = 0, porMaterial = {}, fragmentos = 0, cerrados = {} }
+	return { objetos = 0, dinero = 0, bonus = 0, porMaterial = {}, contenedor = "General", separadas = 0, malSeparadas = 0, llena = false }
+end
+
+-- Lo que multiplica todo el dinero de un deposito: el de los rebirths, el
+-- pase Dinero x2 y el Turbo (pedidos o Robux)
+function Bolsa.multiplicadorDinero(jugador: Player): number
+	local pase = if Monetizacion.tienePase(jugador, "DineroX2") then 2 else 1
+	return Rebirths.multiplicador(jugador) * pase * Turbo.multiplicador(jugador)
+end
+
+-- Lo que multiplica el contenedor a una pieza (materialContenedor nil = el
+-- general): x2 la basura de su tipo, x0,5 la de otro, x1 todo lo demas
+function Bolsa.factorContenedor(item: Item, materialContenedor: string?): number
+	if not materialContenedor or item.tipo ~= "basura" then
+		return 1
+	end
+	return if item.material == materialContenedor then GameConfig.MULT_SEPARADO else GameConfig.MULT_MAL_SEPARADO
 end
 
 function Bolsa.meter(jugador: Player, item: Item): boolean
@@ -169,25 +192,25 @@ function Bolsa.meterVarios(jugador: Player, items: { Item }): boolean
 end
 
 -- Calcula el pago (sin tocar nada) y pasa al perfil lo que no es dinero.
-local function cobrar(jugador: Player, items: { Item }, bonus: number): ResumenDeposito
+local function cobrar(jugador: Player, items: { Item }, bonus: number, materialContenedor: string?): ResumenDeposito
 	local resumen = Bolsa.resumenVacio()
 	resumen.bonus = bonus
+	resumen.contenedor = materialContenedor or "General"
 	local bruto = 0
 	for _, item in items do
 		local valor = Bolsa.valorDeposito(jugador, item)
 		if valor > 0 then
-			local material = item.material or "Mixto"
-			bruto += valor * (1 + Mascotas.bonusMaterial(jugador, material))
+			local material = item.material or "General"
+			local factor = Bolsa.factorContenedor(item, materialContenedor)
+			bruto += valor * factor
+			if factor > 1 then
+				resumen.separadas += 1
+			elseif factor < 1 then
+				resumen.malSeparadas += 1
+			end
 			resumen.objetos += 1
 			resumen.porMaterial[material] = (resumen.porMaterial[material] or 0) + 1
-		elseif item.tipo == "fragmento" and item.id then
-			if Fragmentos.agregar(jugador, item.id, "patio") then
-				resumen.fragmentos += 1
-			else
-				bruto += (GameConfig.VALOR_MATERIAL[item.material or ""] or 0) * GameConfig.MULT_BILLETE
-				table.insert(resumen.cerrados, item.id)
-			end
-		elseif (item.tipo == "figurina" or item.tipo == "cinta" or item.tipo == "traje") and item.id then
+		elseif (item.tipo == "figurina" or item.tipo == "cinta") and item.id then
 			if not Coleccionables.agregar(jugador, item.tipo, item.id) then
 				-- Duplicado (no deberia pasar): Dona Chatarra lo paga como un
 				-- tesoro de papel
@@ -195,7 +218,7 @@ local function cobrar(jugador: Player, items: { Item }, bonus: number): ResumenD
 			end
 		end
 	end
-	resumen.dinero = math.floor(bruto * (1 + bonus) * Rebirths.multiplicador(jugador) + 0.5)
+	resumen.dinero = math.floor(bruto * (1 + bonus) * Bolsa.multiplicadorDinero(jugador) + 0.5)
 	if resumen.dinero > 0 then
 		Economia.ganar(jugador, resumen.dinero)
 	end
@@ -203,23 +226,41 @@ local function cobrar(jugador: Player, items: { Item }, bonus: number): ResumenD
 end
 
 -- Recicla una lista de items (los de su bolsa, o los de una bolsa lanzada que
--- entro). bonus = lo que suma el lanzamiento (0 entregando a mano).
-function Bolsa.depositarItems(jugador: Player, items: { Item }, bonus: number?): ResumenDeposito
-	local resumen = cobrar(jugador, items, bonus or 0)
+-- entro) en el contenedor de `materialContenedor` (nil = el general). bonus =
+-- lo que suma el lanzamiento (0 entregando a mano).
+function Bolsa.depositarItems(jugador: Player, items: { Item }, bonus: number?, materialContenedor: string?): ResumenDeposito
+	local resumen = cobrar(jugador, items, bonus or 0, materialContenedor)
+	resumen.llena = #items >= Bolsa.capacidad(jugador)
 	Perfiles.estadistica(jugador, "objetosReciclados", resumen.objetos)
 	Perfiles.estadistica(jugador, "depositos", 1)
+	if resumen.separadas > 0 then
+		Perfiles.estadistica(jugador, "piezasSeparadas", resumen.separadas)
+	end
 	Bolsa.publicar(jugador)
 	Bolsa.alDepositar:Fire(jugador, items, resumen)
 	Bolsa.alResumen:Fire(jugador, resumen)
 	return resumen
 end
 
--- Deposito por el prompt del Contenedor: entregar a mano, sin bonus.
-function Bolsa.depositar(jugador: Player): ResumenDeposito?
+-- Si el contenedor de `materialContenedor` acepta la bolsa de este jugador
+-- (nil = el general, siempre). El de un tipo que aun no tiene abierto
+-- (GameConfig.MATERIAL_REBIRTH: metal con el Rebirth 1, organico con el 2)
+-- esta cerrado: ni lanzando ni a mano (peticion del usuario, 6 oct).
+function Bolsa.contenedorAbierto(jugador: Player, materialContenedor: string?): boolean
+	local perfil = Perfiles.obtener(jugador)
+	return GameConfig.materialAbierto(materialContenedor, if perfil then perfil.rebirths else 0)
+end
+
+-- Deposito por el prompt de un contenedor: entregar a mano, sin bonus.
+-- (nil, motivo) si no se pudo: "vacia" o "bloqueado"
+function Bolsa.depositar(jugador: Player, materialContenedor: string?): (ResumenDeposito?, string?)
 	if Bolsa.cuenta(jugador) == 0 then
-		return nil
+		return nil, "vacia"
 	end
-	return Bolsa.depositarItems(jugador, Bolsa.vaciar(jugador), 0)
+	if not Bolsa.contenedorAbierto(jugador, materialContenedor) then
+		return nil, "bloqueado"
+	end
+	return Bolsa.depositarItems(jugador, Bolsa.vaciar(jugador), 0, materialContenedor)
 end
 
 -- Recicla sin bonus, sin senales y sin tocar la bolsa en mano: al
@@ -254,6 +295,10 @@ Mejoras.alComprar:Connect(function(jugador, id)
 	end
 end)
 Rebirths.alRenacer:Connect(function(jugador)
+	Bolsa.publicar(jugador)
+end)
+-- Comprar Bolsa XL (o encender el modo dev de pases) cambia la capacidad
+Monetizacion.alCambiarPases:Connect(function(jugador)
 	Bolsa.publicar(jugador)
 end)
 

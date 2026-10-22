@@ -2,7 +2,7 @@
 --[[
 	TiposPatio (ModuleScript)
 	Los tipos que comparten los modulos del patio (Montones, ObjetosPatio,
-	FisicaBasura, Iman, Lanzamiento). Solo tipos: sin requires de servicios,
+	FisicaBasura, Lanzamiento). Solo tipos: sin requires de servicios,
 	para que ningun modulo tenga que importar a otro solo por una anotacion y
 	no haya ciclos.
 ]]
@@ -38,7 +38,7 @@ export type Objeto = {
 	item: Item,
 	modelo: PVInstance, -- el modelo real del item (basura, billete, bolsa caida...)
 	reclamadoPor: Player?,
-	suelto: boolean, -- ya no forma parte de la montana (el iman lo arrastra o cayo en el suelo)
+	suelto: boolean, -- ya no forma parte de la montana (una bolsa caida en el suelo)
 	asentado: boolean, -- anclado tras quedarse quieto (FisicaBasura)
 	monton: Monton?,
 }

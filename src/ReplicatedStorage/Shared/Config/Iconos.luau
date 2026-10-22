@@ -22,7 +22,6 @@ local Iconos = {}
 Iconos.IMAGENES = {
 	-- HUD (prioridad 1)
 	billete = 15402858705, -- CashIcon
-	cartas = 16697439085, -- Pets (huella): mascotas distintas
 	gema = 17368064384, -- GemIcon
 	rayo = 17368078790, -- Energy
 	bolsa = 15402958715, -- Inventory (mochila): lo que cabe
@@ -49,24 +48,22 @@ Iconos.IMAGENES = {
 	figurina = 0,
 	cinta = 95668779942949, -- Disc
 	engranaje = 17368089841, -- Settings
-	iman = 0,
+	camara = 0, -- vista primera/tercera persona (glifo dibujado)
 	bota = 17368052918, -- Speed (zapatilla)
 	cofre = 15402896733, -- GemChest
 	cruz = 17368208554, -- Deny
 	pocion = 15403275152, -- BluePotion: el refresco (mejora Chispa)
 
-	-- Sets de mascotas
+	-- Tipos de basura (contenedores, pedidos)
 	setMetal = 0,
 	setPlastico = 0,
 	setPapel = 0,
 	setOrganico = 0,
-	setRey = 0,
 
 	-- Imagenes grandes (prioridad 1 las manos, 3 el resto)
 	manosVacia = 0,
 	manosMedia = 0,
 	manosLlena = 0,
-	marcoCarta = 0,
 	papel = 0,
 	logo = 0,
 

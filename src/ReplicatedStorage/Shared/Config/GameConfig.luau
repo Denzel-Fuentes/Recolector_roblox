@@ -22,13 +22,6 @@ GameConfig.VERSION_PERFIL = 3
 GameConfig.INTERVALO_AUTOGUARDADO = 120
 GameConfig.REINTENTOS_DATASTORE = 3
 
--- === Iman (lo dan las mascotas Raras y Epicas, solo para su material) ===
-GameConfig.INTERVALO_IMAN = 0.2
--- Nada se recoge por pasar encima ni solo por apuntar (decisiones del
--- usuario): con clic (Alcance), en el movil con la mira mientras el dedo la
--- mueve (ControlPatio) o arrastrado por el Iman. A esta distancia un objeto ARRASTRADO entra en la bolsa.
-GameConfig.DISTANCIA_RECLAMO_IMAN = 2.5
-
 -- === Mejoras (valores y costes en DefinicionesMejoras) ===
 GameConfig.NIVEL_MAX_MEJORA = 10
 GameConfig.FACTOR_COSTE_MEJORA = 1.6
@@ -65,11 +58,10 @@ GameConfig.MAX_OBJETOS_PATIO = 360
 -- recoge. cantidad = montones de ese tamano; radio = de la montana (media
 -- base; la altura sale de min/max).
 -- Diseno v2: tres por cuadrante, 2 chicos de 20 piezas y 1 grande de 60 con
--- un tesoro y un fragmento de mascota garantizados (ConstructorMundo los
--- reparte). Cada pieza se tira por separado (TablasProbabilidad.TIPO_PIEZA).
+-- un tesoro garantizado (ConstructorMundo los reparte). Cada pieza se tira por separado (TablasProbabilidad.TIPO_PIEZA).
 GameConfig.TAMANOS_MONTON = {
 	chico = { min = 20, max = 20, cantidad = 12, radio = 7 },
-	grande = { min = 60, max = 60, cantidad = 6, radio = 13, tesoroGarantizado = true, fragmentoGarantizado = true },
+	grande = { min = 60, max = 60, cantidad = 6, radio = 13, tesoroGarantizado = true },
 }
 -- El patio es un RECTANGULO: 97,5 (oeste-este) x 150 (norte-sur). Era un
 -- cuadrado de 150 centrado en el origen y el usuario lo recorto un 35 % por
@@ -77,19 +69,18 @@ GameConfig.TAMANOS_MONTON = {
 -- ConstructorMundo leen estos bordes.
 GameConfig.PATIO = { oeste = -75, este = 22.5, norte = -75, sur = 75 }
 -- Los 6 cuadrantes del patio: 2 columnas (oeste, este) x 3 filas (norte,
--- centro, sur), numerados en orden de lectura desde el noroeste. Los dos
--- del fondo se abren con rebirths, asi que el patio es a la vez el mapa y la
--- progresion. Cada cuadrante tiene una ZONA que decide la mezcla de
--- materiales de sus montones (TablasProbabilidad.MEZCLA): decision del
--- usuario (29 sep), todos los montones traen basura revuelta y los del
--- norte son mas ricos. Antes cada cuadrante era de un solo material.
+-- centro, sur), numerados en orden de lectura desde el noroeste. Decision
+-- del usuario (5 oct): ya no hay cuadrantes cerrados ni barreras; los
+-- rebirths desbloquean TIPOS de basura (MATERIAL_REBIRTH), no secciones.
+-- Cada cuadrante tiene una ZONA que decide la mezcla de materiales
+-- (TablasProbabilidad.MEZCLA); hoy todos son "patio".
 -- Unica fuente: el constructor la hornea en las ranuras (atributos
 -- Cuadrante y Zona) y el runtime la lee por el indice.
 GameConfig.COLUMNAS_PATIO = 2
 GameConfig.FILAS_PATIO = 3
 GameConfig.CUADRANTES = {
-	{ zona = "metal", rebirth = 1 },
-	{ zona = "organico", rebirth = 2 },
+	{ zona = "patio", rebirth = 0 },
+	{ zona = "patio", rebirth = 0 },
 	{ zona = "patio", rebirth = 0 },
 	{ zona = "patio", rebirth = 0 },
 	{ zona = "patio", rebirth = 0 },
@@ -103,16 +94,32 @@ GameConfig.ZONAS = {
 	organico = { destaca = "Organico" },
 } :: { [string]: { destaca: string? } }
 
+-- Rebirths que hacen falta para cada tipo de basura (decision del usuario,
+-- 5 oct): un monton solo trae los tipos que tiene abiertos quien lo excava,
+-- y nadie recoge una pieza de un tipo que aun no tiene, aunque la haya
+-- sacado otro jugador.
+GameConfig.MATERIAL_REBIRTH = { Papel = 0, Plastico = 0, Metal = 1, Organico = 2 } :: { [string]: number }
+
+function GameConfig.materialAbierto(material: string?, rebirths: number): boolean
+	if not material then
+		return true
+	end
+	return rebirths >= (GameConfig.MATERIAL_REBIRTH[material] or 0)
+end
+
 -- === Punteria: lanzar la BOLSA entera al Contenedor de la caseta ===
 GameConfig.DISTANCIA_MIN_LANZAR = 6
 GameConfig.VIDA_PROYECTIL = 4
 -- Mantener pulsado carga la fuerza: a fuerza 1 la bolsa llega al alcance del
 -- Brazo del jugador (mejora Brazo, 25 -> 70 studs).
 GameConfig.FUERZA_LANZAMIENTO = { segundosCarga = 1.2, minimo = 0.15 }
--- Una bolsa que falla solo la recoge su dueno (auditoria 26 sep: que
--- cualquiera pudiera quedarsela castigaba al que arriesga y daba pie al
--- acoso) y se queda en el suelo hasta que vuelve a por ella: ya no se
--- recicla sola (decision del usuario, 29 sep). Ver Services/Lanzamiento.
+-- Una bolsa que falla es solo de su dueno durante BOLSA_LIBRE_SEGUNDOS desde
+-- que se posa; despues la recoge cualquiera y se queda lo que lleva
+-- (decision del usuario, 6 oct; todos ven la cuenta atras encima). La
+-- auditoria del 26 sep la habia dejado solo para el dueno para siempre
+-- (que cualquiera se la quedara castigaba al que arriesga): los 30 s son el
+-- punto medio. No se recicla sola (29 sep). Ver Services/Lanzamiento.
+GameConfig.BOLSA_LIBRE_SEGUNDOS = 30
 -- Bonus por distancia y racha, ayuda de punteria: Config/DefinicionesPunteria
 
 -- === Valores en $ ===
@@ -126,6 +133,17 @@ GameConfig.VALOR_MATERIAL = { Papel = 5, Plastico = 7, Metal = 15, Organico = 25
 GameConfig.MULT_BILLETE = 6
 GameConfig.MULT_TESORO = 40
 
+-- === Contenedores por tipo (decision del usuario, 3 oct) ===
+-- Un contenedor por tipo de basura y uno general. "Premio por separar": en
+-- el de su tipo una pieza de basura paga x2; en el de otro tipo, x0,5; en
+-- el general todo paga x1. Billetes y tesoros pagan lo suyo en cualquiera.
+-- Asi recoger por colores (la basura es del color de su tipo) tiene premio
+-- y una bolsa revuelta sigue teniendo su sitio. Orden de la fila del mundo
+-- (ConstructorMundo), de la cabana hacia el este.
+GameConfig.TIPOS_BASURA = { "Papel", "Plastico", "Metal", "Organico" }
+GameConfig.MULT_SEPARADO = 2
+GameConfig.MULT_MAL_SEPARADO = 0.5
+
 -- === Red ===
 GameConfig.COOLDOWN_REMOTE = 0.15
 -- Mantener el clic recoge una pieza cada tanto (cliente); >= COOLDOWN_REMOTE,
@@ -135,12 +153,15 @@ GameConfig.DISTANCIA_INTERACCION = 12
 
 -- === Monetizacion ===
 -- En Studio, con esta bandera, todos los pases cuentan como comprados para
--- poder probar sus efectos sin ids reales. /pases off la desactiva en sesion.
-GameConfig.PASES_DEV_EN_STUDIO = true
+-- poder probar sus efectos sin ids reales. Apagada por defecto desde que hay
+-- Dinero x2 y Bolsa XL (lote 8): las pruebas miden el pago y la bolsa sin
+-- ellos. /pases on la enciende en la sesion.
+GameConfig.PASES_DEV_EN_STUDIO = false
 
 -- === Funciones pospuestas (diseno v2, 26 sep) ===
 -- Lo que la v2 QUITA se borro del codigo (energia, gemas, Sobre, Contenedor
--- Dorado, Pase de la Suerte, Monton extra, reparacion, fusion, venta, base).
+-- Dorado, Pase de la Suerte, Monton extra, reparacion, fusion, venta, base;
+-- el 5 oct, los trajes del avatar).
 -- Lo que solo POSPONE queda aqui apagado: diluia los premios de los montones
 -- y puede volver en una actualizacion. Servidor y cliente leen la misma tabla
 -- (vive en ReplicatedStorage). Reactivar = cambiar el booleano (y, para las
@@ -148,7 +169,6 @@ GameConfig.PASES_DEV_EN_STUDIO = true
 GameConfig.FUNCIONES = {
 	FIGURINAS = false, -- figuritas en los montones y escondidas en el decorado
 	CINTAS = false, -- cintas de audio en los montones
-	TRAJES_BOTIN = false, -- los 3 trajes gratis que salian de los montones
 }
 
 function GameConfig.activa(nombre: string): boolean

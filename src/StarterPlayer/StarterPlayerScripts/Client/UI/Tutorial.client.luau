@@ -1,14 +1,17 @@
 --!strict
 --[[
 	Tutorial (cliente)
-	Pinta el paso actual del tutorial jugable con una FLECHA (Beam) desde el
-	jugador hasta el objetivo del paso (el monton sin abrir mas cercano, el
-	contenedor) y avisa al terminarlo.
+	Pinta el paso actual del tutorial jugable: una PILDORA pequena arriba a
+	la izquierda con lo que pide ("Paso 6/8 · Recoge basura de un solo
+	color...", que abre el panel del paso al pulsarla) y una FLECHA (Beam)
+	desde el jugador hasta el objetivo (el monton sin abrir mas cercano, un
+	contenedor). Avisa al terminarlo.
 
-	Sin tarjeta en pantalla: la de abajo-centro ("Primeros pasos 3/5 ·
-	Recoge basura hasta llenar la bolsa", con un boton "Abrir Tienda" en el
-	paso de la mejora) se quito el 29 sep a peticion del usuario. El L9
-	decidira como se explica cada paso sin ella.
+	La tarjeta grande de abajo-centro se quito el 29 sep (en el movil tapaba
+	media pantalla). La pildora del lote 9 va arriba a la izquierda: en PC
+	ese rincon esta libre (la botonera va a media altura) y en tactil va
+	debajo de la botonera; no tapa los avisos (arriba en el centro) ni las
+	barras (derecha).
 
 	Solo presentacion: el paso lo decide el servidor (Services/Tutorial) y
 	llega en el perfil (perfil.tutorial = pasos completados). Se deriva un
@@ -25,20 +28,30 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Paleta = require(Config:WaitForChild("Paleta"))
-local Textos = require(Config:WaitForChild("Textos"))
+-- El copy en el idioma del jugador (misma forma que Config/Textos)
+local Idioma = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Utilidades"):WaitForChild("Idioma"))
+local Textos = Idioma.textos
 local DefinicionesTutorial = require(Config:WaitForChild("DefinicionesTutorial"))
+local DefinicionesRebirths = require(Config:WaitForChild("DefinicionesRebirths"))
+local Formato = require(Shared:WaitForChild("Utilidades"):WaitForChild("Formato"))
 local Cuadrantes = require(Shared:WaitForChild("Utilidades"):WaitForChild("Cuadrantes"))
+local Contenedores = require(Shared:WaitForChild("Utilidades"):WaitForChild("Contenedores"))
 local Fusion = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Fusion"))
 
 local Cliente = script.Parent.Parent
 local EstadoCliente = require(Cliente:WaitForChild("EstadoCliente"))
 local Menu = require(script.Parent:WaitForChild("Menu"))
 local Notificaciones = require(script.Parent:WaitForChild("Notificaciones"))
+local Kit = require(script.Parent:WaitForChild("Kit"))
+local Escala = require(script.Parent:WaitForChild("Kit"):WaitForChild("Escala"))
+local Tema = require(script.Parent:WaitForChild("Kit"):WaitForChild("Tema"))
 
 local peek = Fusion.peek
 
 local jugador = Players.LocalPlayer
-local scope = Fusion.scoped(Fusion)
+local scope = Fusion.scoped(Fusion, Kit)
+local Children = Fusion.Children
+local OnEvent = Fusion.OnEvent
 
 -- Pasos completados (-1 = perfil aun sin cargar)
 local completados = scope:Computed(function(use)
@@ -68,6 +81,76 @@ do
 		anterior = n
 	end)
 end
+
+-- ===========================================================================
+-- Pildora del paso
+-- ===========================================================================
+
+local textoPaso = scope:Computed(function(use)
+	local n = use(completados)
+	local paso = if n >= 0 then DefinicionesTutorial.actual(n) else nil
+	if not paso then
+		return ""
+	end
+	local texto = Textos.formatear((Textos.TUTORIAL :: any)[paso.texto] or "", {
+		dinero = Formato.dinero(DefinicionesRebirths.rebirth(1).requisito),
+	})
+	return Textos.formatear(Textos.TUTORIAL.paso, { n = n + 1, total = DefinicionesTutorial.TOTAL }) .. " · " .. texto
+end)
+local panelPaso = scope:Computed(function(use)
+	local n = use(completados)
+	local paso = if n >= 0 then DefinicionesTutorial.actual(n) else nil
+	return if paso and paso.panel then paso.panel else ""
+end)
+local tactil = scope:Computed(function(use)
+	return use(Escala.disposicion) == "tactil"
+end)
+
+scope:Pantalla({
+	Nombre = "Tutorial",
+	Orden = 2,
+	Hijos = {
+		scope:New("TextButton")({
+			Name = "Objetivo",
+			Text = "",
+			AutoButtonColor = false,
+			-- PC: arriba a la izquierda (la botonera va a media altura).
+			-- Tactil: debajo de la botonera (2 x 88 a 0,8 = ~150 de alto)
+			Position = scope:Computed(function(use)
+				return if use(tactil) then UDim2.fromOffset(16, 176) else UDim2.fromOffset(16, 16)
+			end),
+			Size = scope:Computed(function(use)
+				return UDim2.fromOffset(if use(tactil) then 240 else 330, 0)
+			end),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundColor3 = Paleta.UI_PAPEL,
+			Visible = scope:Computed(function(use)
+				return use(activo) and use(sinPanel) and use(textoPaso) ~= ""
+			end),
+			SelectionImageObject = Tema.SELECCION_INVISIBLE,
+			[OnEvent("Activated")] = function()
+				local panel = peek(panelPaso)
+				if panel ~= "" then
+					Menu.alternar(panel)
+				end
+			end,
+			[Children] = {
+				scope:New("UICorner")({ CornerRadius = UDim.new(0, Tema.RADIO) }),
+				scope:New("UIStroke")({ Color = Paleta.UI_PRIMARIO, Thickness = Tema.GROSOR, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+				scope:Relleno({ X = 10, Y = 6 }),
+				scope:Texto({
+					Texto = textoPaso,
+					Size = UDim2.new(1, 0, 0, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					Tamano = scope:Computed(function(use)
+						return if use(tactil) then 13 else 15
+					end),
+					Fuente = "titulo",
+				}),
+			},
+		}),
+	},
+})
 
 -- ===========================================================================
 -- Flecha
@@ -129,6 +212,20 @@ end
 local function posicionObjetivo(objetivo: string, desde: Vector3): Vector3?
 	if objetivo == "montonLleno" then
 		return montonLlenoMasCercano(desde)
+	elseif objetivo == "Contenedor" then
+		-- El general (el primer lanzamiento siempre entra en el)
+		local general = Contenedores.general()
+		return if general then general.zona.Position else nil
+	elseif objetivo == "ContenedorTipo" then
+		-- El de tipo mas cercano
+		local mejor, dMejor = nil, math.huge
+		for _, c in Contenedores.listar() do
+			local d = (c.zona.Position - desde).Magnitude
+			if c.material and d < dMejor then
+				mejor, dMejor = c, d
+			end
+		end
+		return if mejor then mejor.zona.Position else nil
 	end
 	for _, inst in CollectionService:GetTagged(objetivo) do
 		if inst:IsA("Model") then

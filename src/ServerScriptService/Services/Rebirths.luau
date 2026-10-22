@@ -4,11 +4,10 @@
 	Unica responsabilidad: renacer. Con las 4 mejoras al maximo y el dinero
 	del requisito en mano, el jugador vuelve a empezar mas fuerte: el dinero
 	y las mejoras vuelven a 0 y a cambio sube su multiplicador de dinero y se
-	abren zonas y sets (Config/DefinicionesRebirths, GameConfig.CUADRANTES,
-	DefinicionesMascotas.SETS).
+	abren zonas (Config/DefinicionesRebirths, GameConfig.CUADRANTES).
 
-	Se conserva todo lo demas: mascotas, sus niveles y sus fragmentos,
-	cuadrantes abiertos (salen de perfil.rebirths), records, logros,
+	Se conserva todo lo demas: cuadrantes abiertos y cosmeticos regalados
+	(salen de perfil.rebirths), records, pedidos, insignias,
 	cosmeticos y pases. Quien necesita enterarse (la bolsa que cambia de
 	capacidad, las insignias) escucha alRenacer; el grupo de colision del
 	personaje lo cambia Colisiones al ver el perfil nuevo.

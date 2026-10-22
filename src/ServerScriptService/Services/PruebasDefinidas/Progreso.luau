@@ -23,6 +23,8 @@ local Mundo = require(Servicios:WaitForChild("Mundo"))
 local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
 local Tutorial = require(Servicios:WaitForChild("Tutorial"))
 local Lanzamiento = require(Servicios:WaitForChild("Lanzamiento"))
+local Pedidos = require(Servicios:WaitForChild("Pedidos"))
+local Rebirths = require(Servicios:WaitForChild("Rebirths"))
 
 local Comunes = require(script.Parent:WaitForChild("Comunes"))
 local jugador, teletransportar = Comunes.jugador, Comunes.teletransportar
@@ -101,9 +103,8 @@ end
 function Pruebas.perfilV3()
 	local base = Perfiles.porDefecto()
 	local claves = {
-		"dinero", "mejoras", "rebirths", "mascotas", "equipadas", "fragmentos", "pityMascotas",
-		"fragmentosLibres", "pedidos", "racha", "trajes", "turboHasta", "figurinas",
-		"cintas", "logros", "estadisticas", "recibos", "pasesCache", "tutorial",
+		"dinero", "mejoras", "rebirths", "pedidos", "racha", "turboHasta", "figurinas",
+		"cintas", "logros", "estadisticas", "semana", "recibos", "pasesCache", "tutorial",
 	}
 	local faltan = {}
 	for _, c in claves do
@@ -112,8 +113,11 @@ function Pruebas.perfilV3()
 		end
 	end
 	local sobran = {}
-	-- ("fragmentos" volvio el 29 sep con otro sentido: el montaje de cada set)
-	for _, c in { "gemas", "exhibidas", "skins", "pity", "montonesExtra", "meGusta", "acompanante", "siguienteUid", "medidores", "capsulasLibres" } do
+	-- Las mascotas y sus fragmentos se quitaron el 3 oct; los trajes, el 5
+	for _, c in {
+		"gemas", "exhibidas", "skins", "pity", "montonesExtra", "meGusta", "acompanante", "siguienteUid", "medidores", "capsulasLibres",
+		"mascotas", "equipadas", "fragmentos", "pityMascotas", "fragmentosLibres", "trajes", "trajePuesto",
+	} do
 		if base[c] ~= nil then
 			table.insert(sobran, c)
 		end
@@ -227,10 +231,28 @@ function Pruebas.tutorial()
 	Mejoras.alComprar:Fire(j, "Bolsa", 1)
 	table.insert(pasos, p.tutorial)
 	Bolsa.vaciar(j)
+	-- Lote 9: separar (3 bien separadas en su contenedor), un pedido y el
+	-- Rebirth 1 (sin pedidos ni rebirths previos, para que no se salten)
+	local pedidosPrevios = p.estadisticas.pedidosCompletados
+	p.estadisticas.pedidosCompletados = 0
+	local mal = {}
+	for _ = 1, 3 do
+		table.insert(mal, { tipo = "basura", nombre = "Papel", material = "Papel", valor = 1 })
+	end
+	Bolsa.depositarItems(j, mal, 0, "Plastico") -- en el equivocado: no cuenta
+	table.insert(pasos, p.tutorial)
+	Bolsa.depositarItems(j, mal, 0, "Papel")
+	table.insert(pasos, p.tutorial)
+	Pedidos.alCumplir:Fire(j, {})
+	table.insert(pasos, p.tutorial)
+	Rebirths.alRenacer:Fire(j, 1)
+	table.insert(pasos, p.tutorial)
+	p.estadisticas.pedidosCompletados = pedidosPrevios
 	local terminado = Tutorial.terminado(j)
 	Tutorial.fijar(j, previo)
 	local serie = table.concat(pasos, ",")
-	return string.format("pasos: %s (esperado 0,1,2,3,4,5) terminado=%s => %s", serie, tostring(terminado), ok(serie == "0,1,2,3,4,5" and terminado))
+	local esperado = "0,1,2,3,4,5,5,6,7,8"
+	return string.format("pasos: %s (esperado %s) terminado=%s => %s", serie, esperado, tostring(terminado), ok(serie == esperado and terminado))
 end
 
 -- Nada de lo que la v2 quito sigue en el juego
@@ -245,12 +267,19 @@ function Pruebas.sinRestos()
 		-- Las capsulas del medidor (29 sep: fragmentos en los montones) y los
 		-- dialogos de Dona Chatarra (29 sep: su prompt solo abre la tienda)
 		"CapsulaEvent", "AbrirCapsulaEvent", "DialogoEvent",
+		-- Las mascotas (3 oct: demasiado trabajo para lo que aportaban)
+		"EquiparMascotaEvent", "UsarFragmentoEvent", "RevelacionEvent",
+		-- Los trajes del avatar (5 oct)
+		"PonerTrajeEvent",
 	} do
 		if eventos:FindFirstChild(nombre) then
 			table.insert(restos, nombre)
 		end
 	end
-	for _, nombre in { "Parcelas", "ParcelasHandler", "Energia", "Reparacion", "ReparacionHandler", "Tienda", "Acompanante", "AcompananteHandler", "Capsulas" } do
+	for _, nombre in {
+		"Parcelas", "ParcelasHandler", "Energia", "Reparacion", "ReparacionHandler", "Tienda", "Acompanante", "AcompananteHandler", "Capsulas",
+		"Mascotas", "MascotasHandler", "Fragmentos", "Seguidores", "Iman",
+	} do
 		if Servicios:FindFirstChild(nombre) then
 			table.insert(restos, "Services." .. nombre)
 		end
@@ -263,8 +292,22 @@ function Pruebas.sinRestos()
 	if Shared.Utilidades:FindFirstChild("ProgresoLogros") then
 		table.insert(restos, "Utilidades.ProgresoLogros")
 	end
+	for _, nombre in { "DefinicionesMascotas" } do
+		if Config:FindFirstChild(nombre) then
+			table.insert(restos, "Config." .. nombre)
+		end
+	end
+	if Shared.Utilidades:FindFirstChild("ModelosMascota") then
+		table.insert(restos, "Utilidades.ModelosMascota")
+	end
+	local perfil = Perfiles.obtener(jugador())
+	for _, campo in { "mascotas", "equipadas", "fragmentos", "pityMascotas", "fragmentosLibres", "trajes", "trajePuesto" } do
+		if perfil and (perfil :: any)[campo] ~= nil then
+			table.insert(restos, "perfil." .. campo)
+		end
+	end
 	for nombre in GameConfig.FUNCIONES do
-		if nombre ~= "FIGURINAS" and nombre ~= "CINTAS" and nombre ~= "TRAJES_BOTIN" then
+		if nombre ~= "FIGURINAS" and nombre ~= "CINTAS" then
 			table.insert(restos, "FUNCIONES." .. nombre)
 		end
 	end

@@ -35,7 +35,10 @@
 	    PuntoAparicion    donde aparece todo el mundo (plaza, mirando al patio)
 	    FigurinaFija      marcador de figurina escondida (attr FigurinaId;
 	                      solo con la funcion FIGURINAS, pospuesta)
-	    Contenedor        el contenedor de reciclaje (hijo ZonaAcierto = punteria)
+	    Contenedor        los 5 contenedores de reciclaje (hijo ZonaAcierto =
+	                      punteria): el general, el volquete de la
+	                      recicladora; y uno por tipo de basura (attr
+	                      Material), en fila al este de la caseta
 	    Limite            muros invisibles del borde del mapa
 	    SoloDecorado      arte que no hace nada
 	    Mundo.Manual      carpeta que el horneado NUNCA borra: lo que el
@@ -43,21 +46,27 @@
 
 	Plano v4 (diseno v2, 26 sep; N = z negativa, E = x positiva). Sin bases:
 	el mapa se recorto por el oeste, donde estaban las parcelas, y la valla
-	queda a 24 studs del patio por los tres lados. Cada cuadrante es de un
-	material (GameConfig.CUADRANTES); los dos del norte llevan barrera hasta
-	el Rebirth 1 (Metal) y 2 (Organico):
+	queda a 24 studs del patio por los tres lados. Desde el 5 oct los seis
+	cuadrantes son "patio" con rebirth 0 (GameConfig.CUADRANTES), asi que
+	construirBarreras no levanta ninguna: los rebirths abren tipos de
+	basura, no secciones.
 
 	    +------------------------------+  z = -99
 	    |  +------------+------------+ |
-	    |  | METAL  R1  | ORGANICO R2| |  z = -75..-25 (barreras)
+	    |  | PATIO      | PATIO      | |  z = -75..-25
 	    |  +------------+------------+ |
-	    |  | PAPEL      | PLASTICO   | |
-	    |  | PAPEL      | PLASTICO   | |  z = 75
+	    |  | PATIO      | PATIO      | |
+	    |  | PATIO      | PATIO      | |  z = 75
 	    |  +------------+------------+ |
 	    |  ===== calle + PLAZA (aparicion) ====   z = 96
 	    |  | RECICLADORA: caseta      | |  z = 115..161
 	    +------------------------------+  z = 177
 	   x = -99  -75     -26,25      22,5  46,5
+
+	El lote de la recicladora va de valla a valla (x -95..43,5). De oeste a
+	este (5 oct): camion, recicladora GENERAL (contenedor azul en x -57,5),
+	cabana en x = CASETA_X (-35) y las cuatro unidades de tipo (contenedor
+	+ trituradora escalada) en x -13, 3,7, 20,4 y 37,1.
 
 	Entre el borde del patio y la valla queda una franja de cesped de 24
 	studs: ahi va el decorado (y los escondites de las figurinas).
@@ -72,7 +81,9 @@ local Config = Shared:WaitForChild("Config")
 local Paleta = require(Config:WaitForChild("Paleta"))
 local GameConfig = require(Config:WaitForChild("GameConfig"))
 local Textos = require(Config:WaitForChild("Textos"))
+local Idioma = require(Shared:WaitForChild("Utilidades"):WaitForChild("Idioma"))
 local DefinicionesColeccionables = require(Config:WaitForChild("DefinicionesColeccionables"))
+local DefinicionesRankings = require(Config:WaitForChild("DefinicionesRankings"))
 local Recicladora = require(Config:WaitForChild("Recicladora"))
 local ArteMundo = require(script.Parent:WaitForChild("ArteMundo"))
 
@@ -80,7 +91,7 @@ local M = Paleta.MUNDO
 local V = Paleta.VARIANTES
 
 local ConstructorMundo = {}
-ConstructorMundo.VERSION = 5
+ConstructorMundo.VERSION = 6
 
 -- ===========================================================================
 -- LAYOUT
@@ -123,6 +134,28 @@ local LAYOUT = {
 	LOTE_SUR = 161,
 	CASETA_Z = 133,
 	CALLE_ANCHO = 12,
+	-- Mundo v6 (3 oct): los 4 contenedores de tipo, en fila sobre la solera
+	-- al este de la cabana (x local negativa), a la altura del general (z
+	-- local 6) y mirando a la plaza. Mas pequenos que el general (8 x 6):
+	-- pagan el doble, que cueste un poco mas acertar. Orden de la fila:
+	-- GameConfig.TIPOS_BASURA desde la cabana.
+	-- 5 oct (decision del usuario): cada uno con la trituradora y la cinta
+	-- de la recicladora general, escalada (escalaTrituradora) y metida
+	-- desfase studs detras/al lado del contenedor, que es mas grande que el
+	-- volquete escalado. Cada unidad ocupa ~15 studs: paso entre centros.
+	CONTENEDOR_TIPO = {
+		ancho = 5.5,
+		fondo = 4.5,
+		alto = 4,
+		primeroX = -22,
+		paso = 16.7,
+		escalaTrituradora = 0.65,
+		desfase = Vector3.new(0, 0, -0.8),
+	},
+	-- La caseta (cabana, recicladora general y su chatarra) en x del mundo:
+	-- desde el 5 oct, 35 studs al oeste para que quepan las cuatro unidades
+	-- de tipo con su trituradora al este de la cabana
+	CASETA_X = -35,
 	-- Limite del mapa: rectangulo con muro invisible alto y la valla de
 	-- madera del vertedero por dentro. Al norte, al este y (desde que no hay
 	-- parcelas) al oeste queda una franja de cesped de 24 entre el patio y la
@@ -133,6 +166,12 @@ local LAYOUT = {
 	-- alguien apague el muro invisible
 	VALLA_ALTURA = 10,
 	VALLA_MARGEN = 1.6,
+	-- Tablones de ranking (8 oct): en el cesped del este, donde acaba la calle,
+	-- mirando al oeste (al spawn), uno por DefinicionesRankings.LISTA de norte
+	-- a sur. Fuera de las lineas de tiro del patio a los contenedores: entre el
+	-- Puente (z <= 64) y el contenedor organico (z ~ 120), y al este de la
+	-- pila de neumaticos (x ~ 32)
+	TABLONES = { x = 41, z = { 74, 89, 104 } },
 	-- Barrera de un cuadrante cerrado: mas alta que un salto (~7,5) y metida
 	-- un poco hacia dentro de su cuadrante, para que las dos del borde comun
 	-- (Metal | Organico) no coincidan
@@ -218,7 +257,7 @@ local function carpeta(nombre, padre)
 end
 
 -- Parte invisible que solo existe para marcar una posicion. No colisiona, no
--- se toca y no entra en raycasts, asi no molesta ni al jugador ni al iman.
+-- se toca y no entra en raycasts, asi no molesta al jugador.
 local function marcador(nombre, cframe, padre)
 	return parte({
 		Name = nombre,
@@ -266,6 +305,7 @@ local function cartelFlotante(parteBase, texto, altura, ancho)
 	bb.StudsOffset = Vector3.new(0, altura or 3, 0)
 	bb.AlwaysOnTop = false
 	bb.MaxDistance = 90
+	bb.AutoLocalize = false -- el idioma lo pone TraducirMundo.client
 	bb.Parent = parteBase
 	local tl = Instance.new("TextLabel")
 	tl.Name = "Texto"
@@ -303,11 +343,12 @@ local function centroMapa()
 	return (L.oeste + L.este) / 2, (L.norte + L.sur) / 2
 end
 
--- El lote de la recicladora (en x del mundo): desde el borde oeste del patio
--- hasta 3 studs antes de la valla este. Es mas ancho que el patio desde que
--- este se recorto por el este; la caseta sigue en x = 0.
+-- El lote de la recicladora (en x del mundo): de valla a valla, con 3-4
+-- studs de margen. Desde el 5 oct pasa del borde oeste del patio hasta casi
+-- la valla oeste: la caseta se movio al oeste (LAYOUT.CASETA_X) para dejar
+-- sitio a las trituradoras de los contenedores de tipo.
 local function limitesLote()
-	return LAYOUT.PATIO.oeste, LAYOUT.LIMITE.este - 3
+	return LAYOUT.LIMITE.oeste + 4, LAYOUT.LIMITE.este - 3
 end
 
 -- ===========================================================================
@@ -604,7 +645,7 @@ local function construirDecorado(patio)
 	ArteMundo.pilaNeumaticos(decorado, CFrame.new(32, 0, 84), 4, 24)
 
 	-- F1: detras de la caseta, en el lote de la recicladora
-	escondites.F1 = CFrame.new(0, 1.6, LAYOUT.CASETA_Z + 7.5)
+	escondites.F1 = CFrame.new(LAYOUT.CASETA_X, 1.6, LAYOUT.CASETA_Z + 7.5)
 
 	return escondites
 end
@@ -687,7 +728,7 @@ local function construirNPC(caseta, cf)
 	parte({ Name = "BrazoDer", Size = Vector3.new(0.7, 2.2, 0.7), CFrame = cf * CFrame.new(1.5, 4.2, 0), Color = color, Parent = npc })
 	parte({ Name = "Piernas", Size = Vector3.new(2, 2, 1), CFrame = cf * CFrame.new(0, 2, 0), Color = Paleta.gris(150), Parent = npc })
 	npc.PrimaryPart = torso
-	prompt(torso, Textos.PATIO.tienda, "Doña Chatarra", 10)
+	prompt(torso, Textos.PATIO.tienda, Textos.MUNDO.tendero, 10)
 	ArteMundo.vestirChatarra(npc)
 	return npc
 end
@@ -696,32 +737,39 @@ end
 -- losas invisibles de Config/Recicladora en el marco del pivote de la malla
 -- (el suelo bajo el volquete, +Z al frente). Con CanQuery: la bolsa lanzada
 -- rebota en ellas y el apuntado las ve (Lanzamiento barre lo consultable).
-local function construirColisionRecicladora(caseta, pivote)
+-- escala: la de la malla (las trituradoras de los contenedores de tipo van
+-- escaladas, 5 oct); nombre: la carpeta (una por recicladora).
+local function construirColisionRecicladora(caseta, pivote, escala, nombre)
+	local s = escala or 1
 	local carpeta = Instance.new("Folder")
-	carpeta.Name = "ColisionRecicladora"
+	carpeta.Name = nombre or "ColisionRecicladora"
 	carpeta.Parent = caseta
-	local function caja(nombre, cf, tamano)
-		parte({ Name = nombre, Size = tamano, CFrame = cf, Color = Paleta.CONTENEDOR, Transparency = 1, Parent = carpeta })
+	local function caja(nombreCaja, cf, tamano)
+		parte({ Name = nombreCaja, Size = tamano, CFrame = cf, Color = Paleta.CONTENEDOR, Transparency = 1, Parent = carpeta })
 	end
 	for _, c in Recicladora.COLISION_CAJAS do
-		caja(c.nombre, pivote * CFrame.new(c.centro), c.tamano)
+		caja(c.nombre, pivote * CFrame.new(c.centro * s), c.tamano * s)
 	end
 	for _, l in Recicladora.COLISION_LOSAS do
-		local largo = (l.hasta - l.desde).Magnitude
-		local cf = CFrame.lookAt((l.desde + l.hasta) / 2, l.hasta) * CFrame.new(0, -l.grosor / 2 + 0.3, 0)
-		caja(l.nombre, pivote * cf, Vector3.new(l.ancho, l.grosor, largo))
+		local desde, hasta = l.desde * s, l.hasta * s
+		local grosor = l.grosor * s
+		local cf = CFrame.lookAt((desde + hasta) / 2, hasta) * CFrame.new(0, -grosor / 2 + 0.3 * s, 0)
+		caja(l.nombre, pivote * cf, Vector3.new(l.ancho * s, grosor, (hasta - desde).Magnitude))
 	end
 end
 
--- cf = suelo bajo el centro del contenedor; la pared del frente (con el
--- prompt) queda en +Z local, hacia la plaza. Alto 4,7: el del volquete verde
--- de la recicladora de Blender (decision del usuario: manda el modelo, asi
--- los rodillos de la trituradora se ven por encima del borde).
-local function construirContenedor(caseta, cf)
-	local cont = modelo("Contenedor", caseta)
+-- La caja funcional de un contenedor: piso, cuatro paredes y la zona de
+-- acierto (su volumen interior), con el prompt de entregar a mano en la
+-- pared del frente. cf = suelo bajo el centro; el frente queda en +Z local,
+-- hacia la plaza.
+local function cajaContenedor(caseta, cf, ancho, alto, fondo, material)
+	local cont = modelo(if material then "Contenedor" .. material else "Contenedor", caseta)
 	etiquetar(cont, "Contenedor")
+	if material then
+		cont:SetAttribute("Material", material)
+	end
 	local color = Paleta.CONTENEDOR
-	local ancho, alto, fondo, grosor = 8, 4.7, 6, 0.5
+	local grosor = 0.5
 	local y = 1 + alto / 2
 	parte({ Name = "Piso", Size = Vector3.new(ancho, grosor, fondo), CFrame = cf * CFrame.new(0, 1 + grosor / 2, 0), Color = color, Parent = cont })
 	parte({ Name = "ParedFondo", Size = Vector3.new(ancho, alto, grosor), CFrame = cf * CFrame.new(0, y, -fondo / 2), Color = color, Parent = cont })
@@ -729,7 +777,7 @@ local function construirContenedor(caseta, cf)
 	parte({ Name = "ParedIzq", Size = Vector3.new(grosor, alto, fondo), CFrame = cf * CFrame.new(-ancho / 2, y, 0), Color = color, Parent = cont })
 	parte({ Name = "ParedDer", Size = Vector3.new(grosor, alto, fondo), CFrame = cf * CFrame.new(ancho / 2, y, 0), Color = color, Parent = cont })
 	-- Zona de acierto: el volumen interior. Un proyectil que la toque entro.
-	local zona = parte({
+	parte({
 		Name = "ZonaAcierto",
 		Size = Vector3.new(ancho - grosor * 2, alto - 1, fondo - grosor * 2),
 		CFrame = cf * CFrame.new(0, y + 0.5, 0),
@@ -740,10 +788,22 @@ local function construirContenedor(caseta, cf)
 		Parent = cont,
 	})
 	cont.PrimaryPart = frente
-	cartelFlotante(frente, Textos.MUNDO.venderBasura, 4.5, 240)
-	prompt(frente, Textos.PATIO.reciclar, "Contenedor", 10)
-	-- La recicladora de Blender (volquete verde + trituradora + cinta en L +
-	-- salida) si el place tiene la malla: las paredes whitebox siguen
+	-- Solo el general lleva cartel flotante (el texto lo pone el cliente,
+	-- Escena): los de tipo ya tienen su placa en el frente (5 oct)
+	if not material then
+		cartelFlotante(frente, Textos.MUNDO.contenedorGeneral, 4.5, 240)
+	end
+	prompt(frente, Textos.PATIO.reciclar, Textos.TIPOS[material or "General"], 10)
+	return cont
+end
+
+-- El GENERAL, que acepta de todo. Alto 4,7: el del volquete de la
+-- recicladora de Blender (decision del usuario: manda el modelo, asi los
+-- rodillos de la trituradora se ven por encima del borde).
+local function construirContenedor(caseta, cf)
+	local cont = cajaContenedor(caseta, cf, 8, 4.7, 6, nil)
+	-- La recicladora de Blender (volquete, ahora azul + trituradora + cinta
+	-- en L + salida) si el place tiene la malla: las paredes whitebox siguen
 	-- colisionando y llevando el prompt, pero no se ven. Sin malla, el
 	-- decorado de partes de siempre.
 	if ArteMundo.recicladora(caseta, cf) then
@@ -752,10 +812,37 @@ local function construirContenedor(caseta, cf)
 		end
 		construirColisionRecicladora(caseta, cf * CFrame.new(0, 1, 0))
 	else
-		ArteMundo.contenedorVerde(caseta, cont)
+		local placa = Idioma.mensaje("MUNDO.placaGeneral", { tipo = Idioma.enMayusculas(Idioma.mensaje("TIPOS.General")) })
+		ArteMundo.contenedorColor(caseta, cont, Paleta.TIPO.General, Idioma.resolver(placa, "es"), placa)
 		ArteMundo.trituradora(caseta, cf * CFrame.new(0, 1, -6.8))
 	end
-	return cont, zona
+	return cont
+end
+
+-- Los 4 de tipo, en fila (LAYOUT.CONTENEDOR_TIPO); en(x, y, z) es el marco
+-- local de la caseta
+local function construirContenedoresTipo(caseta, en)
+	local C = LAYOUT.CONTENEDOR_TIPO
+	for i, material in GameConfig.TIPOS_BASURA do
+		local cf = en(C.primeroX - (i - 1) * C.paso, 0, 6)
+		local cont = cajaContenedor(caseta, cf, C.ancho, C.alto, C.fondo, material)
+		-- La misma malla que el volquete general, de su color (5 oct); sin
+		-- ella en el place, el contenedor de obra de partes
+		-- La placa dice tambien que paga x2 (no hay cartel flotante)
+		local mensaje = Idioma.mensaje("MUNDO.contenedorTipo", { tipo = Idioma.enMayusculas(Idioma.mensaje("TIPOS." .. material)) })
+		local rotulo = Idioma.resolver(mensaje, "es")
+		if ArteMundo.contenedorMalla(caseta, cont, cf, C.ancho, C.alto, C.fondo, Paleta.TIPO[material], rotulo, mensaje) then
+			-- Y detras su trituradora con la cinta, la de la recicladora general
+			-- escalada (sin su volquete: el contenedor es el de arriba)
+			local pivote = cf * CFrame.new(C.desfase)
+			local opciones = { escala = C.escalaTrituradora, material = material, sinContenedor = true }
+			if ArteMundo.recicladora(caseta, pivote, opciones) then
+				construirColisionRecicladora(caseta, pivote * CFrame.new(0, 1, 0), C.escalaTrituradora, "ColisionRecicladora" .. material)
+			end
+		else
+			ArteMundo.contenedorColor(caseta, cont, Paleta.TIPO[material], rotulo, mensaje)
+		end
+	end
 end
 
 local function construirCaseta(mundo)
@@ -764,17 +851,20 @@ local function construirCaseta(mundo)
 	-- el frente de la caseta y de sus maquinas en +Z local (CARA_PATIO), asi
 	-- que todo se construye en coordenadas locales sobre un pivote girado
 	-- 180 grados: +Z local = norte (la plaza y el patio), +X local = oeste.
-	local base = CFrame.new(0, 0, LAYOUT.CASETA_Z) * CFrame.Angles(0, math.pi, 0)
+	local base = CFrame.new(LAYOUT.CASETA_X, 0, LAYOUT.CASETA_Z) * CFrame.Angles(0, math.pi, 0)
 	local function en(x, y, z)
 		return base * CFrame.new(x, y, z)
 	end
 	local tierra = 0.12 -- altura del lote de tierra
-	-- Lote de tierra pisada de toda la recicladora, del ancho del patio
+	-- Lote de tierra pisada de toda la recicladora, de valla a valla
 	local loteOeste, loteEste = limitesLote()
 	ArteMundo.loteTierra(caseta, CFrame.new((loteOeste + loteEste) / 2, 0, (LAYOUT.LOTE_NORTE + LAYOUT.LOTE_SUR) / 2), loteEste - loteOeste, LAYOUT.LOTE_SUR - LAYOUT.LOTE_NORTE, 50)
-	-- Solera de hormigon bajo la caseta, el contenedor y la
-	-- recicladora (hasta x=38 local: la salida de bloques acaba en x~34)
-	ArteMundo.studsSuelo(parte({ Name = "Solera", Size = Vector3.new(70, 1, 30), CFrame = en(3, 0.5, 1), Color = M.HORMIGON, Material = Enum.Material.Concrete, Parent = caseta }))
+	-- Solera de hormigon bajo la caseta, la recicladora general (su salida de
+	-- bloques acaba en x~40 local) y la fila de unidades de tipo, hasta el
+	-- borde este del lote (x local = CASETA_X - loteEste)
+	local soleraEste = LAYOUT.CASETA_X - loteEste
+	local soleraOeste = 41.5
+	ArteMundo.studsSuelo(parte({ Name = "Solera", Size = Vector3.new(soleraOeste - soleraEste, 1, 30), CFrame = en((soleraOeste + soleraEste) / 2, 0.5, 1), Color = M.HORMIGON, Material = Enum.Material.Concrete, Parent = caseta }))
 	-- Cabina abierta al frente (+Z local): fondo, dos lados y techo. Son la
 	-- colision; ArteMundo.caseta construye la cabana alrededor.
 	local madera = Enum.Material.WoodPlanks
@@ -791,42 +881,35 @@ local function construirCaseta(mundo)
 	construirNPC(caseta, en(0, 0, 1.5))
 	-- x=22,5: la cinta en L y la caja gris de la recicladora llegan 9,5 studs
 	-- a la izquierda del contenedor y la cabana ocupa hasta x=11,3
-	local _, zona = construirContenedor(caseta, en(22.5, 0, 6))
-	-- Chatarra sobre la solera, junto a la cabana
-	ArteMundo.pilaNeumaticos(caseta, en(-29, 1, 4), 3, 31)
-	ArteMundo.barril(caseta, en(-30, 1, 11), M.OXIDO)
-	ArteMundo.bolsaBasura(caseta, en(-27, 1, 10), 32)
-	-- El resto del lote, sobre la tierra: camiones abandonados, neumaticos,
-	-- barriles, cajas y un contenedor viejo. En x local el lote va de -43,5
-	-- (valla este) a 75 (borde oeste del patio, donde empieza la calle).
-	ArteMundo.camion(caseta, en(44, tierra, 6) * CFrame.Angles(0, math.rad(-25), 0))
-	ArteMundo.pilaNeumaticos(caseta, en(58, tierra, 8), 4, 33)
-	ArteMundo.barril(caseta, en(64, tierra, 2), M.AZUL_MAQUINA)
-	ArteMundo.barril(caseta, en(66.6, tierra, 4.4), M.OXIDO)
-	ArteMundo.caja(caseta, en(70, tierra, -2), Vector3.new(3, 2.6, 2.8))
-	ArteMundo.caja(caseta, en(70.3, tierra + 2.6, -1.7) * CFrame.Angles(0, math.rad(20), 0), Vector3.new(2.4, 2, 2.2))
-	ArteMundo.bolsaBasura(caseta, en(69, tierra, 7), 34)
-	ArteMundo.bolsaBasura(caseta, en(71.5, tierra, 4.4), 35)
-	pieza({ Name = "ContenedorViejo", Size = Vector3.new(10, 6, 5), CFrame = en(62, tierra + 3, -9) * CFrame.Angles(0, math.rad(8), 0), Color = M.OXIDO, Material = Enum.Material.CorrodedMetal, Parent = caseta })
-	-- Lado este (x local negativa): entre la solera (-32) y el borde del lote
-	-- (-43,5) solo queda una franja de 11; el segundo camion ya no cabe
-	ArteMundo.barril(caseta, en(-37, tierra, 12), M.OXIDO)
-	ArteMundo.barril(caseta, en(-39.6, tierra, 9.6), M.AZUL_MAQUINA)
-	ArteMundo.barril(caseta, en(-37.4, tierra, 7.3), M.AMARILLO)
-	ArteMundo.pilaNeumaticos(caseta, en(-38, tierra, -20), 5, 36)
-	ArteMundo.caja(caseta, en(-40, tierra, -4), Vector3.new(2.8, 2.4, 2.6))
-	ArteMundo.caja(caseta, en(-37.5, tierra, -5.4) * CFrame.Angles(0, math.rad(-30), 0), Vector3.new(2.2, 1.8, 2))
-	ArteMundo.bolsaBasura(caseta, en(-38, tierra, -10), 37)
-	-- Postes de luz con cables a lo largo del frente del lote (la calle)
-	local anteriores = nil
-	for _, x in { -42, -14, 14, 42, 70 } do
-		local _, puntos = ArteMundo.posteLuz(caseta, en(x, tierra, 17.4))
-		if anteriores then
-			ArteMundo.cables(anteriores, puntos)
-		end
-		anteriores = puntos
-	end
-	return zona
+	construirContenedor(caseta, en(22.5, 0, 6))
+	construirContenedoresTipo(caseta, en)
+	-- Chatarra sobre la solera, detras de las unidades de tipo (sus
+	-- trituradoras llegan hasta z~0 local)
+	ArteMundo.pilaNeumaticos(caseta, en(-30, 1, -9), 3, 31)
+	ArteMundo.barril(caseta, en(-47, 1, -8), M.OXIDO)
+	ArteMundo.bolsaBasura(caseta, en(-64, 1, -10), 32)
+	-- El resto del lote, sobre la tierra: el camion, neumaticos, barriles,
+	-- cajas y un contenedor viejo. Desde el 5 oct la caseta esta en
+	-- x = CASETA_X: al oeste de la recicladora general queda poco (el camion,
+	-- en x local ~49) y el resto va detras de la solera (z local < -14).
+	ArteMundo.camion(caseta, en(50, tierra, 6) * CFrame.Angles(0, math.rad(-25), 0))
+	ArteMundo.pilaNeumaticos(caseta, en(55, tierra, -6), 4, 33)
+	ArteMundo.barril(caseta, en(58, tierra, 12), M.AZUL_MAQUINA)
+	ArteMundo.barril(caseta, en(55.6, tierra, 14.2), M.OXIDO)
+	ArteMundo.caja(caseta, en(30, tierra, -19), Vector3.new(3, 2.6, 2.8))
+	ArteMundo.caja(caseta, en(30.3, tierra + 2.6, -18.7) * CFrame.Angles(0, math.rad(20), 0), Vector3.new(2.4, 2, 2.2))
+	ArteMundo.bolsaBasura(caseta, en(26, tierra, -20), 34)
+	ArteMundo.bolsaBasura(caseta, en(33.5, tierra, -21.6), 35)
+	pieza({ Name = "ContenedorViejo", Size = Vector3.new(10, 6, 5), CFrame = en(46, tierra + 3, -20) * CFrame.Angles(0, math.rad(8), 0), Color = M.OXIDO, Material = Enum.Material.CorrodedMetal, Parent = caseta })
+	-- Detras de la fila de tipo (lado este)
+	ArteMundo.barril(caseta, en(-20, tierra, -19), M.OXIDO)
+	ArteMundo.barril(caseta, en(-17.6, tierra, -21.4), M.AZUL_MAQUINA)
+	ArteMundo.barril(caseta, en(-22.4, tierra, -21.6), M.AMARILLO)
+	ArteMundo.pilaNeumaticos(caseta, en(-55, tierra, -21), 5, 36)
+	ArteMundo.caja(caseta, en(-72, tierra, -19), Vector3.new(2.8, 2.4, 2.6))
+	ArteMundo.caja(caseta, en(-69.5, tierra, -20.4) * CFrame.Angles(0, math.rad(-30), 0), Vector3.new(2.2, 1.8, 2))
+	ArteMundo.bolsaBasura(caseta, en(-40, tierra, -21), 37)
+	-- Sin postes de luz ni cables en la calle (decision del usuario, 5 oct)
 end
 
 -- Plaza: el cruce de caminos entre el patio y la recicladora. Todos aparecen
@@ -854,6 +937,20 @@ local function construirCalles(mundo)
 	local _, loteEste = limitesLote()
 	local xEste = loteEste - 4
 	ArteMundo.caminoTierra(calles, CFrame.new((xOeste + xEste) / 2, 0, LAYOUT.SPAWN_Z) * CFrame.Angles(0, math.rad(90), 0), ancho, xEste - xOeste, 70)
+end
+
+-- Los tablones de ranking (LAYOUT.TABLONES; los pinta Client/Tablones)
+local function construirTablones(mundo)
+	local tablones = carpeta("Tablones", mundo)
+	local T = LAYOUT.TABLONES
+	for i, def in DefinicionesRankings.LISTA do
+		local z = T.z[i]
+		if z then
+			local pos = Vector3.new(T.x, 0, z)
+			ArteMundo.tablonRanking(tablones, CFrame.lookAt(pos, pos + Vector3.new(-1, 0, 0)), def.id)
+		end
+	end
+	return tablones
 end
 
 -- Borde del mapa: muro invisible alto por cada lado (tag Limite, nadie sale)
@@ -960,6 +1057,7 @@ function ConstructorMundo.construir(): Model
 	construirCaseta(mundo)
 	construirPlaza(mundo)
 	construirCalles(mundo)
+	construirTablones(mundo)
 	construirLimites(mundo)
 	ConstructorMundo.iluminar()
 	print(string.format(
@@ -973,6 +1071,21 @@ function ConstructorMundo.construir(): Model
 	return mundo
 end
 
+-- Rehace solo los tablones de ranking sobre el workspace.Mundo existente,
+-- sin hornear todo (hornear borra Mundo salvo Manual). Tambien sirve tras
+-- cambiar ServerStorage.Arte.LeaderBoard
+function ConstructorMundo.rehacerTablones(): string
+	local mundo = workspace:FindFirstChild("Mundo")
+	assert(mundo, "no hay workspace.Mundo: hay que hornear primero")
+	local viejos = mundo:FindFirstChild("Tablones")
+	if viejos then
+		viejos:Destroy()
+	end
+	local tablones = construirTablones(mundo)
+	local deModelo = tablones:FindFirstChild("Tablon_" .. DefinicionesRankings.LISTA[1].id, true)
+	return #tablones:GetChildren() .. " tablones " .. (if deModelo and deModelo:FindFirstChild("Base") then "de partes" else "del modelo LeaderBoard")
+end
+
 -- Rehace solo la tienda sobre el workspace.Mundo existente, sin hornear todo
 -- (hornear borra Mundo salvo Manual). Sirve tras importar o reexportar la
 -- malla de ServerStorage.Arte.Tienda
@@ -984,7 +1097,7 @@ function ConstructorMundo.rehacerTienda(): string
 	if cabana then
 		cabana:Destroy()
 	end
-	local tienda = if caseta then ArteMundo.caseta(caseta, CFrame.new(0, 0, LAYOUT.CASETA_Z) * CFrame.Angles(0, math.pi, 0) * CFrame.new(0, 1, 0)) else nil
+	local tienda = if caseta then ArteMundo.caseta(caseta, CFrame.new(LAYOUT.CASETA_X, 0, LAYOUT.CASETA_Z) * CFrame.Angles(0, math.pi, 0) * CFrame.new(0, 1, 0)) else nil
 	return "tienda " .. (if tienda then (if tienda:FindFirstChild("Tienda_Coral", true) then "de malla" else "de partes") else "sin caseta")
 end
 

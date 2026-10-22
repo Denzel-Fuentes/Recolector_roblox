@@ -17,6 +17,11 @@
 	entera es el boton (InputHoldBegin/End). Style = Custom se pone LOCALMENTE
 	a cada prompt (pasada inicial + DescendantAdded): asi no hay que re-hornear
 	el mundo ni tocar el servidor, y PromptTriggered sigue igual.
+
+	=== Idioma ===
+	ActionText/ObjectText los pone el servidor en espanol. Si el prompt trae
+	el mensaje en un atributo (MensajeAccion/MensajeObjeto, Montones) se usa
+	ese; si no, se traduce el literal (Utilidades/Idioma).
 ]]
 
 local Players = game:GetService("Players")
@@ -26,6 +31,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Paleta = require(Shared:WaitForChild("Config"):WaitForChild("Paleta"))
+local Idioma = require(Shared:WaitForChild("Utilidades"):WaitForChild("Idioma"))
 local Fusion = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Fusion"))
 
 local UI = script.Parent:WaitForChild("UI")
@@ -34,6 +40,12 @@ local Kit = require(UI:WaitForChild("Kit"))
 local Tema = require(UI:WaitForChild("Kit"):WaitForChild("Tema"))
 
 local jugador = Players.LocalPlayer
+
+-- El texto de un prompt en el idioma del jugador
+local function textoPrompt(prompt: ProximityPrompt, atributo: string, espanol: string): string
+	local mensaje = Idioma.decodificar(prompt:GetAttribute(atributo))
+	return if mensaje then Idioma.resolver(mensaje) else Idioma.literal(espanol)
+end
 
 -- ===========================================================================
 -- Estilo de los prompts
@@ -174,7 +186,7 @@ local function montarPrompt(prompt: ProximityPrompt, tipoEntrada: Enum.Proximity
 						Size = UDim2.new(1, -x - 14, 0, 28),
 						Position = UDim2.fromOffset(x, 6),
 						BackgroundTransparency = 1,
-						Text = prompt.ActionText,
+						Text = textoPrompt(prompt, "MensajeAccion", prompt.ActionText),
 						TextColor3 = Paleta.UI_TINTA,
 						FontFace = Tema.FUENTE_TITULO,
 						TextScaled = true,
@@ -183,7 +195,7 @@ local function montarPrompt(prompt: ProximityPrompt, tipoEntrada: Enum.Proximity
 						[Children] = scope:New("UITextSizeConstraint")({ MaxTextSize = 21, MinTextSize = 11 }),
 					}),
 					scope:Texto({
-						Texto = prompt.ObjectText,
+						Texto = textoPrompt(prompt, "MensajeObjeto", prompt.ObjectText),
 						Size = UDim2.new(1, -x - 14, 0, 18),
 						Position = UDim2.fromOffset(x, 34),
 						Tamano = 13,

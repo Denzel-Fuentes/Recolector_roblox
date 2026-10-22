@@ -15,7 +15,8 @@
 	tambien aqui, porque Transform no se replica y la vista de servidor de
 	Studio es donde el usuario mira su personaje desde fuera. La bolsa
 	(ModelosObjetos.bolsaAbierta) se suelda al torso justo entre las manos,
-	medidas de verdad una vez puesta la pose, y crece con el llenado.
+	medidas de verdad una vez puesta la pose, crece con el llenado y, llena,
+	se cierra con su nudo (las manos la cogen entonces por el nudo).
 ]]
 
 local Players = game:GetService("Players")
@@ -31,12 +32,16 @@ local Senal = require(Shared:WaitForChild("Utilidades"):WaitForChild("Senal"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
 local Bolsa = require(Servicios:WaitForChild("Bolsa"))
+local Cosmeticos = require(Servicios:WaitForChild("Cosmeticos"))
 
 local Patio = {}
 
 Patio.alCambiar = Senal.nueva() :: Senal.Senal<Player, boolean>
 
 local dentro: { [Player]: boolean } = {}
+
+-- Studs que sube la bolsa atada respecto a la abierta (ver colocarBolsa)
+local SUBIDA_CERRADA = 0.6
 
 function Patio.estaDentro(jugador: Player): boolean
 	return dentro[jugador] == true
@@ -87,6 +92,7 @@ local function colocarBolsa(jugador: Player)
 	quitarBolsa(personaje)
 	local fraccion = Bolsa.cuenta(jugador) / math.max(1, Bolsa.capacidad(jugador))
 	local bolsa, alto = ModelosObjetos.bolsaAbierta(fraccion)
+	ModelosObjetos.vestirBolsa(bolsa, Cosmeticos.puesto(jugador, "bolsa"))
 	bolsa.Name = "BolsaEnManos"
 	for _, p in bolsa:GetDescendants() do
 		if p:IsA("BasePart") then
@@ -96,8 +102,11 @@ local function colocarBolsa(jugador: Player)
 			p.Massless = true
 		end
 	end
-	-- Las manos agarran el borde de la boca: el fondo del saco cuelga debajo
-	bolsa:PivotTo(torso.CFrame * manos * CFrame.new(0, -alto + 0.25, 0))
+	-- Las manos agarran el borde de la boca: el fondo del saco cuelga debajo.
+	-- La atada (llena) va SUBIDA_CERRADA mas arriba (peticion del usuario,
+	-- 6 oct): colgada del nudo quedaba demasiado baja
+	local subida = if bolsa:FindFirstChild("Nudo") then SUBIDA_CERRADA else 0
+	bolsa:PivotTo(torso.CFrame * manos * CFrame.new(0, -alto + 0.25 + subida, 0))
 	for _, p in bolsa:GetDescendants() do
 		if p:IsA("BasePart") then
 			local weld = Instance.new("WeldConstraint")
@@ -185,6 +194,13 @@ end
 Players.PlayerRemoving:Connect(function(jugador)
 	dentro[jugador] = nil
 	pendientes[jugador] = nil
+end)
+
+-- Al cambiar de diseno de bolsa se rehace la que lleva en las manos
+Cosmeticos.alCambiar:Connect(function(jugador)
+	if dentro[jugador] then
+		Patio.actualizarBolsa(jugador)
+	end
 end)
 
 Bolsa.alCambiar:Connect(function(jugador)

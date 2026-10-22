@@ -21,8 +21,11 @@
 
 	=== Version 3 (diseno v2, 26 sep) ===
 	El esquema entero de la v2 esta aqui desde el primer lote (rebirths,
-	mascotas por nivel y sus fragmentos, pedidos, cosmeticos), aunque
-	cada sistema llegue en su lote: asi no hace falta migrar entre lotes.
+	pedidos, cosmeticos), aunque cada sistema llegue en su lote: asi no hace
+	falta migrar entre lotes. Las mascotas y sus fragmentos se quitaron el
+	3 oct y los trajes el 5: completar borra sus campos (OBSOLETOS) de un
+	perfil guardado antes, para que no viajen al cliente ni se vuelvan a
+	guardar.
 	No hay migracion desde la v2: el juego nunca se publico, no existen
 	perfiles reales, y el DataStore cambia de nombre (GameConfig).
 	`completar` solo rellena las claves que falten.
@@ -34,6 +37,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared:WaitForChild("Config"):WaitForChild("GameConfig"))
 local DefinicionesMejoras = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesMejoras"))
+local DefinicionesRankings = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesRankings"))
 local Senal = require(Shared:WaitForChild("Utilidades"):WaitForChild("Senal"))
 local Red = require(Shared:WaitForChild("Utilidades"):WaitForChild("Red"))
 
@@ -44,13 +48,7 @@ export type Pedido = {
 	progreso: number,
 	parametro: any?, -- material, distancia...
 	cobrado: boolean,
-}
-
--- La mascota que un set esta montando con fragmentos
-export type Montaje = {
-	id: string,
-	n: number, -- fragmentos que lleva
-	total: number, -- los que pide (DefinicionesMascotas.FRAGMENTOS_RAREZA)
+	recompensa: number?, -- $ al cumplirlo (con el multiplicador de rebirth del dia)
 }
 
 export type Perfil = {
@@ -58,27 +56,22 @@ export type Perfil = {
 	dinero: number,
 	mejoras: { [string]: number },
 	rebirths: number,
-	-- Mascotas: id -> nivel (1..5). Solo las que tienes.
-	mascotas: { [string]: number },
-	equipadas: { string }, -- ids, en orden de hueco
-	-- Fragmentos (29 sep, sustituyen a las capsulas): la mascota que monta
-	-- cada set y cuantos lleva, y el pity de cada set (Services/Fragmentos)
-	fragmentos: { [string]: Montaje },
-	pityMascotas: { [string]: { sinRara: number, sinEpica: number } },
-	fragmentosLibres: number, -- premio de los pedidos: el jugador elige el set
 	pedidos: { dia: number, lista: { Pedido }, premioCobrado: boolean },
 	racha: number, -- aciertos seguidos al contenedor
 	-- Cosmeticos (los de pago se validan contra el pase)
-	trajes: { [string]: boolean },
-	trajePuesto: string?,
-	estela: string?,
-	disenoBolsa: string?,
+	estela: string?, -- DefinicionesCosmeticos.ESTELAS
+	disenoBolsa: string?, -- DefinicionesCosmeticos.BOLSAS
+	camara: string?, -- "primera" | "tercera" en el patio (Client/Camara)
 	turboHasta: number, -- os.time() hasta el que dura el Turbo de dinero
 	-- Pospuesto (GameConfig.FUNCIONES): se guarda para no migrar al volver
 	figurinas: { [string]: boolean },
 	cintas: { [string]: boolean },
 	logros: { [string]: boolean },
 	estadisticas: { [string]: number },
+	-- Para los rankings semanales (DefinicionesRankings): la semana, la foto de
+	-- las estadisticas al empezarla (las sumas se restan) y los maximos de la
+	-- semana (la racha no se puede restar)
+	semana: { id: number, base: { [string]: number }, maximos: { [string]: number } },
 	recibos: { string },
 	pasesCache: { [string]: boolean },
 	tiempoJugado: number,
@@ -113,15 +106,8 @@ function Perfiles.porDefecto(): Perfil
 		dinero = 0,
 		mejoras = mejoras,
 		rebirths = 0,
-		mascotas = {},
-		equipadas = {},
-		fragmentos = {},
-		pityMascotas = {},
-		fragmentosLibres = 0,
 		pedidos = { dia = 0, lista = {}, premioCobrado = false },
 		racha = 0,
-		trajes = {},
-		trajePuesto = nil,
 		estela = nil,
 		disenoBolsa = nil,
 		turboHasta = 0,
@@ -129,6 +115,7 @@ function Perfiles.porDefecto(): Perfil
 		cintas = {},
 		logros = {},
 		estadisticas = {},
+		semana = { id = 0, base = {}, maximos = {} },
 		recibos = {},
 		pasesCache = {},
 		tiempoJugado = 0,
@@ -137,12 +124,19 @@ function Perfiles.porDefecto(): Perfil
 	}
 end
 
+-- Campos de sistemas quitados (las mascotas, 3 oct; los trajes, 5 oct)
+local OBSOLETOS = { "mascotas", "equipadas", "fragmentos", "pityMascotas", "fragmentosLibres", "trajes", "trajePuesto" }
+
 -- Rellena lo que falte con el perfil por defecto (campos nuevos) sin tocar lo
--- que ya hay. Las mejoras se completan por id por si se anade una.
+-- que ya hay, y borra lo OBSOLETO. Las mejoras se completan por id por si se
+-- anade una.
 function Perfiles.completar(datos: any): Perfil
 	local base = Perfiles.porDefecto()
 	if typeof(datos) ~= "table" then
 		return base
+	end
+	for _, clave in OBSOLETOS do
+		datos[clave] = nil
 	end
 	for clave, valorDefecto in pairs(base :: any) do
 		local v = datos[clave]
@@ -160,10 +154,23 @@ function Perfiles.completar(datos: any): Perfil
 	return datos :: Perfil
 end
 
+-- La semana de los rankings al dia: si empezo otra, la base de las sumas
+-- son las estadisticas de ahora y los maximos vuelven a 0. Lo que se gane
+-- entre el cambio de semana y la primera llamada cuenta para la anterior
+-- (minutos como mucho: la llaman registrar, estadisticaMaxima y Rankings).
+function Perfiles.semanaAlDia(perfil: Perfil): { id: number, base: { [string]: number }, maximos: { [string]: number } }
+	local id = DefinicionesRankings.semana(os.time())
+	if typeof(perfil.semana) ~= "table" or perfil.semana.id ~= id then
+		perfil.semana = { id = id, base = table.clone(perfil.estadisticas), maximos = {} }
+	end
+	return perfil.semana
+end
+
 function Perfiles.registrar(jugador: Player, perfil: Perfil, cargado: boolean)
 	perfiles[jugador] = perfil
 	cargados[jugador] = cargado
 	perfil.ultimaSesion = os.time()
+	Perfiles.semanaAlDia(perfil)
 	sucios[jugador] = true
 	Perfiles.alCargar:Fire(jugador, perfil)
 end
@@ -225,6 +232,11 @@ function Perfiles.estadisticaMaxima(jugador: Player, clave: string, valor: numbe
 	local perfil = perfiles[jugador]
 	if not perfil then
 		return 0
+	end
+	local semana = Perfiles.semanaAlDia(perfil)
+	if valor > (semana.maximos[clave] or 0) then
+		semana.maximos[clave] = valor
+		sucios[jugador] = true
 	end
 	local actual = perfil.estadisticas[clave] or 0
 	if valor > actual then

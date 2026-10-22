@@ -14,8 +14,8 @@
 	no, la racha se farmearia a quemarropa).
 
 	Pago de una bolsa (Services/Bolsa):
-	  valor de las piezas x (1 + bonus distancia + racha) x multiplicador de
-	  rebirth x (1 + bonus mascotas, por pieza) x pase de dinero
+	  valor de las piezas (x2 / x0,5 en un contenedor de tipo) x (1 + bonus
+	  distancia + racha) x multiplicador de rebirth x pase de dinero x turbo
 ]]
 
 local DefinicionesPunteria = {}

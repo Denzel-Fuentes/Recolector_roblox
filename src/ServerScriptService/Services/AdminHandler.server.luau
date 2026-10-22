@@ -6,10 +6,7 @@
 	horas.
 
 	    /dar dinero 5000
-	    /dar mascota latita (una mas: nueva, o sube de nivel)
-	    /dar fragmento Plastin 3 (fragmentos de ese set, como reciclados)
-	    /dar todas         (una de cada una de las 40: corona al Rey)
-	    /dar figurina F7   /dar cinta C1   /dar traje T2
+	    /dar figurina F7   /dar cinta C1
 	    /maxmejoras        /pases on|off   /repoblar
 	    /rebirths 2        (fija cuantos rebirths tiene; abre sus cuadrantes)
 	    /tutorial 0        (pasos del tutorial completados)
@@ -25,7 +22,6 @@ local TextChatService = game:GetService("TextChatService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared:WaitForChild("Config"):WaitForChild("GameConfig"))
-local DefinicionesMascotas = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesMascotas"))
 local Red = require(Shared:WaitForChild("Utilidades"):WaitForChild("Red"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
@@ -37,8 +33,6 @@ local Coleccionables = require(Servicios:WaitForChild("Coleccionables"))
 local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
 local Botin = require(Servicios:WaitForChild("Botin"))
 local Tutorial = require(Servicios:WaitForChild("Tutorial"))
-local Mascotas = require(Servicios:WaitForChild("Mascotas"))
-local Fragmentos = require(Servicios:WaitForChild("Fragmentos"))
 
 local NotificacionEvent = Red.evento("NotificacionEvent")
 
@@ -55,37 +49,11 @@ local function dar(jugador: Player, args: { string })
 	if que == "dinero" then
 		Economia.ganar(jugador, tonumber(args[2]) or 1000)
 		return "dinero: " .. Economia.dinero(jugador)
-	elseif que == "mascota" then
-		local id = args[2] or ""
-		if not DefinicionesMascotas.obtener(id) then
-			return "mascota desconocida: " .. id
-		end
-		local r = Mascotas.agregar(jugador, id)
-		return string.format("%s nivel %d%s", id, r.nivel, if r.dinero > 0 then " (+$" .. r.dinero .. ")" else "")
-	elseif que == "fragmento" then
-		local set = args[2] or "Plastin"
-		local ultimo = nil
-		for _ = 1, math.clamp(tonumber(args[3]) or 1, 1, 100) do
-			ultimo = Fragmentos.agregar(jugador, set, "admin") or ultimo
-		end
-		if not ultimo then
-			return "set desconocido o cerrado: " .. set
-		end
-		return string.format("%s: %s %d/%d%s", set, ultimo.id, ultimo.n, ultimo.total, if ultimo.completa then " (completada)" else "")
-	elseif que == "todas" then
-		local n = 0
-		for _, def in DefinicionesMascotas.LISTA do
-			if def.id ~= DefinicionesMascotas.ID_REY and not Mascotas.tiene(jugador, def.id) then
-				Mascotas.agregar(jugador, def.id)
-				n += 1
-			end
-		end
-		return string.format("%d mascotas anadidas; coleccion %d/40; rey=%s", n, Mascotas.distintas(jugador), tostring(Mascotas.tiene(jugador, DefinicionesMascotas.ID_REY)))
-	elseif que == "figurina" or que == "cinta" or que == "traje" then
+	elseif que == "figurina" or que == "cinta" then
 		local nuevo = Coleccionables.agregar(jugador, que, args[2] or "")
 		return que .. " " .. tostring(args[2]) .. (if nuevo then " anadida" else " ya la tenias o no existe")
 	end
-	return "uso: /dar dinero|mascota|fragmento|todas|figurina|cinta|traje ..."
+	return "uso: /dar dinero|figurina|cinta ..."
 end
 
 local COMANDOS: { [string]: (Player, { string }) -> string } = {
@@ -132,7 +100,6 @@ local COMANDOS: { [string]: (Player, { string }) -> string } = {
 			end
 		end
 		Perfiles.marcarSucio(jugador)
-		Coleccionables.vestir(jugador)
 		Mejoras.aplicarVelocidad(jugador)
 		return "perfil reiniciado (se guardara asi al salir)"
 	end,

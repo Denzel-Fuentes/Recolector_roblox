@@ -1,29 +1,34 @@
 --!strict
 --[[
 	Recicladora (cliente)
-	Unica responsabilidad: animar la recicladora de Blender (modelo con tag
+	Unica responsabilidad: animar las recicladoras de Blender (modelos con tag
 	RecicladoraArte que coloca ArteMundo.recicladora). Puro decorado local:
 
 	  Trituradora  los dos rodillos dentados giran siempre, y mas deprisa
 	               mientras cae basura en la tolva.
 	  Cinta en L   parada hasta que alguien deposita una bolsa: el servidor
-	               avisa a todos (RecicladoraEvent con el material de cada
-	               objeto) y de la caja gris salen objetos de basura que suben
-	               por el tramo 1, doblan en la esquina, suben por el tramo 2 y
-	               caen en la tolva. Mientras haya basura encima los listones
-	               avanzan, los rodillos de la cinta giran y la luz de la salida
-	               pasa de roja a verde.
+	               avisa a todos (RecicladoraEvent con el contenedor y el
+	               material de cada objeto) y de la caja gris salen objetos de
+	               basura que suben por el tramo 1, doblan en la esquina, suben
+	               por el tramo 2 y caen en la tolva. Mientras haya basura
+	               encima los listones avanzan, los rodillos de la cinta giran
+	               y la luz de la salida pasa de roja a verde.
 	  Salida       cuando cae el ultimo objeto de un deposito la trituradora
 	               prensa un momento y sale un bloque por la rampa (clon de
 	               BloqueMolde), que se queda al final y se desvanece.
 
-	La ruta, los ejes y los tiempos estan en Config/Recicladora; la basura son
-	los modelos de Utilidades/ModelosObjetos escalados a la banda. Nada
-	colisiona ni toca el estado del juego. Varios depositos seguidos se ponen
-	en cola: la cinta suelta un objeto cada INTERVALO_BASURA.
+	Desde el 5 oct hay CINCO: la del general (sin atributo Material) y una
+	por contenedor de tipo (atributo Material), escaladas (GetScale). Cada
+	una tiene su propia cola y su propio estado; el deposito anima la del
+	contenedor donde entro. La ruta, los ejes y los tiempos estan en
+	Config/Recicladora en el marco del pivote a escala 1: aqui se multiplican
+	por la escala del modelo. Nada colisiona ni toca el estado del juego.
+	Varios depositos seguidos se ponen en cola: la cinta suelta un objeto
+	cada INTERVALO_BASURA.
 
 	Pruebas: workspace.RecicladoraEfectos lleva los atributos Lista, EnCinta y
-	Bloques (lo lee PruebasCliente "recicladora").
+	Bloques de la del GENERAL, Vistas con cuantas hay listas y Cola con los
+	objetos que esperan en todas (lo lee PruebasCliente "recicladora").
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -40,12 +45,16 @@ local Red = require(Utilidades:WaitForChild("Red"))
 local RecicladoraEvent = Red.evento("RecicladoraEvent")
 
 local MATERIALES = { "Metal", "Plastico", "Papel", "Organico" }
+local GENERAL = "General"
 local rng = Random.new()
 
 type Giratoria = { parte: BasePart, base: CFrame, eje: Vector3, sentido: number }
 type Listones = { parte: BasePart, base: CFrame, dir: Vector3 }
+type Pendiente = { material: string, alCaer: () -> () }
 type Vista = {
 	modelo: Model,
+	clave: string, -- "General" o el material del contenedor
+	escala: number,
 	trituradora: { Giratoria },
 	cinta: { Giratoria },
 	rampa: { Giratoria },
@@ -55,8 +64,19 @@ type Vista = {
 	molde: Model?,
 	rutaBasura: { Vector3 },
 	rutaBloque: { Vector3 },
+	cola: { Pendiente },
+	triturandoHasta: number,
+	lucesEnMarcha: boolean?,
+	bloques: { Model },
+	enCinta: number,
+	enRampa: number,
+	anguloTrituradora: number,
+	anguloCinta: number,
+	anguloRampa: number,
+	desplazamiento: number,
 }
 type Viaje = {
+	vista: Vista,
 	modelo: Model,
 	ruta: { Vector3 },
 	tramo: number,
@@ -69,19 +89,25 @@ type Viaje = {
 	alLlegar: () -> (),
 }
 
-local vista: Vista? = nil
+local vistas: { [string]: Vista } = {}
+local preparando: { [Instance]: boolean } = {}
 local viajes: { Viaje } = {}
-local cola: { { material: string, alCaer: () -> () } } = {}
-local triturandoHasta = 0
-local lucesEnMarcha: boolean? = nil
-local bloques: { Model } = {}
 
 local efectos = Instance.new("Folder")
 efectos.Name = "RecicladoraEfectos"
 efectos:SetAttribute("Lista", false)
 efectos:SetAttribute("EnCinta", 0)
 efectos:SetAttribute("Bloques", 0)
+efectos:SetAttribute("Vistas", 0)
 efectos.Parent = workspace
+
+local function contarVistas()
+	local n = 0
+	for _ in vistas do
+		n += 1
+	end
+	efectos:SetAttribute("Vistas", n)
+end
 
 -- ===========================================================================
 -- Preparar el modelo
@@ -92,10 +118,10 @@ local function girar(g: Giratoria, angulo: number)
 end
 
 local function encenderLuces(v: Vista, enMarcha: boolean)
-	if lucesEnMarcha == enMarcha then
+	if v.lucesEnMarcha == enMarcha then
 		return
 	end
-	lucesEnMarcha = enMarcha
+	v.lucesEnMarcha = enMarcha
 	if v.luzVerde then
 		v.luzVerde.Material = if enMarcha then Enum.Material.Neon else Enum.Material.SmoothPlastic
 	end
@@ -109,12 +135,16 @@ local function preparar(modelo: Model)
 	local trit = modelo:WaitForChild("Trituradora", 15)
 	local moviles = trit and trit:WaitForChild("Moviles", 15)
 	if not moviles then
-		warn("[Recicladora] el modelo no tiene Trituradora.Moviles: sin animacion")
+		warn("[Recicladora] " .. modelo:GetFullName() .. " no tiene Trituradora.Moviles: sin animacion")
 		return
 	end
+	local material = modelo:GetAttribute("Material")
 	local pivote = modelo:GetPivot()
+	local escala = modelo:GetScale()
 	local v: Vista = {
 		modelo = modelo,
+		clave = if typeof(material) == "string" and material ~= "" then material else GENERAL,
+		escala = escala,
 		trituradora = {},
 		cinta = {},
 		rampa = {},
@@ -124,12 +154,22 @@ local function preparar(modelo: Model)
 		molde = nil,
 		rutaBasura = {},
 		rutaBloque = {},
+		cola = {},
+		triturandoHasta = 0,
+		lucesEnMarcha = nil,
+		bloques = {},
+		enCinta = 0,
+		enRampa = 0,
+		anguloTrituradora = 0,
+		anguloCinta = 0,
+		anguloRampa = 0,
+		desplazamiento = 0,
 	}
 	for _, p in Datos.RUTA_BASURA do
-		table.insert(v.rutaBasura, pivote:PointToWorldSpace(p))
+		table.insert(v.rutaBasura, pivote:PointToWorldSpace(p * escala))
 	end
 	for _, p in Datos.RUTA_BLOQUE do
-		table.insert(v.rutaBloque, pivote:PointToWorldSpace(p))
+		table.insert(v.rutaBloque, pivote:PointToWorldSpace(p * escala))
 	end
 	for nombre, eje in Datos.EJE_GIRO do
 		local p = moviles:WaitForChild(nombre, 5)
@@ -168,12 +208,16 @@ local function preparar(modelo: Model)
 	local molde = modelo:WaitForChild("BloqueMolde", 5)
 	v.molde = if molde and molde:IsA("Model") then molde else nil
 	encenderLuces(v, false)
-	vista = v
-	efectos:SetAttribute("Lista", true)
+	vistas[v.clave] = v
+	contarVistas()
+	if v.clave == GENERAL then
+		efectos:SetAttribute("Lista", true)
+	end
 end
 
 local function considerar(inst: Instance)
-	if inst:IsA("Model") and not vista then
+	if inst:IsA("Model") and not preparando[inst] then
+		preparando[inst] = true
 		task.spawn(preparar, inst)
 	end
 end
@@ -213,14 +257,15 @@ local function colocar(viaje: Viaje)
 	viaje.modelo:PivotTo(cf * CFrame.new(0, -viaje.alto / 2, 0))
 end
 
-local function empezarViaje(modelo: Model, ruta: { Vector3 }, velocidad: number, esBasura: boolean, alLlegar: () -> ())
+local function empezarViaje(v: Vista, modelo: Model, ruta: { Vector3 }, velocidad: number, esBasura: boolean, alLlegar: () -> ())
 	local _, tamano = modelo:GetBoundingBox()
 	local viaje: Viaje = {
+		vista = v,
 		modelo = modelo,
 		ruta = ruta,
 		tramo = 1,
 		recorrido = 0,
-		velocidad = velocidad,
+		velocidad = velocidad * v.escala,
 		alto = tamano.Y,
 		orientacion = CFrame.lookAt(Vector3.zero, (ruta[#ruta] - ruta[1]) * Vector3.new(1, 0, 1)),
 		giro = if esBasura then CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0) else CFrame.identity,
@@ -258,24 +303,30 @@ local function avanzar(viaje: Viaje, dt: number): boolean
 	return false
 end
 
-local function crearBasura(material: string): Model
+local function crearBasura(v: Vista, material: string): Model
 	local mat = if table.find(MATERIALES, material) then material else MATERIALES[rng:NextInteger(1, #MATERIALES)]
 	local m = ModelosObjetos.basura(mat, rng)
 	local _, tamano = m:GetBoundingBox()
 	local mayor = math.max(tamano.X, tamano.Y, tamano.Z)
 	if mayor > 0 then
-		m:ScaleTo(m:GetScale() * Datos.LARGO_OBJETO / mayor)
+		m:ScaleTo(m:GetScale() * Datos.LARGO_OBJETO * v.escala / mayor)
 	end
 	soloDecorado(m)
 	m.Parent = efectos
 	return m
 end
 
-local function desvanecer(m: Model)
-	local idx = table.find(bloques, m)
+local function actualizarBloques(v: Vista)
+	if v.clave == GENERAL then
+		efectos:SetAttribute("Bloques", #v.bloques)
+	end
+end
+
+local function desvanecer(v: Vista, m: Model)
+	local idx = table.find(v.bloques, m)
 	if idx then
-		table.remove(bloques, idx)
-		efectos:SetAttribute("Bloques", #bloques)
+		table.remove(v.bloques, idx)
+		actualizarBloques(v)
 	end
 	local info = TweenInfo.new(0.6)
 	for _, d in m:GetDescendants() do
@@ -289,9 +340,8 @@ local function desvanecer(m: Model)
 end
 
 -- Sale un bloque prensado por la rampa
-local function sacarBloque()
-	local v = vista
-	if not v or not v.molde then
+local function sacarBloque(v: Vista)
+	if not v.molde then
 		return
 	end
 	local b = v.molde:Clone()
@@ -307,23 +357,28 @@ local function sacarBloque()
 	b.WorldPivot = CFrame.new(centro.Position) * v.modelo:GetPivot().Rotation * CFrame.new(0, -tamano.Y / 2, 0)
 	b.Name = "Bloque"
 	b.Parent = efectos
-	table.insert(bloques, b)
-	efectos:SetAttribute("Bloques", #bloques)
-	if #bloques > Datos.MAX_BLOQUES then
-		desvanecer(bloques[1])
+	table.insert(v.bloques, b)
+	actualizarBloques(v)
+	if #v.bloques > Datos.MAX_BLOQUES then
+		desvanecer(v, v.bloques[1])
 	end
-	empezarViaje(b, v.rutaBloque, Datos.VELOCIDAD_BLOQUE, false, function()
+	empezarViaje(v, b, v.rutaBloque, Datos.VELOCIDAD_BLOQUE, false, function()
 		task.delay(Datos.VIDA_BLOQUE, function()
 			if b.Parent then
-				desvanecer(b)
+				desvanecer(v, b)
 			end
 		end)
 	end)
 end
 
--- Un deposito: sus objetos a la cola; cuando cae el ultimo, sale el bloque
-RecicladoraEvent.OnClientEvent:Connect(function(materiales)
-	if typeof(materiales) ~= "table" or not vista then
+-- Un deposito en `contenedor` ("General" o un material): sus objetos a la
+-- cola de esa recicladora; cuando cae el ultimo, sale el bloque
+RecicladoraEvent.OnClientEvent:Connect(function(contenedor, materiales)
+	if typeof(materiales) ~= "table" then
+		return
+	end
+	local v = vistas[if typeof(contenedor) == "string" then contenedor else GENERAL] or vistas[GENERAL]
+	if not v then
 		return
 	end
 	local lista: { string } = {}
@@ -338,35 +393,39 @@ RecicladoraEvent.OnClientEvent:Connect(function(materiales)
 	end
 	local pendientes = #lista
 	for _, material in lista do
-		table.insert(cola, {
+		table.insert(v.cola, {
 			material = material,
 			alCaer = function()
 				pendientes -= 1
-				triturandoHasta = os.clock() + Datos.ESPERA_TRITURAR
+				v.triturandoHasta = os.clock() + Datos.ESPERA_TRITURAR
 				if pendientes == 0 then
-					task.delay(Datos.ESPERA_TRITURAR, sacarBloque)
+					task.delay(Datos.ESPERA_TRITURAR, sacarBloque, v)
 				end
 			end,
 		})
 	end
 end)
 
--- Suelta un objeto de la cola cada INTERVALO_BASURA
+-- Cada recicladora suelta un objeto de su cola cada INTERVALO_BASURA
+local ultimaSalida: { [Vista]: number } = {}
 task.spawn(function()
 	while true do
-		local v = vista
-		local siguiente = if v then table.remove(cola, 1) else nil
-		if v and siguiente then
-			local alCaer = siguiente.alCaer
-			local m = crearBasura(siguiente.material)
-			empezarViaje(m, v.rutaBasura, Datos.VELOCIDAD_CINTA, true, function()
-				m:Destroy()
-				alCaer()
-			end)
-			task.wait(Datos.INTERVALO_BASURA)
-		else
-			task.wait(0.1)
+		local ahora = os.clock()
+		local enCola = 0
+		for _, v in vistas do
+			enCola += #v.cola
+			if #v.cola > 0 and ahora - (ultimaSalida[v] or 0) >= Datos.INTERVALO_BASURA then
+				ultimaSalida[v] = ahora
+				local siguiente = table.remove(v.cola, 1) :: Pendiente
+				local m = crearBasura(v, siguiente.material)
+				empezarViaje(v, m, v.rutaBasura, Datos.VELOCIDAD_CINTA, true, function()
+					m:Destroy()
+					siguiente.alCaer()
+				end)
+			end
 		end
+		efectos:SetAttribute("Cola", enCola)
+		task.wait(0.05)
 	end
 end)
 
@@ -374,23 +433,19 @@ end)
 -- Cada frame
 -- ===========================================================================
 
-local anguloTrituradora, anguloCinta, anguloRampa, desplazamiento = 0, 0, 0, 0
-
 RunService.RenderStepped:Connect(function(dt)
-	local v = vista
-	if not v then
-		return
+	for _, v in vistas do
+		v.enCinta, v.enRampa = 0, 0
 	end
-	local enCinta, enRampa = 0, 0
 	for i = #viajes, 1, -1 do
 		local viaje = viajes[i]
 		if not viaje.modelo.Parent then
 			table.remove(viajes, i)
 		else
 			if viaje.esBasura then
-				enCinta += 1
+				viaje.vista.enCinta += 1
 			else
-				enRampa += 1
+				viaje.vista.enRampa += 1
 			end
 			if avanzar(viaje, dt) then
 				table.remove(viajes, i)
@@ -398,28 +453,32 @@ RunService.RenderStepped:Connect(function(dt)
 			end
 		end
 	end
-	efectos:SetAttribute("EnCinta", enCinta)
+	local general = vistas[GENERAL]
+	efectos:SetAttribute("EnCinta", if general then general.enCinta else 0)
 
-	local giro = if os.clock() < triturandoHasta then Datos.GIRO_TRITURANDO else Datos.GIRO_TRITURADORA
-	anguloTrituradora += dt * giro
-	for _, g in v.trituradora do
-		girar(g, anguloTrituradora)
-	end
-	if enCinta > 0 then
-		anguloCinta += dt * Datos.GIRO_RODILLOS_CINTA
-		desplazamiento = (desplazamiento + dt * Datos.VELOCIDAD_CINTA) % Datos.PASO_LISTONES
-		for _, g in v.cinta do
-			girar(g, anguloCinta)
+	local ahora = os.clock()
+	for _, v in vistas do
+		local giro = if ahora < v.triturandoHasta then Datos.GIRO_TRITURANDO else Datos.GIRO_TRITURADORA
+		v.anguloTrituradora += dt * giro
+		for _, g in v.trituradora do
+			girar(g, v.anguloTrituradora)
 		end
-		for _, l in v.listones do
-			l.parte.CFrame = l.base + l.dir * desplazamiento
+		if v.enCinta > 0 then
+			v.anguloCinta += dt * Datos.GIRO_RODILLOS_CINTA
+			v.desplazamiento = (v.desplazamiento + dt * Datos.VELOCIDAD_CINTA * v.escala) % (Datos.PASO_LISTONES * v.escala)
+			for _, g in v.cinta do
+				girar(g, v.anguloCinta)
+			end
+			for _, l in v.listones do
+				l.parte.CFrame = l.base + l.dir * v.desplazamiento
+			end
 		end
-	end
-	if enRampa > 0 then
-		anguloRampa += dt * Datos.GIRO_RODILLOS_CINTA * (Datos.VELOCIDAD_BLOQUE / Datos.VELOCIDAD_CINTA)
-		for _, g in v.rampa do
-			girar(g, anguloRampa)
+		if v.enRampa > 0 then
+			v.anguloRampa += dt * Datos.GIRO_RODILLOS_CINTA * (Datos.VELOCIDAD_BLOQUE / Datos.VELOCIDAD_CINTA)
+			for _, g in v.rampa do
+				girar(g, v.anguloRampa)
+			end
 		end
+		encenderLuces(v, v.enCinta > 0)
 	end
-	encenderLuces(v, enCinta > 0)
 end)

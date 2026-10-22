@@ -16,7 +16,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Productos = require(Shared:WaitForChild("Config"):WaitForChild("Productos"))
-local Textos = require(Shared:WaitForChild("Config"):WaitForChild("Textos"))
+local Idioma = require(Shared:WaitForChild("Utilidades"):WaitForChild("Idioma"))
 local Red = require(Shared:WaitForChild("Utilidades"):WaitForChild("Red"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
@@ -36,14 +36,14 @@ MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(jugador, game
 	local pase = Productos.pasePorGamePassId(gamePassId)
 	if pase then
 		Monetizacion.marcarPase(jugador, pase.id)
-		NotificacionEvent:FireClient(jugador, Textos.formatear(Textos.NOTIFICACIONES.compraRobux, { nombre = pase.nombre }), "exito")
+		NotificacionEvent:FireClient(jugador, Idioma.mensaje("NOTIFICACIONES.compraRobux", { nombre = Idioma.mensajeNombre("Pases", pase) }), "exito")
 	end
 end)
 
 Monetizacion.alComprarProducto:Connect(function(jugador, idProducto)
 	local producto = Productos.PRODUCTO_POR_ID[idProducto]
 	if producto then
-		NotificacionEvent:FireClient(jugador, Textos.formatear(Textos.NOTIFICACIONES.compraRobux, { nombre = producto.nombre }), "exito")
+		NotificacionEvent:FireClient(jugador, Idioma.mensaje("NOTIFICACIONES.compraRobux", { nombre = Idioma.mensajeNombre("Productos", producto) }), "exito")
 	end
 end)
 

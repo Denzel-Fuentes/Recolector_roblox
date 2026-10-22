@@ -4,20 +4,25 @@
 	Tres canales de texto efimero, y solo estos tres (no hay dialogos de NPC:
 	se quitaron el 29 sep):
 
-	  toast   lo que te pasa a TI ("+$40", "Bolsa llena"). Pila pegada arriba
+	  toast   lo que te pasa a TI (pedido cumplido, rebirth, compra). Los
+	          rechazos con sitio en el mundo (montón agotado, contenedor
+	          cerrado...) son burbujas desde el 6 oct (AvisosMundo.client).
+	          Pila pegada arriba
 	          en el centro (peticion del usuario, 29 sep: a 122 px caian a
 	          media pantalla en el movil, que mide ~500 px de alto); baja
 	          por debajo de la tarjeta de logro mientras esta se ve. En
 	          tactil la botonera sube arriba-izquierda y los contadores
-	          (dinero, fragmentos) se apartan de las barras hacia el centro:
+	          (dinero, pedido) se apartan de las barras hacia el centro:
 	          la pila se centra en el hueco libre entre los dos, medido en
-	          pantalla. Tarjeta blanca con contorno marino y una franja del
-	          color del tipo, 3.5 s.
+	          pantalla. Tarjeta blanca con contorno marino, medalla del tipo
+	          con icono, pop de entrada y barra de tiempo, 3.5 s.
 	  feed    lo que pasa en el SERVIDOR (alguien activo un monton grande,
-	          encontro una Rara, Dona Chatarra repuso). Arriba a la derecha, es
+	          bato un record, Dona Chatarra repuso). Arriba a la derecha, es
 	          la senal social del GDD: invita a ir donde esta pasando algo.
 	  logro   tarjeta grande que baja desde arriba con el trofeo, 4 s (las
-	          insignias; llegan en el lote 7).
+	          insignias: NotificacionEvent con tipo "logro"; desde el 7 oct
+	          tambien los records de distancia, tipo "record": en el feed
+	          se leian muy pequenos).
 
 	Cada aviso vive en su propio scope de Fusion: su aparicion y su fundido
 	son Tweens de un Value de transparencia, y al acabar se limpia entero.
@@ -29,7 +34,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Paleta = require(Shared:WaitForChild("Config"):WaitForChild("Paleta"))
-local Textos = require(Shared:WaitForChild("Config"):WaitForChild("Textos"))
+local DefinicionesInsignias = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesInsignias"))
+-- El copy en el idioma del jugador (misma forma que Config/Textos)
+local Idioma = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Utilidades"):WaitForChild("Idioma"))
+local Textos = Idioma.textos
 local Red = require(Shared:WaitForChild("Utilidades"):WaitForChild("Red"))
 local Fusion = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Fusion"))
 
@@ -83,13 +91,13 @@ local pilaToasts = scope:New("Frame")({
 })
 
 -- Feed: arriba-derecha, debajo de los contadores del HUD (dinero y
--- fragmentos: 16 + 58 + 8 + 30). En tactil los contadores se apartan de las
+-- pedido: 16 + 58 + 8 + 30). En tactil los contadores se apartan de las
 -- barras verticales y el feed con ellos (recolocarFeed): pegado al borde
 -- caia encima de las barras de bolsa y fuerza.
 local posicionFeed = scope:Value(UDim2.new(1, -16, 0, 124))
 local pilaFeed = scope:New("Frame")({
 	Name = "Feed",
-	Size = UDim2.fromOffset(340, 240),
+	Size = UDim2.fromOffset(420, 300),
 	Position = posicionFeed,
 	AnchorPoint = Vector2.new(1, 0),
 	BackgroundTransparency = 1,
@@ -172,13 +180,41 @@ local function recolocarFeed()
 	posicionFeed:set(UDim2.new(0, derecha, 0, abajo))
 end
 
+-- Icono de cada tipo de toast (Config/Iconos, o su glifo dibujado)
+local ICONO_TIPO = {
+	aviso = "rayo",
+	exito = "estrella",
+	dinero = "billete",
+	objeto = "bolsa",
+	peligro = "cruz",
+	info = "check",
+}
+
+-- Toast (6 oct, peticion del usuario: "que se vean mejor, con algun
+-- efecto"): pastilla blanca con contorno marino y una medalla redonda del
+-- color del tipo con su icono. Entra con un pop elastico (UIScale con
+-- muelle); los de aviso y peligro, ademas, con una sacudida. Debajo, una
+-- barra fina del color del tipo se vacia mientras dura. Los rechazos que
+-- tienen un sitio en el mundo ya no llegan aqui: son burbujas
+-- (AvisosMundo.client).
+local DURACION_TOAST = 3.5
 local ordenToast = 0
 function Notificaciones.mostrar(texto: string, tipo: string?)
 	recolocarToasts()
 	ordenToast += 1
-	local color = COLOR_TIPO[tipo or "info"] or Paleta.UI_TINTA_SUAVE
+	local clase = tipo or "info"
+	local color = COLOR_TIPO[clase] or Paleta.UI_TINTA_SUAVE
+	local sacude = clase == "aviso" or clase == "peligro"
 	local orden = ordenToast
-	aviso(pilaToasts, MAX_TOASTS, 3.5, function(s, opacidad)
+	aviso(pilaToasts, MAX_TOASTS, DURACION_TOAST, function(s, opacidad)
+		local escala = s:Value(0.55)
+		local giro = s:Value(if sacude then -7 else 0)
+		local resto = s:Value(1)
+		task.defer(function()
+			escala:set(1)
+			giro:set(0)
+			resto:set(0)
+		end)
 		return s:New("Frame")({
 			Name = "Toast",
 			Size = UDim2.new(1, 0, 0, 0),
@@ -186,23 +222,31 @@ function Notificaciones.mostrar(texto: string, tipo: string?)
 			LayoutOrder = orden,
 			BackgroundColor3 = Paleta.UI_PAPEL,
 			BackgroundTransparency = opacidad,
+			Rotation = s:Spring(giro, 40, 0.25),
 			[Children] = {
+				s:New("UIScale")({ Scale = s:Spring(escala, 28, 0.45) }),
 				s:New("UICorner")({ CornerRadius = UDim.new(0, Tema.RADIO) }),
 				s:New("UIStroke")({ Color = Paleta.UI_TINTA, Thickness = Tema.GROSOR, Transparency = opacidad }),
 				s:New("UIPadding")({
-					PaddingLeft = UDim.new(0, 24),
+					PaddingLeft = UDim.new(0, 56),
 					PaddingRight = UDim.new(0, 14),
-					PaddingTop = UDim.new(0, 8),
-					PaddingBottom = UDim.new(0, 8),
+					PaddingTop = UDim.new(0, 10),
+					PaddingBottom = UDim.new(0, 12),
 				}),
-				-- Franja del color del tipo pegada al borde izquierdo
+				-- Medalla del tipo con su icono, asomando por la izquierda
 				s:New("Frame")({
-					Name = "Marca",
-					Size = UDim2.new(0, 10, 1, 4),
-					Position = UDim2.new(0, -18, 0, -2),
+					Name = "Medalla",
+					Size = UDim2.fromOffset(40, 40),
+					Position = UDim2.new(0, -48, 0.5, 0),
+					AnchorPoint = Vector2.new(0, 0.5),
 					BackgroundColor3 = color,
 					BackgroundTransparency = opacidad,
-					[Children] = s:New("UICorner")({ CornerRadius = UDim.new(0, 5) }),
+					[Children] = {
+						s:New("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+						s:New("UIStroke")({ Color = Paleta.UI_TINTA, Thickness = 2, Transparency = opacidad }),
+						s:New("UIGradient")({ Color = Tema.DEGRADADO, Rotation = 90 }),
+						s:Icono({ Clave = ICONO_TIPO[clase] or "check", Tamano = 26, Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5) }),
+					},
 				}),
 				s:New("TextLabel")({
 					Name = "Texto",
@@ -212,9 +256,26 @@ function Notificaciones.mostrar(texto: string, tipo: string?)
 					Text = texto,
 					TextColor3 = Paleta.UI_TINTA,
 					TextTransparency = opacidad,
-					TextSize = 17,
+					TextSize = 18,
 					TextWrapped = true,
+					TextXAlignment = Enum.TextXAlignment.Left,
 					FontFace = Tema.FUENTE_TITULO,
+				}),
+				-- Lo que le queda: una barra fina que se vacia
+				s:New("Frame")({
+					Name = "Tiempo",
+					Size = s:Tween(
+						s:Computed(function(use)
+							return UDim2.new(use(resto), 0, 0, 4)
+						end),
+						TweenInfo.new(DURACION_TOAST, Enum.EasingStyle.Linear)
+					),
+					Position = UDim2.new(0, 0, 1, 6),
+					AnchorPoint = Vector2.new(0, 1),
+					BackgroundColor3 = color,
+					BackgroundTransparency = opacidad,
+					BorderSizePixel = 0,
+					[Children] = s:New("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
 				}),
 			},
 		})
@@ -237,12 +298,14 @@ function Notificaciones.feed(texto: string)
 				return 0.15 + (use(opacidad) :: number) * 0.85
 			end),
 			[Children] = {
-				s:New("UICorner")({ CornerRadius = UDim.new(0, 10) }),
+				s:New("UICorner")({ CornerRadius = UDim.new(0, 12) }),
+				-- Borde del color primario: se distingue del fondo (7 oct)
+				s:New("UIStroke")({ Color = Paleta.UI_PRIMARIO, Thickness = 2, Transparency = opacidad }),
 				s:New("UIPadding")({
-					PaddingLeft = UDim.new(0, 10),
-					PaddingRight = UDim.new(0, 10),
-					PaddingTop = UDim.new(0, 5),
-					PaddingBottom = UDim.new(0, 5),
+					PaddingLeft = UDim.new(0, 14),
+					PaddingRight = UDim.new(0, 14),
+					PaddingTop = UDim.new(0, 8),
+					PaddingBottom = UDim.new(0, 8),
 				}),
 				s:New("TextLabel")({
 					Name = "Texto",
@@ -252,7 +315,7 @@ function Notificaciones.feed(texto: string)
 					Text = texto,
 					TextColor3 = Paleta.UI_PAPEL,
 					TextTransparency = opacidad,
-					TextSize = 14,
+					TextSize = 18, -- a 14 no se leia (7 oct)
 					TextWrapped = true,
 					TextXAlignment = Enum.TextXAlignment.Right,
 					FontFace = Tema.FUENTE_NEGRITA,
@@ -262,29 +325,31 @@ function Notificaciones.feed(texto: string)
 	end)
 end
 
-function Notificaciones.logro(nombre: string, descripcion: string)
+-- Tarjeta grande que baja desde arriba (insignias y records): icono a la
+-- izquierda, linea pequena arriba, linea grande y descripcion
+local function tarjetaGrande(icono: string, color: Color3, arriba: string, grande: string, descripcion: string)
 	local s = scope:innerScope()
 	local dentro = s:Value(false)
 	local posicion = s:Spring(
 		s:Computed(function(use)
-			return if use(dentro) then UDim2.new(0.5, 0, 0, 12) else UDim2.new(0.5, 0, 0, -120)
+			return if use(dentro) then UDim2.new(0.5, 0, 0, 12) else UDim2.new(0.5, 0, 0, -130)
 		end),
 		22,
 		0.7
 	)
 	s:Tarjeta({
 		Nombre = "Logro",
-		Size = UDim2.fromOffset(440, 100),
+		Size = UDim2.fromOffset(460, 108),
 		Position = posicion,
 		AnchorPoint = Vector2.new(0.5, 0),
-		Color = Paleta.UI_PRIMARIO,
+		Color = color,
 		Radio = 18,
 		Relleno = 14,
 		Hijos = {
-			s:Icono({ Clave = "trofeo", Tamano = 62, Position = UDim2.new(0, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5) }),
-			s:Texto({ Texto = Textos.LOGROS.desbloqueado, Size = UDim2.new(1, -76, 0, 22), Position = UDim2.fromOffset(74, 0), Tamano = 15, Fuente = "titulo", Color = Paleta.UI_PAPEL, Contorno = Paleta.UI_TINTA, Mayusculas = true }),
-			s:Texto({ Texto = nombre, Size = UDim2.new(1, -76, 0, 28), Position = UDim2.fromOffset(74, 22), Tamano = 22, Fuente = "titulo", Color = Paleta.UI_PAPEL, Contorno = Paleta.UI_TINTA }),
-			s:Texto({ Texto = descripcion, Size = UDim2.new(1, -76, 0, 20), Position = UDim2.fromOffset(74, 50), Tamano = 14, Fuente = "negrita", Color = Paleta.UI_TINTA }),
+			s:Icono({ Clave = icono, Tamano = 68, Position = UDim2.new(0, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5) }),
+			s:Texto({ Texto = arriba, Size = UDim2.new(1, -82, 0, 22), Position = UDim2.fromOffset(80, 0), Tamano = 16, Fuente = "titulo", Color = Paleta.UI_PAPEL, Contorno = Paleta.UI_TINTA, Mayusculas = true }),
+			s:Texto({ Texto = grande, Size = UDim2.new(1, -82, 0, 36), Position = UDim2.fromOffset(80, 22), Tamano = 30, Fuente = "titulo", Color = Paleta.UI_PAPEL, Contorno = Paleta.UI_TINTA }),
+			s:Texto({ Texto = descripcion, Size = UDim2.new(1, -82, 0, 20), Position = UDim2.fromOffset(80, 58), Tamano = 15, Fuente = "negrita", Color = Paleta.UI_TINTA }),
 		},
 	}).Parent = pantalla
 	dentro:set(true)
@@ -297,14 +362,44 @@ function Notificaciones.logro(nombre: string, descripcion: string)
 	end)
 end
 
-Red.evento("NotificacionEvent").OnClientEvent:Connect(function(texto, tipo)
-	if typeof(texto) == "string" then
+-- Record de distancia (7 oct: en el feed, a 14 px, no se leia): la misma
+-- tarjeta que las insignias, con la distancia en grande
+function Notificaciones.record(distancia: string, delServidor: boolean)
+	tarjetaGrande("trofeo", Paleta.UI_DINERO, Textos.RECORD.titulo, Textos.formatear(Textos.RECORD.distancia, { distancia = distancia }),
+		if delServidor then Textos.RECORD.servidor else Textos.RECORD.personal)
+end
+
+function Notificaciones.logro(nombre: string, descripcion: string)
+	tarjetaGrande("trofeo", Paleta.UI_PRIMARIO, Textos.LOGROS.desbloqueado, nombre, descripcion)
+end
+
+-- El servidor manda Idioma.mensaje (o un string suelto); aqui se escribe en
+-- el idioma del jugador
+Red.evento("NotificacionEvent").OnClientEvent:Connect(function(mensaje, tipo)
+	if tipo == "logro" then
+		-- Las insignias llegan por id (Services/Insignias)
+		local def = if typeof(mensaje) == "string" then DefinicionesInsignias.POR_ID[mensaje] else nil
+		if def then
+			Notificaciones.logro(Idioma.nombre("Insignias", def), Idioma.descripcion("Insignias", def))
+		end
+		return
+	end
+	local texto = Idioma.resolver(mensaje)
+	if texto == "" then
+		return
+	end
+	if tipo == "record" then
+		-- "distancia|servidor" o "distancia|personal" (Services/Lanzamiento)
+		local partes = string.split(texto, "|")
+		Notificaciones.record(partes[1], partes[2] == "servidor")
+	else
 		Notificaciones.mostrar(texto, tipo)
 	end
 end)
 
-Red.evento("FeedEvent").OnClientEvent:Connect(function(texto)
-	if typeof(texto) == "string" then
+Red.evento("FeedEvent").OnClientEvent:Connect(function(mensaje)
+	local texto = Idioma.resolver(mensaje)
+	if texto ~= "" then
 		Notificaciones.feed(texto)
 	end
 end)

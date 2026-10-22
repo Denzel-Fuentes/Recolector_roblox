@@ -33,7 +33,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared:WaitForChild("Config"):WaitForChild("GameConfig"))
-local Textos = require(Shared:WaitForChild("Config"):WaitForChild("Textos"))
+local Idioma = require(Shared:WaitForChild("Utilidades"):WaitForChild("Idioma"))
 local Red = require(Shared:WaitForChild("Utilidades"):WaitForChild("Red"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
@@ -95,7 +95,7 @@ local function cargar(jugador: Player)
 		-- El cliente puede no tener aun la UI: se reintenta un poco despues.
 		task.delay(3, function()
 			if jugador.Parent then
-				NotificacionEvent:FireClient(jugador, Textos.NOTIFICACIONES.perfilNoCargado, "peligro")
+				NotificacionEvent:FireClient(jugador, Idioma.mensaje("NOTIFICACIONES.perfilNoCargado"), "peligro")
 			end
 		end)
 	end

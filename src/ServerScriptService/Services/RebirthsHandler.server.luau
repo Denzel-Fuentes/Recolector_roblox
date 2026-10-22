@@ -10,9 +10,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Textos = require(Shared:WaitForChild("Config"):WaitForChild("Textos"))
 local DefinicionesRebirths = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesRebirths"))
-local Formato = require(Shared:WaitForChild("Utilidades"):WaitForChild("Formato"))
+local Idioma = require(Shared:WaitForChild("Utilidades"):WaitForChild("Idioma"))
 local Red = require(Shared:WaitForChild("Utilidades"):WaitForChild("Red"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
@@ -35,14 +34,14 @@ RenacerEvent.OnServerEvent:Connect(function(jugador)
 	if ok then
 		local n = tonumber(motivo) or 1
 		local def = DefinicionesRebirths.rebirth(n)
-		NotificacionEvent:FireClient(jugador, Textos.formatear(Textos.REBIRTH.hecho, { n = n, mult = Formato.multiplicador(def.multiplicador) }), "exito")
-		FeedEvent:FireAllClients(Textos.formatear(Textos.FEED.rebirth, { jugador = jugador.DisplayName, n = n }))
+		NotificacionEvent:FireClient(jugador, Idioma.mensaje("REBIRTH.hecho", { n = n, mult = Idioma.multiplicador(def.multiplicador) }), "exito")
+		FeedEvent:FireAllClients(Idioma.mensaje("FEED.rebirth", { jugador = jugador.DisplayName, n = n }))
 	elseif motivo == "mejoras" then
-		NotificacionEvent:FireClient(jugador, Textos.REBIRTH.faltanMejoras, "aviso")
+		NotificacionEvent:FireClient(jugador, Idioma.mensaje("REBIRTH.faltanMejoras"), "aviso")
 	elseif motivo == "dinero" then
 		local perfil = Perfiles.obtener(jugador)
 		local falta = if perfil then DefinicionesRebirths.rebirth(perfil.rebirths + 1).requisito - perfil.dinero else 0
-		NotificacionEvent:FireClient(jugador, Textos.formatear(Textos.REBIRTH.faltaDinero, { dinero = Formato.dinero(falta) }), "aviso")
+		NotificacionEvent:FireClient(jugador, Idioma.mensaje("REBIRTH.faltaDinero", { dinero = Idioma.dinero(falta) }), "aviso")
 	end
 end)
 

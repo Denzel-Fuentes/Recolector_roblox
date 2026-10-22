@@ -2,8 +2,13 @@
 --[[
 	Textos
 	Todo el copy de la UI en un solo sitio, en espanol. El codigo nunca lleva
-	cadenas visibles al jugador sueltas: asi se revisa el tono de una pasada y se
-	podria localizar despues sin tocar logica.
+	cadenas visibles al jugador sueltas: asi se revisa el tono de una pasada.
+
+	Es el ORIGINAL de la localizacion (7 oct): las traducciones estan en
+	Config/Traducciones (en, pt) con la misma forma, y el cliente no lee este
+	modulo sino Utilidades/Idioma.textos. Toda clave nueva va tambien alli
+	(la prueba "idioma" lo comprueba). El servidor no envia estos textos
+	montados: envia Idioma.mensaje("SECCION.clave", valores).
 
 	formatear(clave, {...}) sustituye {nombre} por el valor.
 ]]
@@ -13,18 +18,19 @@ local Textos = {}
 Textos.HUD = {
 	dinero = "$",
 	bolsa = "Bolsa",
-	bolsaLlena = "¡Bolsa llena! Lánzala al contenedor verde",
+	bolsaLlena = "¡Bolsa llena! Lánzala a un contenedor",
 	tienda = "Tienda",
-	mascotas = "Mascotas",
 	rebirth = "Rebirth",
 	pedidos = "Pedidos",
+	camara = "Cámara",
 	lanzar = "Lanzar",
 	-- La tecla/boton va en una insignia al lado, no en el texto
 	mantenerLanzar = "MANTÉN PARA LANZAR",
 	tocarLanzar = "MANTÉN",
 	mantenerRecoger = "MANTÉN PARA RECOGER",
-	-- En el movil se recoge lo que pasa por la mira mientras el dedo la mueve
-	tocarRecoger = "DESLIZA EL DEDO: LA MIRA RECOGE",
+	-- En tactil se apunta con la mira y se mantiene el boton RECOGER (6 oct)
+	tocarRecoger = "APUNTA Y MANTÉN RECOGER",
+	botonRecoger = "RECOGER",
 	clic = "CLIC",
 	fuerza = "Fuerza",
 	-- Sobre la barra de fuerza, en el patio: lo que daria acertar desde aqui
@@ -35,8 +41,17 @@ Textos.HUD = {
 
 -- Carteles flotantes del mundo (los pinta el cliente sobre lo etiquetado)
 Textos.MUNDO = {
-	venderBasura = "VENDER BASURA",
-	chatarra = "DOÑA CHATARRA",
+	-- Carteles de los contenedores (3 oct): el general acepta todo; los de
+	-- tipo pagan x2 lo suyo
+	contenedorGeneral = "GENERAL · TODO",
+	contenedorTipo = "{tipo} · x2",
+	-- La placa del contenedor general cuando no esta la malla de la recicladora
+	placaGeneral = "♻ {tipo}",
+	-- Encima de un contenedor de un tipo aun bloqueado (ContenedoresBloqueados.client)
+	contenedorCandado = "REBIRTH {n}",
+	chatarra = "RECICLADORA",
+	-- nombre del tendero en su prompt (5 oct: sin "Doña Chatarra")
+	tendero = "Reciclador",
 	-- rotulo de la tienda (el de la malla de Blender lleva las letras en 3D)
 	tienda = "SHOP",
 	patio = "Patio de basura ↑",
@@ -51,43 +66,101 @@ Textos.ZONAS = {
 	organico = "Zona de orgánico",
 }
 
+-- Los tipos de basura (y sus contenedores), para carteles y titulos
+Textos.TIPOS = {
+	Papel = "Papel",
+	Plastico = "Plástico",
+	Metal = "Metal",
+	Organico = "Orgánico",
+	General = "General",
+}
+
+-- "del contenedor ...", para los avisos
+Textos.CONTENEDOR = {
+	General = "general",
+	Papel = "del papel",
+	Plastico = "del plástico",
+	Metal = "del metal",
+	Organico = "del orgánico",
+}
+
 Textos.PATIO = {
 	excavar = "Excavar",
 	montonAgotado = "Montón agotado",
 	reciclar = "Reciclar bolsa",
 	-- El prompt de Dona Chatarra: abre la tienda (sin dialogos desde el 29 sep)
 	tienda = "Tienda",
-	bolsaLlena = "¡Bolsa llena! Lánzala al contenedor verde",
+	-- Burbujas en el mundo (AvisosMundo): cortas, se leen de un vistazo
 	bolsaVacia = "No llevas nada que reciclar",
-	nadaQueLanzar = "La bolsa está vacía: no hay nada que lanzar",
+	contenedorBloqueado = "Se abre con el Rebirth {n}",
+	nadaQueLanzar = "La bolsa está vacía",
 	bolsaDe = "Bolsa de {dueno}",
-	bolsaRecogida = "Recuperaste tu bolsa ({n} objetos)",
-	bolsaAjena = "Esa bolsa es de {dueno}: solo su dueño puede recogerla",
+	bolsaAjena = "Es de {dueno}: libre en {s} s",
+	bolsaTeLaQuitaron = "{quien} se llevó tu bolsa",
+	-- La cuenta atras encima de una bolsa caida (TemporizadorBolsas.client)
+	temporizadorBolsa = "{s}s",
+	bolsaLibre = "¡LIBRE!",
 	demasiadoCerca = "Aléjate un poco para lanzar",
-	acierto = "¡Dentro! +${dinero} desde {distancia} studs",
-	aciertoBonus = " · +{pct} %",
-	aciertoRacha = " · racha {n}",
-	fallo = "Fuera. Tu bolsa te espera en el suelo: ve a recogerla",
-	reciclado = "Reciclaste {objetos} objetos por ${dinero}",
 	sinDinero = "No te alcanza el dinero",
 	figurinaEncontrada = "¡Figurita encontrada: {nombre}!",
 	figurinaYaTienes = "Ya tienes esta figurita",
-	patioLleno = "Hay demasiada basura en el patio: espera a que se recoja un poco",
-	montonPendiente = "Termina tu montón antes de abrir otro",
+	patioLleno = "Patio lleno: espera un poco",
+	montonPendiente = "Termina tu montón primero",
 	monton = "Montón de basura",
 	montonRico = "Montón con mucho {material}",
-	cuadranteBloqueado = "Se abre con el Rebirth {n}",
-	prioridad = "Espera {s} s: es el montón de {dueno}",
+	materialBloqueado = "{material}: Rebirth {n}",
+	prioridad = "Espera {s} s: es de {dueno}",
+}
+
+-- Celebraciones (5 oct, peticion del usuario: sin toasts al cobrar): letras
+-- grandes que aparecen un momento al encestar o entregar la bolsa
+-- (UI/Celebraciones) y el "+1" que sale de cada objeto recogido
+-- (EfectoRecogida)
+Textos.CELEBRACION = {
+	acierto = "¡DENTRO!",
+	entrega = "¡RECICLADO!",
+	dinero = "+${dinero}",
+	distancia = "{distancia} m",
+	bonusDistancia = "+{pct} % distancia",
+	racha = "Racha ×{n}",
+	separadas = "{n} bien separadas ×2",
+	malSeparadas = "{n} en el equivocado",
+	mas = "+{n}",
+	billete = "+${dinero}",
+	tesoro = "¡TESORO!",
 }
 
 Textos.FEED = {
 	montonGrande = "{jugador} activó un montón grande",
-	repoblacion = "¡Doña Chatarra trajo más basura!",
+	repoblacion = "¡Llegó más basura al patio!",
 	rebirth = "¡{jugador} hizo el Rebirth {n}!",
-	recordServidor = "¡Récord del servidor! {jugador} acertó desde {distancia} studs",
-	mascota = "¡{jugador} completó a {mascota} ({rareza})!",
-	rey = "¡{jugador} tiene las 40 mascotas: el Rey Reciclón es suyo!",
-	recordPersonal = "Nuevo récord personal: {distancia} studs",
+	recordServidor = "¡Récord del servidor! {jugador} acertó desde {distancia} m",
+}
+
+-- La tarjeta grande de record de distancia (UI/Notificaciones, 7 oct)
+Textos.RECORD = {
+	titulo = "¡NUEVO RÉCORD!",
+	distancia = "{distancia} m",
+	personal = "Tu mejor lanzamiento",
+	servidor = "¡El mejor del servidor!",
+}
+
+-- Los tablones de ranking de la plaza (Client/Tablones; DefinicionesRankings)
+Textos.RANKING = {
+	titulo = {
+		dinero = "Dinero ganado",
+		racha = "Racha máxima",
+		aciertos = "Bolsas encestadas",
+	},
+	historico = "Histórico",
+	semanal = "Esta semana",
+	-- Tu fila, al pie de cada columna
+	tu = "Tú: #{pos} · {valor}",
+	tuFuera = "Tú: fuera del top {n} · {valor}",
+	tuSinValor = "Tú: aún sin puesto",
+	cargando = "Cargando…",
+	noDisponible = "Ranking no disponible",
+	vacio = "Aún nadie",
 }
 
 Textos.REBIRTH = {
@@ -99,13 +172,13 @@ Textos.REBIRTH = {
 	mejora = "{nombre} {n}/10",
 	premio = "Tu dinero pasa a {mult}",
 	desbloquea = {
-		metal = "Abre la zona de metal y el set Chatarrín",
-		organico = "Abre la zona de orgánico y el set Mostrenco",
-		segundaMascota = "Una segunda mascota equipada",
+		metal = "Desbloquea la basura de metal",
+		organico = "Desbloquea la basura orgánica",
+		bolsaPlateada = "Regala la Bolsa plateada",
 		insignia = "Solo multiplicador e insignia",
 	},
 	reinicia = "Se reinician el dinero y las mejoras",
-	conserva = "Te quedas las mascotas, sus fragmentos, las zonas abiertas, los récords y los pases",
+	conserva = "Te quedas las zonas abiertas, los récords, las insignias y los pases",
 	renacer = "Renacer",
 	hecho = "¡Rebirth {n}! Tu dinero ahora vale {mult}",
 	faltanMejoras = "Antes de renacer, lleva las 4 mejoras al máximo",
@@ -113,83 +186,84 @@ Textos.REBIRTH = {
 }
 
 Textos.TIENDA = {
-	titulo = "Caseta de Doña Chatarra",
+	titulo = "Caseta de reciclaje",
 	mejoras = "Mejoras",
-	trajes = "Trajes",
 	pases = "Pases",
-	nivel = "Nivel {n}/10",
+	estilo = "Estilo",
+	proximamente = "Próximamente",
+	loTienes = "Es tuyo",
+	dePago = "Pase de Robux",
+	conRebirth = "Regalo del Rebirth {n}",
 	maximo = "MÁXIMO",
 	comprar = "Comprar",
 	comprado = "Comprado",
 	equipar = "Equipar",
 	equipado = "Equipado",
 	quitar = "Quitar",
-	noEncontrado = "Aún no lo has encontrado",
 	robux = "{precio} Robux",
 	sinIds = "Producto no disponible todavía",
 	mejoraComprada = "{nombre} → nivel {nivel}",
-}
-
-Textos.MASCOTAS = {
-	titulo = "Mascotas",
-	coleccion = "{n}/10",
-	equipadas = "Equipadas {n}/{max}",
-	nivel = "Nv {n}",
-	noLaTienes = "Aún no la tienes",
-	bonus = "+{pct} % al {material}",
-	bonusRey = "+{pct} % a todo",
-	iman = "Atrae {material} a {radio} studs",
-	sinIman = "Sin imán",
-	equipar = "Equipar",
-	quitar = "Quitar",
-	equipada = "Equipada",
-	siempreContigo = "Siempre contigo",
-	huecosLlenos = "No te quedan huecos: quita una antes",
-	-- La mascota que monta cada set con sus fragmentos
-	montando = "Montando {nombre} ({rareza}): {n}/{total} fragmentos",
-	sinMontar = "Busca fragmentos de {set} en los montones",
-	fragmentosHud = "{nombre} {n}/{total}",
-	sinFragmentosHud = "Busca fragmentos ✦",
-	probabilidades = "Siguiente mascota: {texto}",
-	pity = "Rara o mejor cada 5; Épica cada 20",
-	bloqueado = "Se abre con el Rebirth {n}",
-	fragmentosLibres = "Fragmentos libres: {n}",
-	usarLibre = "Usar uno aquí",
-	rey = "Consíguelas todas para coronar al Rey Reciclón",
-}
-
--- La ventana que ensena una mascota completada con sus fragmentos
-Textos.REVELACION = {
-	titulo = "¡Mascota completa!",
-	nueva = "¡Nueva!",
-	subeNivel = "Sube a nivel {n}",
-	convertida = "Ya la tienes al máximo: +{dinero}",
-	genial = "¡Genial!",
-	deSet = "¡Mascota de {set}!",
 }
 
 Textos.LOGROS = {
 	desbloqueado = "¡Insignia conseguida!",
 }
 
+-- Los pedidos de Dona Chatarra (DefinicionesPedidos): {objetivo}, {progreso}
+-- y {parametro} (una distancia o un tipo de basura ya traducido)
+Textos.PEDIDOS = {
+	titulo = "Pedidos",
+	pestanaPedidos = "Pedidos del día",
+	pestanaInsignias = "Insignias",
+	aciertos = "Encesta {objetivo} bolsas",
+	racha = "Consigue una racha de {objetivo}",
+	lejos = "Encesta {objetivo} desde {parametro} m o más",
+	piezas = "Recicla {objetivo} piezas",
+	separadas = "Recicla {objetivo} piezas en su contenedor de color",
+	material = "Recicla {objetivo} de {parametro}",
+	tesoros = "Encuentra {objetivo} tesoros",
+	bolsasLlenas = "Recicla {objetivo} bolsas llenas",
+	hecho = "¡Hecho!",
+	premioDia = "Completa los 3: {minutos} min de dinero x2",
+	premioCobrado = "Turbo del día conseguido",
+	cerrados = "Los pedidos se abren cuando compres tu primera mejora",
+	nuevos = "Pedidos nuevos cada día",
+	insigniasConseguidas = "{n}/{total} conseguidas",
+}
+
+-- Version corta para la barra del HUD: "{etiqueta} n/objetivo"
+Textos.PEDIDOS_HUD = {
+	aciertos = "Encesta",
+	racha = "Racha",
+	lejos = "Desde {parametro} m",
+	piezas = "Recicla",
+	separadas = "Separa",
+	material = "{parametro}",
+	tesoros = "Tesoros",
+	bolsasLlenas = "Bolsas llenas",
+	formato = "{etiqueta} {n}/{total}",
+}
+
+Textos.PEDIDOS_AVISOS = {
+	cumplido = "¡Pedido cumplido! +${dinero}",
+	todos = "¡Los 3 pedidos del día! Dinero x2 durante {minutos} min",
+}
+
+-- El Turbo en el HUD (dinero x2 un rato)
+Textos.TURBO = {
+	activo = "x2 {tiempo}",
+}
+
 Textos.NOTIFICACIONES = {
-	bienvenida = "¡Bienvenido a Recíclatas! Excava un montón del patio y lanza la bolsa al contenedor verde.",
+	bienvenida = "¡Bienvenido a Recíclatas! Excava un montón del patio y lanza la bolsa a un contenedor. Si separas por colores, pagan el doble.",
 	perfilNoCargado = "No se pudo cargar tu progreso. Esta sesión no se guardará.",
 	guardado = "Progreso guardado",
 	compraRobux = "Compra completada: {nombre}",
-	trajePuesto = "Traje: {nombre}",
 	cintaEncontrada = "¡Cinta encontrada: {nombre}!",
-	trajeEncontrado = "¡Traje encontrado: {nombre}!",
 	tesoro = "Tesoro guardado en la bolsa",
-	mascotaEquipada = "{nombre} te sigue",
-	fragmentoRecogido = "¡{nombre}! Recíclalo para que cuente",
-	-- Al reciclar un fragmento (el primero de una mascota dice cual es)
-	fragmentoNuevo = "¡Fragmento! Estás montando a {nombre} ({rareza}): {n}/{total}",
-	fragmento = "Fragmento de {nombre}: {n}/{total}",
-	fragmentoCerrado = "Fragmento de {set}: se abre con el Rebirth {n}. Doña Chatarra te lo paga",
 }
 
--- Nombres de los materiales en minuscula, para frases ("atrae metal")
+-- Nombres de los materiales en minuscula, para frases ("recicla 40 de papel")
 Textos.MATERIALES = {
 	Metal = "metal",
 	Plastico = "plástico",
@@ -198,16 +272,20 @@ Textos.MATERIALES = {
 	Mixto = "de todo",
 }
 
--- Tutorial jugable (<90 s): un paso a la vez, lo avanza el servidor. Los
--- pasoN son lo que pide cada paso (DefinicionesTutorial); ya no se ensenan
--- en una tarjeta (quitada el 29 sep), el L9 decidira como
+-- Tutorial jugable: un paso a la vez, lo avanza el servidor. Los pasoN son
+-- lo que pide cada paso (DefinicionesTutorial); se ensenan en una pildora
+-- arriba a la izquierda (lote 9; la tarjeta de abajo se quito el 29 sep)
 Textos.TUTORIAL = {
+	paso = "Paso {n}/{total}",
 	paso1 = "Ve al patio de basura",
 	paso2 = "Excava un montón: acércate y mantén Excavar",
 	paso3 = "Recoge basura hasta llenar la bolsa",
-	paso4 = "Lanza la bolsa al contenedor verde: mantén Lanzar y suelta",
+	paso4 = "Lanza la bolsa al contenedor azul: mantén Lanzar y suelta",
 	paso5 = "Compra una mejora en la Tienda",
-	completado = "¡Ya sabes reciclar!",
+	paso6 = "Recoge basura de un solo color y lánzala a su contenedor: paga el doble",
+	paso7 = "Cumple un pedido de la recicladora",
+	paso8 = "Meta: las 4 mejoras al máximo y {dinero} para el Rebirth 1",
+	completado = "¡Tutorial completado! Ya eres un reciclador",
 }
 
 function Textos.formatear(plantilla: string, valores: { [string]: any }): string
