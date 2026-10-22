@@ -19,7 +19,6 @@ return {
 		rebirth = "Rebirth",
 		pedidos = "Orders",
 		camara = "Camera",
-		lanzar = "Throw",
 		mantenerLanzar = "HOLD TO THROW",
 		tocarLanzar = "HOLD",
 		mantenerRecoger = "HOLD TO PICK UP",
@@ -29,7 +28,6 @@ return {
 		fuerza = "Power",
 		bonusAqui = "+{pct} %",
 		bolsaLlenaBarra = "FULL!",
-		cerrar = "Close",
 	},
 
 	MUNDO = {
@@ -81,13 +79,15 @@ return {
 		demasiadoCerca = "Step back a bit to throw",
 		sinDinero = "You can't afford it",
 		figurinaEncontrada = "Figurine found: {nombre}!",
-		figurinaYaTienes = "You already have this figurine",
 		patioLleno = "Junkyard full: wait a moment",
 		montonPendiente = "Finish your pile first",
 		monton = "Trash pile",
 		montonRico = "Pile with lots of {material}",
 		materialBloqueado = "{material}: Rebirth {n}",
 		prioridad = "Wait {s} s: it's {dueno}'s",
+		-- P3, 22 oct
+		bolsaNoLlena = "Fill your bag to throw it",
+		bolsaViejaReciclada = "Too many bags on the ground: your oldest one was recycled for {dinero}, no bonus",
 	},
 
 	CELEBRACION = {
@@ -166,10 +166,8 @@ return {
 		dePago = "Robux pass",
 		conRebirth = "Rebirth {n} reward",
 		maximo = "MAX",
-		comprar = "Buy",
 		comprado = "Bought",
 		equipar = "Equip",
-		equipado = "Equipped",
 		quitar = "Remove",
 		robux = "{precio} Robux",
 		sinIds = "Product not available yet",
@@ -224,10 +222,10 @@ return {
 	NOTIFICACIONES = {
 		bienvenida = "Welcome to Recíclatas! Dig a pile in the junkyard and throw the bag into a bin. Sort by color and it pays double.",
 		perfilNoCargado = "Your progress couldn't be loaded. This session won't be saved.",
-		guardado = "Progress saved",
 		compraRobux = "Purchase complete: {nombre}",
 		cintaEncontrada = "Tape found: {nombre}!",
-		tesoro = "Treasure stored in your bag",
+		-- P1, 22 oct
+		sesionEnOtroServidor = "Your game was opened on another server. Rejoin to keep playing.",
 	},
 
 	MATERIALES = {

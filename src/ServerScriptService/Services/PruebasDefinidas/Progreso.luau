@@ -311,6 +311,39 @@ function Pruebas.sinRestos()
 			table.insert(restos, "FUNCIONES." .. nombre)
 		end
 	end
+	-- El copy, los iconos y el glifo sin uso que se borraron el 22 oct: ni en
+	-- Textos ni en ninguna traduccion, ni en Config/Iconos ni en
+	-- Utilidades/Glifos. Si alguno vuelve a hacer falta de verdad, se quita
+	-- de estas listas.
+	local Idioma = require(Shared:WaitForChild("Utilidades"):WaitForChild("Idioma"))
+	local Glifos = require(Shared:WaitForChild("Utilidades"):WaitForChild("Glifos"))
+	local Iconos = require(Config:WaitForChild("Iconos"))
+	local Traducciones = require(Config:WaitForChild("Traducciones"))
+	local idiomas = { "es" }
+	for codigo in Traducciones.IDIOMAS do
+		table.insert(idiomas, codigo)
+	end
+	for _, clave in {
+		"HUD.lanzar", "HUD.cerrar", "PATIO.figurinaYaTienes", "TIENDA.comprar", "TIENDA.equipado",
+		"NOTIFICACIONES.guardado", "NOTIFICACIONES.tesoro",
+	} do
+		-- plantilla(clave, codigo) da la traduccion o, si falta, el espanol:
+		-- nil en todos = no esta en ningun sitio
+		for _, codigo in idiomas do
+			if Idioma.plantilla(clave, codigo) ~= nil then
+				table.insert(restos, "Textos." .. clave .. " (" .. codigo .. ")")
+				break
+			end
+		end
+	end
+	for _, clave in { "gema", "sobre", "contenedorDorado", "pocion" } do
+		if Iconos.existe(clave) then
+			table.insert(restos, "Iconos." .. clave)
+		end
+	end
+	if Glifos.existe("gema") then
+		table.insert(restos, "Glifos.gema")
+	end
 	return string.format("restos: [%s] => %s", table.concat(restos, ", "), ok(#restos == 0))
 end
 

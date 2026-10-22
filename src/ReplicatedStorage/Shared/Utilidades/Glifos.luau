@@ -108,12 +108,6 @@ DIBUJOS.billete = function(l, color)
 	forma(l, 0.36, 0.34, 0.28, 0.32, claro(c), 0.5)
 end
 
-DIBUJOS.gema = function(l, color)
-	local c = color or Paleta.UI_GEMAS
-	forma(l, 0.24, 0.24, 0.52, 0.52, c, 0.12, 45)
-	forma(l, 0.38, 0.38, 0.2, 0.2, claro(c), 0.12, 45)
-end
-
 DIBUJOS.rayo = function(l, color)
 	local c = color or Paleta.UI_ENERGIA
 	forma(l, 0.42, 0.04, 0.26, 0.5, c, 0.1, 22)

@@ -23,7 +23,6 @@ Textos.HUD = {
 	rebirth = "Rebirth",
 	pedidos = "Pedidos",
 	camara = "Cámara",
-	lanzar = "Lanzar",
 	-- La tecla/boton va en una insignia al lado, no en el texto
 	mantenerLanzar = "MANTÉN PARA LANZAR",
 	tocarLanzar = "MANTÉN",
@@ -36,7 +35,6 @@ Textos.HUD = {
 	-- Sobre la barra de fuerza, en el patio: lo que daria acertar desde aqui
 	bonusAqui = "+{pct} %",
 	bolsaLlenaBarra = "¡LLENA!",
-	cerrar = "Cerrar",
 }
 
 -- Carteles flotantes del mundo (los pinta el cliente sobre lo etiquetado)
@@ -103,13 +101,18 @@ Textos.PATIO = {
 	demasiadoCerca = "Aléjate un poco para lanzar",
 	sinDinero = "No te alcanza el dinero",
 	figurinaEncontrada = "¡Figurita encontrada: {nombre}!",
-	figurinaYaTienes = "Ya tienes esta figurita",
 	patioLleno = "Patio lleno: espera un poco",
 	montonPendiente = "Termina tu montón primero",
 	monton = "Montón de basura",
 	montonRico = "Montón con mucho {material}",
 	materialBloqueado = "{material}: Rebirth {n}",
 	prioridad = "Espera {s} s: es de {dueno}",
+	-- P3, 22 oct: el servidor no deja lanzar una bolsa que no esta llena
+	bolsaNoLlena = "Llena la bolsa para poder lanzarla",
+	-- P3, 22 oct: al dueno, cuando por pasar el tope de bolsas caidas su
+	-- bolsa mas antigua se recicla sola y sin bonus. {dinero} es lo cobrado,
+	-- con Idioma.dinero (ya trae el "$")
+	bolsaViejaReciclada = "Demasiadas bolsas en el suelo: la más vieja se recicló sola por {dinero}, sin bonus",
 }
 
 -- Celebraciones (5 oct, peticion del usuario: sin toasts al cobrar): letras
@@ -195,10 +198,8 @@ Textos.TIENDA = {
 	dePago = "Pase de Robux",
 	conRebirth = "Regalo del Rebirth {n}",
 	maximo = "MÁXIMO",
-	comprar = "Comprar",
 	comprado = "Comprado",
 	equipar = "Equipar",
-	equipado = "Equipado",
 	quitar = "Quitar",
 	robux = "{precio} Robux",
 	sinIds = "Producto no disponible todavía",
@@ -257,10 +258,12 @@ Textos.TURBO = {
 Textos.NOTIFICACIONES = {
 	bienvenida = "¡Bienvenido a Recíclatas! Excava un montón del patio y lanza la bolsa a un contenedor. Si separas por colores, pagan el doble.",
 	perfilNoCargado = "No se pudo cargar tu progreso. Esta sesión no se guardará.",
-	guardado = "Progreso guardado",
 	compraRobux = "Compra completada: {nombre}",
 	cintaEncontrada = "¡Cinta encontrada: {nombre}!",
-	tesoro = "Tesoro guardado en la bolsa",
+	-- P1, 22 oct: con esto se expulsa (Player:Kick) a quien abrio su partida
+	-- en otro servidor (bloqueo de sesion). Kick solo admite texto plano: el
+	-- servidor tiene que resolverlo en el idioma del jugador antes de enviarlo
+	sesionEnOtroServidor = "Tu partida se abrió en otro servidor. Vuelve a entrar para seguir jugando.",
 }
 
 -- Nombres de los materiales en minuscula, para frases ("recicla 40 de papel")

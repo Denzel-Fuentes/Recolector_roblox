@@ -15,6 +15,9 @@
 	borraron los scripts y solo se apuntaron aqui los ids de las IMAGENES (el
 	origen de cada una, en assets/ui/README.md). Las claves que siguen a 0 no
 	tienen equivalente en ese set y se dibujan con Glifos.
+
+	Las claves de lo que la v2 quito (gema, sobre, contenedorDorado, pocion)
+	se borraron el 22 oct: la prueba sinRestos falla si vuelven.
 ]]
 
 local Iconos = {}
@@ -22,7 +25,6 @@ local Iconos = {}
 Iconos.IMAGENES = {
 	-- HUD (prioridad 1)
 	billete = 15402858705, -- CashIcon
-	gema = 17368064384, -- GemIcon
 	rayo = 17368078790, -- Energy
 	bolsa = 15402958715, -- Inventory (mochila): lo que cabe
 	libreta = 127110909372919, -- Index (libro): el album
@@ -37,8 +39,6 @@ Iconos.IMAGENES = {
 	flecha = 15403007921, -- Strength (brazo): fuerza de lanzamiento
 
 	-- Paneles (prioridad 2)
-	sobre = 17368122337, -- RNG/Box (caja misteriosa)
-	contenedorDorado = 17368402884, -- RNG/Crate
 	estrella = 17368097932, -- Star
 	corona = 16912465495, -- VIP
 	check = 17368190066, -- Accept
@@ -52,7 +52,6 @@ Iconos.IMAGENES = {
 	bota = 17368052918, -- Speed (zapatilla)
 	cofre = 15402896733, -- GemChest
 	cruz = 17368208554, -- Deny
-	pocion = 15403275152, -- BluePotion: el refresco (mejora Chispa)
 
 	-- Tipos de basura (contenedores, pedidos)
 	setMetal = 0,

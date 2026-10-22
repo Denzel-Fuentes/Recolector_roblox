@@ -20,7 +20,6 @@ return {
 		rebirth = "Rebirth",
 		pedidos = "Pedidos",
 		camara = "Câmera",
-		lanzar = "Jogar",
 		mantenerLanzar = "SEGURE PARA JOGAR",
 		tocarLanzar = "SEGURE",
 		mantenerRecoger = "SEGURE PARA PEGAR",
@@ -30,7 +29,6 @@ return {
 		fuerza = "Força",
 		bonusAqui = "+{pct} %",
 		bolsaLlenaBarra = "CHEIO!",
-		cerrar = "Fechar",
 	},
 
 	MUNDO = {
@@ -82,13 +80,15 @@ return {
 		demasiadoCerca = "Afaste-se um pouco para jogar",
 		sinDinero = "Você não tem dinheiro suficiente",
 		figurinaEncontrada = "Figurinha encontrada: {nombre}!",
-		figurinaYaTienes = "Você já tem esta figurinha",
 		patioLleno = "Lixão cheio: espere um pouco",
 		montonPendiente = "Termine sua pilha primeiro",
 		monton = "Pilha de lixo",
 		montonRico = "Pilha com muito {material}",
 		materialBloqueado = "{material}: Rebirth {n}",
 		prioridad = "Espere {s} s: é de {dueno}",
+		-- P3, 22 oct
+		bolsaNoLlena = "Encha o saco para poder jogá-lo",
+		bolsaViejaReciclada = "Sacos demais no chão: o mais antigo foi reciclado sozinho por {dinero}, sem bônus",
 	},
 
 	CELEBRACION = {
@@ -167,10 +167,8 @@ return {
 		dePago = "Passe de Robux",
 		conRebirth = "Prêmio do Rebirth {n}",
 		maximo = "MÁXIMO",
-		comprar = "Comprar",
 		comprado = "Comprado",
 		equipar = "Equipar",
-		equipado = "Equipado",
 		quitar = "Tirar",
 		robux = "{precio} Robux",
 		sinIds = "Produto ainda não disponível",
@@ -225,10 +223,10 @@ return {
 	NOTIFICACIONES = {
 		bienvenida = "Bem-vindo ao Recíclatas! Cave uma pilha do lixão e jogue o saco numa lixeira. Se separar por cores, paga o dobro.",
 		perfilNoCargado = "Não foi possível carregar seu progresso. Esta sessão não será salva.",
-		guardado = "Progresso salvo",
 		compraRobux = "Compra concluída: {nombre}",
 		cintaEncontrada = "Fita encontrada: {nombre}!",
-		tesoro = "Tesouro guardado no saco",
+		-- P1, 22 oct
+		sesionEnOtroServidor = "Sua partida foi aberta em outro servidor. Entre de novo para continuar jogando.",
 	},
 
 	MATERIALES = {
