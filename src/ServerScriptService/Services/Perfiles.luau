@@ -2,33 +2,43 @@
 --[[
 	Perfiles (ModuleScript)
 	Unica responsabilidad: el perfil de cada jugador EN MEMORIA y su
-	publicacion al cliente. No sabe nada de DataStore: eso es DataService, que
-	llama a registrar() al entrar y lee snapshot() al guardar.
+	publicacion al cliente. No sabe nada de DataStore: eso es Guardado, que
+	llama a registrar() al entrar, lee snapshot() al guardar y quitar() tras
+	el guardado de salida.
 
 	=== Dos banderas distintas (leccion de Fly_Roblox) ===
 
 	  cargado    la lectura del DataStore tuvo exito. Solo entonces se puede
 	             GUARDAR: escribir un perfil por defecto encima del real seria
 	             destruir el progreso. Un perfil no cargado se juega igual, pero
-	             DataService se niega a persistirlo.
+	             Guardado se niega a persistirlo. Se publica en el atributo
+	             PerfilListo del Player (nil mientras carga: la pantalla de
+	             carga espera a que exista, sea true o false).
 	  sucio      hubo cambios desde la ultima publicacion al cliente. Se vacia en
 	             el siguiente Heartbeat (maximo 4 envios/s por jugador).
 
 	Se envia el perfil ENTERO cada vez (PerfilEvent): son unos pocos KB y el
-	cliente nunca puede quedarse desincronizado por un parche perdido.
+	cliente nunca puede quedarse desincronizado por un parche perdido. La
+	sesion del bloqueo (Guardado) va en el registro del DataStore, fuera del
+	perfil: nunca viaja al cliente.
 
 	Lo que NO esta en el perfil porque no persiste: la bolsa y lo que vuela.
 
-	=== Version 3 (diseno v2, 26 sep) ===
-	El esquema entero de la v2 esta aqui desde el primer lote (rebirths,
-	pedidos, cosmeticos), aunque cada sistema llegue en su lote: asi no hace
-	falta migrar entre lotes. Las mascotas y sus fragmentos se quitaron el
-	3 oct y los trajes el 5: completar borra sus campos (OBSOLETOS) de un
-	perfil guardado antes, para que no viajen al cliente ni se vuelvan a
-	guardar.
-	No hay migracion desde la v2: el juego nunca se publico, no existen
-	perfiles reales, y el DataStore cambia de nombre (GameConfig).
-	`completar` solo rellena las claves que falten.
+	=== Al salir: alSalir ===
+	Guardado dispara alSalir ANTES del guardado de salida (antes se esperaban
+	0,2 s a que los demas tocaran el perfil). Quien tenga que dejar algo en el
+	perfil al salir (Bolsa recicla lo que llevaba, los rankings publican) se
+	conecta aqui y lo hace SIN ceder antes: Senal arranca cada callback en su
+	hilo y el guardado empieza en cuanto todos ceden o acaban.
+
+	=== Versiones ===
+	v3 (diseno v2, 26 sep): el esquema entero de la v2. v4 (22 oct): store
+	nuevo y perfiles desde cero (GameConfig), mas los ajustes de sonido.
+	`completar` primero MIGRA (MIGRACIONES[v] lleva un perfil de v-1 a v, una
+	version tras otra) y despues rellena las claves que falten y borra las
+	OBSOLETAS (campos de sistemas quitados: las mascotas el 3 oct, los trajes
+	el 5). Rellenar ya cubre los campos nuevos: una migracion solo hace falta
+	cuando algo cambia de forma o de sentido.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -77,6 +87,7 @@ export type Perfil = {
 	tiempoJugado: number,
 	ultimaSesion: number,
 	tutorial: number, -- pasos completados (DefinicionesTutorial)
+	ajustes: { musica: boolean, efectos: boolean }, -- sonido (v4)
 }
 
 local Perfiles = {}
@@ -88,11 +99,28 @@ Perfiles.extrasSnapshot = nil :: ((Player) -> any)?
 
 Perfiles.alCargar = Senal.nueva() :: Senal.Senal<Player, Perfil>
 Perfiles.alCambiar = Senal.nueva() :: Senal.Senal<Player, Perfil>
+-- Lo dispara Guardado al salir cada jugador, ANTES de su guardado de salida
+-- (ver cabecera). El perfil es nil si se fue antes de que cargara.
+Perfiles.alSalir = Senal.nueva() :: Senal.Senal<Player, Perfil?>
 
 local perfiles: { [Player]: Perfil } = {}
 local cargados: { [Player]: boolean } = {}
 local sucios: { [Player]: boolean } = {}
 local ultimoEnvio: { [Player]: number } = {}
+-- Copia del perfil tal y como llego del DataStore, antes de que registrar lo
+-- toque (ultimaSesion, la semana): el bono de regreso mira cuando jugo antes
+local anteriores: { [Player]: Perfil } = {}
+
+local function copiaProfunda(valor: any): any
+	if typeof(valor) ~= "table" then
+		return valor
+	end
+	local copia = {}
+	for clave, v in valor do
+		copia[clave] = copiaProfunda(v)
+	end
+	return copia
+end
 
 local PerfilEvent = Red.evento("PerfilEvent")
 
@@ -121,19 +149,50 @@ function Perfiles.porDefecto(): Perfil
 		tiempoJugado = 0,
 		ultimaSesion = 0,
 		tutorial = 0,
+		ajustes = { musica = true, efectos = true },
 	}
 end
 
 -- Campos de sistemas quitados (las mascotas, 3 oct; los trajes, 5 oct)
 local OBSOLETOS = { "mascotas", "equipadas", "fragmentos", "pityMascotas", "fragmentosLibres", "trajes", "trajePuesto" }
 
--- Rellena lo que falte con el perfil por defecto (campos nuevos) sin tocar lo
--- que ya hay, y borra lo OBSOLETO. Las mejoras se completan por id por si se
--- anade una.
-function Perfiles.completar(datos: any): Perfil
+-- Tablas cuyas claves se completan una a una (una mejora o un ajuste nuevo
+-- en un perfil que ya tenia la tabla). Las demas tablas son datos del
+-- jugador (listas, contadores) y se dejan como estan.
+local COMPLETAR_POR_CLAVE = { "mejoras", "ajustes" }
+
+-- MIGRACIONES[v](datos): lleva un perfil de la version v-1 a la v. Solo para
+-- lo que cambia de forma o de sentido: los campos nuevos los pone completar.
+-- No hay perfiles v3 en el store v4 (empieza de cero), pero la cadena queda
+-- lista para la siguiente version y la prueba "migracionPerfil" la recorre.
+Perfiles.MIGRACIONES = {
+	-- v4: los ajustes de sonido existen y arrancan encendidos
+	[4] = function(datos: any)
+		if typeof(datos.ajustes) ~= "table" then
+			datos.ajustes = { musica = true, efectos = true }
+		end
+	end,
+} :: { [number]: (datos: any) -> () }
+
+-- Migra (version a version, hasta `hasta`; por defecto VERSION_PERFIL),
+-- rellena lo que falte con el perfil por defecto sin tocar lo que ya hay y
+-- borra lo OBSOLETO. Un perfil de una version MAS NUEVA (otro servidor con
+-- codigo mas reciente) conserva su version: no se le baja, y sus campos
+-- desconocidos se guardan tal cual.
+function Perfiles.completar(datos: any, hasta: number?): Perfil
+	local objetivo = hasta or GameConfig.VERSION_PERFIL
 	local base = Perfiles.porDefecto()
 	if typeof(datos) ~= "table" then
+		base.version = objetivo
 		return base
+	end
+	local desde = tonumber(datos.version) or 1
+	for v = desde + 1, objetivo do
+		local migrar = Perfiles.MIGRACIONES[v]
+		if migrar then
+			migrar(datos)
+		end
+		datos.version = v
 	end
 	for _, clave in OBSOLETOS do
 		datos[clave] = nil
@@ -142,15 +201,15 @@ function Perfiles.completar(datos: any): Perfil
 		local v = datos[clave]
 		if v == nil then
 			(datos :: any)[clave] = valorDefecto
-		elseif clave == "mejoras" and typeof(v) == "table" then
-			for id, nivel in pairs(valorDefecto) do
-				if v[id] == nil then
-					v[id] = nivel
+		elseif typeof(v) == "table" and table.find(COMPLETAR_POR_CLAVE, clave) then
+			for subclave, valor in pairs(valorDefecto) do
+				if v[subclave] == nil then
+					v[subclave] = valor
 				end
 			end
 		end
 	end
-	datos.version = GameConfig.VERSION_PERFIL
+	datos.version = math.max(desde, objetivo)
 	return datos :: Perfil
 end
 
@@ -167,16 +226,24 @@ function Perfiles.semanaAlDia(perfil: Perfil): { id: number, base: { [string]: n
 end
 
 function Perfiles.registrar(jugador: Player, perfil: Perfil, cargado: boolean)
+	anteriores[jugador] = copiaProfunda(perfil)
 	perfiles[jugador] = perfil
 	cargados[jugador] = cargado
 	perfil.ultimaSesion = os.time()
 	Perfiles.semanaAlDia(perfil)
 	sucios[jugador] = true
+	jugador:SetAttribute("PerfilListo", cargado)
 	Perfiles.alCargar:Fire(jugador, perfil)
 end
 
 function Perfiles.obtener(jugador: Player): Perfil?
 	return perfiles[jugador]
+end
+
+-- El perfil como llego al entrar (antes de que registrar pisara ultimaSesion
+-- y pusiera la semana al dia). Copia: cambiarla no toca el perfil vivo.
+function Perfiles.anterior(jugador: Player): Perfil?
+	return anteriores[jugador]
 end
 
 function Perfiles.esperar(jugador: Player, tiempoMax: number?): Perfil?
@@ -196,6 +263,7 @@ function Perfiles.quitar(jugador: Player)
 	cargados[jugador] = nil
 	sucios[jugador] = nil
 	ultimoEnvio[jugador] = nil
+	anteriores[jugador] = nil
 end
 
 function Perfiles.todos(): { [Player]: Perfil }
@@ -204,7 +272,8 @@ end
 
 -- Copia plana para enviar o guardar. El perfil ya es data pura (sin Instances
 -- ni funciones), asi que basta con devolverlo; existe como punto unico por si
--- algun dia hay que filtrar campos.
+-- algun dia hay que filtrar campos. La sesion del bloqueo no esta aqui: va en
+-- el registro del DataStore, al lado del perfil (Guardado).
 function Perfiles.snapshot(perfil: Perfil): Perfil
 	return perfil
 end
@@ -289,7 +358,7 @@ task.spawn(function()
 	end
 end)
 
--- La limpieza al salir la hace DataService (quitar) DESPUES de guardar, para
--- que el guardado siempre vea el perfil.
+-- La limpieza al salir la hace Guardado (quitar) DESPUES del guardado de
+-- salida, para que el guardado siempre vea el perfil.
 
 return Perfiles

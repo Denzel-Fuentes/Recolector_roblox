@@ -14,13 +14,32 @@ local GameConfig = {}
 
 GameConfig.NOMBRE_JUEGO = "Recíclatas"
 
--- === Persistencia ===
--- v3 (diseno v2, 26 sep): DataStore nuevo y sin migracion. El juego nunca se
--- publico, asi que no hay perfiles reales que convertir.
-GameConfig.NOMBRE_DATASTORE = "ReciclatasPerfiles_v3"
-GameConfig.VERSION_PERFIL = 3
+-- === Persistencia (Services/Guardado) ===
+-- v4 (22 oct, lanzamiento): los perfiles empiezan de cero en un store nuevo
+-- (decision del usuario: el de la v3 se abandona, no se borra). En Studio,
+-- Guardado le anade "_Studio" (como los rankings): las pruebas tocan el
+-- perfil y no deben acabar en el del juego publicado. Las versiones del
+-- perfil se migran una a una (Perfiles.MIGRACIONES).
+GameConfig.NOMBRE_DATASTORE = "ReciclatasPerfiles_v4"
+GameConfig.VERSION_PERFIL = 4
 GameConfig.INTERVALO_AUTOGUARDADO = 120
 GameConfig.REINTENTOS_DATASTORE = 3
+-- Bloqueo de sesion: cada autoguardado renueva el latido de la sesion. Una
+-- sesion de otro servidor con el latido mas viejo que SESION_CADUCA es de un
+-- servidor que murio sin liberarla y se toma sin esperar (5 autoguardados
+-- seguidos sin escribir: un servidor vivo nunca llega). Si esta viva (el
+-- jugador acaba de cambiar de servidor y el otro aun guarda su salida), se
+-- reintenta cada SESION_REINTENTO s y a los SESION_ESPERA_ROBO s se roba.
+-- Un reintento sin escribir no gasta el limite de 1 escritura cada 6 s por
+-- clave.
+GameConfig.SESION_CADUCA = 600
+GameConfig.SESION_ESPERA_ROBO = 20
+GameConfig.SESION_REINTENTO = 5
+-- Si la carga falla las REINTENTOS_DATASTORE veces, se juega con un perfil
+-- que no se guarda y se reintenta en segundo plano: la primera vez a los
+-- tantos segundos, y cada vez el doble (hasta 5 minutos) mientras siga
+-- conectado
+GameConfig.REINTENTO_CARGA_FONDO = 30
 
 -- === Mejoras (valores y costes en DefinicionesMejoras) ===
 GameConfig.NIVEL_MAX_MEJORA = 10

@@ -35,7 +35,6 @@
 	el dinero por una caida de conexion es un castigo injusto).
 ]]
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
@@ -264,14 +263,18 @@ function Bolsa.depositar(jugador: Player, materialContenedor: string?): (Resumen
 end
 
 -- Recicla sin bonus, sin senales y sin tocar la bolsa en mano: al
--- desconectar (DataService espera un instante antes del guardado final) y
--- para una bolsa perdida que nadie recogio (Lanzamiento).
+-- desconectar (Perfiles.alSalir, antes del guardado de salida) y para una
+-- bolsa perdida que nadie recogio (Lanzamiento).
 function Bolsa.reciclarSinBonus(jugador: Player, items: { Item }): ResumenDeposito
 	local resumen = cobrar(jugador, items, 0)
 	Perfiles.estadistica(jugador, "objetosReciclados", resumen.objetos)
 	return resumen
 end
 
+-- Al salir, en Perfiles.alSalir: Guardado lo dispara ANTES del guardado de
+-- salida, asi que el dinero ya esta en el perfil que se escribe. Sin ceder
+-- en ningun momento (el guardado empieza en cuanto esto acaba). Llega
+-- tambien sin perfil (se fue antes de cargar): entonces solo se limpia.
 local function vaciarAlSalir(jugador: Player)
 	local items = bolsas[jugador]
 	bolsas[jugador] = nil
@@ -281,7 +284,7 @@ local function vaciarAlSalir(jugador: Player)
 	Bolsa.reciclarSinBonus(jugador, items)
 end
 
-Players.PlayerRemoving:Connect(vaciarAlSalir)
+Perfiles.alSalir:Connect(vaciarAlSalir)
 
 Perfiles.alCargar:Connect(function(jugador)
 	Bolsa.publicar(jugador)

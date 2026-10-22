@@ -51,8 +51,9 @@ DefinicionesRankings.LEER = 100
 -- jugador; 6 lecturas cada 2 min caben de sobra
 DefinicionesRankings.INTERVALO_LECTURA = 120
 DefinicionesRankings.INTERVALO_ESCRITURA = 120
--- Cambiarla empieza rankings nuevos, vacios (los viejos se quedan sin leer)
-DefinicionesRankings.VERSION = 1
+-- Cambiarla empieza rankings nuevos, vacios (los viejos se quedan sin leer).
+-- 2 (22 oct): tablones limpios para el lanzamiento, con los perfiles v4
+DefinicionesRankings.VERSION = 2
 
 -- La semana de un instante (os.time). El 1 ene 1970 fue jueves: sumar 3 dias
 -- hace que cada semana empiece el lunes a las 00:00 UTC

@@ -85,9 +85,26 @@ end
 -- que cambio
 local escritos: { [Player]: { [string]: number } } = {}
 
+-- Publicaciones con escrituras en curso: el cierre del servidor las espera
+-- (antes las de los que salian al cerrar se perdian)
+local enVuelo = 0
+
+function Rankings.escriturasEnVuelo(): number
+	return enVuelo
+end
+
+-- Espera a que acaben las escrituras en curso, como mucho `limite` s
+function Rankings.esperarEscrituras(limite: number): boolean
+	local fin = os.clock() + limite
+	while enVuelo > 0 and os.clock() < fin do
+		task.wait(0.1)
+	end
+	return enVuelo == 0
+end
+
 -- Escribe los valores del jugador que cambiaron. Devuelve cuantos escribio.
 -- Los valores se calculan antes de la primera espera, asi que vale llamarlo
--- en PlayerRemoving aunque el perfil desaparezca despues.
+-- desde Perfiles.alSalir aunque el perfil desaparezca despues.
 function Rankings.publicar(jugador: Player): number
 	if not Perfiles.estaCargado(jugador) then
 		return 0
@@ -110,8 +127,12 @@ function Rankings.publicar(jugador: Player): number
 			end
 		end
 	end
+	if #pendientes == 0 then
+		return 0
+	end
 	local clave = tostring(jugador.UserId)
 	local escritas = 0
+	enVuelo += 1
 	for _, p in pendientes do
 		if not hayPresupuesto(Enum.DataStoreRequestType.SetIncrementSortedAsync) then
 			break
@@ -130,6 +151,7 @@ function Rankings.publicar(jugador: Player): number
 			end
 		end
 	end
+	enVuelo -= 1
 	return escritas
 end
 

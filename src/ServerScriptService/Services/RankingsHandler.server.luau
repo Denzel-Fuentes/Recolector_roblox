@@ -2,9 +2,11 @@
 --[[
 	RankingsHandler
 	Cableado de los rankings (Services/Rankings): cada INTERVALO_ESCRITURA
-	publica los valores de cada jugador (y al salir), cada INTERVALO_LECTURA
-	lee los primeros puestos y los manda a todos (RankingsEvent). Un cliente
-	que acaba de entrar pide la ultima lectura con RankingsEvent:FireServer().
+	publica los valores de cada jugador (y al salir, en Perfiles.alSalir),
+	cada INTERVALO_LECTURA lee los primeros puestos y los manda a todos
+	(RankingsEvent). Un cliente que acaba de entrar pide la ultima lectura con
+	RankingsEvent:FireServer(). Al cerrar el servidor se publica a quien
+	quede y se esperan las escrituras en curso (antes se perdian).
 ]]
 
 local Players = game:GetService("Players")
@@ -14,6 +16,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local DefinicionesRankings = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesRankings"))
 local Red = require(Shared:WaitForChild("Utilidades"):WaitForChild("Red"))
 
+local Perfiles = require(script.Parent:WaitForChild("Perfiles"))
 local Rankings = require(script.Parent:WaitForChild("Rankings"))
 
 local RankingsEvent = Red.evento("RankingsEvent")
@@ -35,10 +38,21 @@ end)
 
 Players.PlayerRemoving:Connect(function(jugador)
 	ultimoPedido[jugador] = nil
-	-- Rankings.publicar calcula antes de esperar: el perfil todavia esta
-	-- (DataService lo quita despues de guardar)
+end)
+
+-- Antes del guardado de salida: Rankings.publicar calcula los valores sin
+-- ceder (el perfil todavia esta: Guardado lo quita despues de guardar) y
+-- solo entonces escribe
+Perfiles.alSalir:Connect(function(jugador)
 	Rankings.publicar(jugador)
 	Rankings.olvidar(jugador)
+end)
+
+game:BindToClose(function()
+	for _, jugador in Players:GetPlayers() do
+		task.spawn(Rankings.publicar, jugador)
+	end
+	Rankings.esperarEscrituras(25)
 end)
 
 -- Escritura: cada jugador por su lado, repartidos en el intervalo para no

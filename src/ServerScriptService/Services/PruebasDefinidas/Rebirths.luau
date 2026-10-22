@@ -27,14 +27,18 @@ local function ok(cond: boolean): string
 	return if cond then "OK" else "FALLO"
 end
 
--- Guarda y restaura lo que tocan las pruebas de rebirth
+-- Guarda y restaura lo que tocan las pruebas de rebirth (tambien los
+-- cosmeticos: "renacer" se pone la estela para ver que se conserva, y antes
+-- se quedaba puesta en el perfil)
 local function copiar(p)
-	return { dinero = p.dinero, rebirths = p.rebirths, mejoras = table.clone(p.mejoras) }
+	return { dinero = p.dinero, rebirths = p.rebirths, mejoras = table.clone(p.mejoras), estela = p.estela, disenoBolsa = p.disenoBolsa }
 end
 local function restaurar(j, p, copia)
 	p.dinero = copia.dinero
 	p.rebirths = copia.rebirths
 	p.mejoras = copia.mejoras
+	p.estela = copia.estela
+	p.disenoBolsa = copia.disenoBolsa
 	Perfiles.marcarSucio(j)
 end
 

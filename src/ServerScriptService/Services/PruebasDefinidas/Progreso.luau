@@ -1,6 +1,6 @@
 --!nonstrict
 --[[
-	Pruebas de progreso y economia: estado y forma del perfil v3, dinero,
+	Pruebas de progreso y economia: estado y forma del perfil v4, dinero,
 	mejoras (las 4 de la v2 y el Brazo), aparicion en la plaza, tutorial,
 	coleccionables, pases, y que no quede nada de lo que la v2 quito.
 ]]
@@ -99,12 +99,14 @@ function Pruebas.darColeccionable(tipo, id)
 	return string.format("%s %s nuevo=%s", tipo, tostring(id), tostring(nuevo))
 end
 
--- El perfil v3 trae el esquema entero de la v2 y completar() rellena sin pisar
-function Pruebas.perfilV3()
+-- El perfil v4 (22 oct) trae el esquema entero de la v2 mas los ajustes de
+-- sonido; completar() migra y rellena sin pisar, y la sesion del bloqueo no
+-- esta en el perfil (no viaja al cliente)
+function Pruebas.perfilV4()
 	local base = Perfiles.porDefecto()
 	local claves = {
 		"dinero", "mejoras", "rebirths", "pedidos", "racha", "turboHasta", "figurinas",
-		"cintas", "logros", "estadisticas", "semana", "recibos", "pasesCache", "tutorial",
+		"cintas", "logros", "estadisticas", "semana", "recibos", "pasesCache", "tutorial", "ajustes",
 	}
 	local faltan = {}
 	for _, c in claves do
@@ -127,11 +129,21 @@ function Pruebas.perfilV3()
 		nMejoras += 1
 	end
 	local viejo = Perfiles.completar({ dinero = 55, mejoras = { Bolsa = 3 } })
-	return string.format("v%d, faltan [%s], sobran [%s], %d mejoras | completar: dinero=%d Bolsa=%d Brazo=%d rebirths=%d => %s",
-		base.version, table.concat(faltan, ","), table.concat(sobran, ","), nMejoras,
-		viejo.dinero, viejo.mejoras.Bolsa, viejo.mejoras.Brazo, viejo.rebirths,
-		ok(base.version == 3 and #faltan == 0 and #sobran == 0 and nMejoras == 4
-			and viejo.dinero == 55 and viejo.mejoras.Bolsa == 3 and viejo.mejoras.Brazo == 0 and viejo.rebirths == 0 and viejo.version == 3))
+	local ajustesOk = base.ajustes.musica == true and base.ajustes.efectos == true
+		and typeof(viejo.ajustes) == "table" and viejo.ajustes.musica == true
+	-- La sesion va en el registro del DataStore, no en el perfil
+	local j = Players:GetPlayers()[1]
+	local vivo = j and Perfiles.obtener(j)
+	local sinSesion = Perfiles.snapshot(base).sesion == nil and (not vivo or Perfiles.snapshot(vivo).sesion == nil)
+	-- anterior: copia de como llego (ultimaSesion de la vez anterior, 0 si es nuevo)
+	local anterior = j and Perfiles.anterior(j)
+	local anteriorOk = not vivo or (anterior ~= nil and anterior ~= vivo and anterior.ultimaSesion < vivo.ultimaSesion)
+	return string.format("v%d, faltan [%s], sobran [%s], %d mejoras, ajustes=%s, sin sesion en el snapshot=%s, anterior.ultimaSesion=%s (ahora %s) | completar: dinero=%d Bolsa=%d Brazo=%d rebirths=%d v%d => %s",
+		base.version, table.concat(faltan, ","), table.concat(sobran, ","), nMejoras, tostring(ajustesOk), tostring(sinSesion),
+		tostring(anterior and anterior.ultimaSesion), tostring(vivo and vivo.ultimaSesion),
+		viejo.dinero, viejo.mejoras.Bolsa, viejo.mejoras.Brazo, viejo.rebirths, viejo.version,
+		ok(base.version == 4 and #faltan == 0 and #sobran == 0 and nMejoras == 4 and ajustesOk and sinSesion and anteriorOk
+			and viejo.dinero == 55 and viejo.mejoras.Bolsa == 3 and viejo.mejoras.Brazo == 0 and viejo.rebirths == 0 and viejo.version == 4))
 end
 
 -- Las 4 mejoras del diseno v2: valores en 0 y 10, costes y total $118.030
