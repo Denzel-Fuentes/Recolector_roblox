@@ -13,6 +13,10 @@
 	entra y los cinco primeros llevan linea de trayectoria (Lanzamiento,
 	ControlPatio); todos aparecen en la plaza, con el patio a la vista
 	(AparicionHandler).
+
+	alCompletar(jugador, idPaso, indice) avisa de cada paso completado (el
+	embudo de inicio de la analitica). Fijar el paso a mano (fijar: admin y
+	pruebas) no avisa: no es un paso hecho.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,6 +24,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local DefinicionesTutorial = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesTutorial"))
+local Senal = require(Shared:WaitForChild("Utilidades"):WaitForChild("Senal"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
 local Perfiles = require(Servicios:WaitForChild("Perfiles"))
@@ -32,6 +37,10 @@ local Pedidos = require(Servicios:WaitForChild("Pedidos"))
 local Rebirths = require(Servicios:WaitForChild("Rebirths"))
 
 local Tutorial = {}
+
+-- (jugador, id del paso, su posicion 1..TOTAL) al completar cada paso, en
+-- orden (antes de completar los siguientes que ya se cumplan)
+Tutorial.alCompletar = Senal.nueva() :: Senal.Senal<Player, string, number>
 
 function Tutorial.completados(jugador: Player): number
 	local perfil = Perfiles.obtener(jugador)
@@ -68,6 +77,7 @@ function Tutorial.completar(jugador: Player, id: string)
 	end
 	perfil.tutorial = (perfil.tutorial or 0) + 1
 	Perfiles.marcarSucio(jugador)
+	Tutorial.alCompletar:Fire(jugador, id, perfil.tutorial)
 	local siguiente = DefinicionesTutorial.actual(perfil.tutorial)
 	if siguiente and yaCumple(jugador, siguiente.id) then
 		Tutorial.completar(jugador, siguiente.id)
