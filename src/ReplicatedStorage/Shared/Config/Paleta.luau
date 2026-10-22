@@ -141,6 +141,9 @@ Paleta.MUNDO = {
 	BORDE_PATIO = Color3.fromRGB(214, 48, 49),
 	TIERRA = Color3.fromRGB(172, 138, 96),
 	TIERRA_OSCURA = Color3.fromRGB(150, 116, 80),
+	-- cajas de carton del decorado: color fijo. Seguian a Paleta.TIPO.Papel y
+	-- salieron celestes al hornear tras el cambio de color del papel (6 oct)
+	CARTON = Color3.fromRGB(145, 125, 93),
 	MADERA = Color3.fromRGB(216, 168, 107),
 	MADERA_CLARA = Color3.fromRGB(236, 196, 140),
 	VIGA = Color3.fromRGB(138, 90, 51),

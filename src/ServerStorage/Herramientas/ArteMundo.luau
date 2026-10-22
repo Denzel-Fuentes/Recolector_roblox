@@ -540,8 +540,8 @@ end
 function ArteMundo.caja(padre, cf, tamano)
 	local m = modelo("Caja", padre)
 	local s = tamano or Vector3.new(2.4, 2, 2.2)
-	parte({ Name = "Carton", Size = s, CFrame = cf * CFrame.new(0, s.Y / 2, 0), Color = Paleta.BASURA.Papel[1], Material = Enum.Material.Cardboard, Parent = m })
-	parte({ Name = "Cinta", Size = Vector3.new(s.X + 0.02, 0.35, s.Z + 0.02), CFrame = cf * CFrame.new(0, s.Y - 0.2, 0), Color = Paleta.escalar(Paleta.BASURA.Papel[1], 0.8), Material = Enum.Material.Cardboard, Parent = m })
+	parte({ Name = "Carton", Size = s, CFrame = cf * CFrame.new(0, s.Y / 2, 0), Color = M.CARTON, Material = Enum.Material.Cardboard, Parent = m })
+	parte({ Name = "Cinta", Size = Vector3.new(s.X + 0.02, 0.35, s.Z + 0.02), CFrame = cf * CFrame.new(0, s.Y - 0.2, 0), Color = Paleta.escalar(M.CARTON, 0.8), Material = Enum.Material.Cardboard, Parent = m })
 	return m
 end
 
