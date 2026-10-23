@@ -12,7 +12,12 @@
 	Roblox confirme que el pase es suyo (UserOwnsGamePassAsync, con
 	REINTENTOS_PASE mas si aun dice que no: la compra tarda un momento en
 	verse). El "comprado" del evento no basta (revision P2, 23 oct): no es
-	una prueba de pago y no debe dar nada por si solo.
+	una prueba de pago y no debe dar nada por si solo. Las esperas entre
+	consultas doblan hasta ~1 min: Roblox recuerda un "no" de
+	UserOwnsGamePassAsync unos 10 s (medido por la comunidad, sin documentar),
+	y con 3 consultas en 4 s una primera hecha antes de que la compra se viera
+	dejaba el "no" toda la ventana: el pase no llegaba hasta volver a entrar
+	(revision Q4b, 23 oct).
 
 	MODO DEV: SOLO EN STUDIO, con GameConfig.PASES_DEV_EN_STUDIO, todos los
 	pases cuentan como comprados para poder probar sus efectos sin ids reales.
@@ -101,9 +106,10 @@ Monetizacion.poseePase = function(userId: number, gamePassId: number): boolean?
 	end
 	return tiene == true
 end
--- Al confirmar una compra de pase: consultas de mas si aun no se ve, y cada
--- cuanto
-Monetizacion.REINTENTOS_PASE = 2
+-- Al confirmar una compra de pase: consultas de mas si aun no se ve, y la
+-- primera espera, que dobla en cada una (2, 4, 8, 16 y 32 s: la ultima
+-- consulta a los ~62 s; ver cabecera)
+Monetizacion.REINTENTOS_PASE = 5
 Monetizacion.ESPERA_REINTENTO_PASE = 2
 -- La hora de una compra (compras.ultimaRobux)
 Monetizacion.ahora = os.time
@@ -220,7 +226,7 @@ function Monetizacion.registrarCompraPase(jugador: Player, gamePassId: number): 
 	local confirmado = false
 	for intento = 0, Monetizacion.REINTENTOS_PASE do
 		if intento > 0 then
-			task.wait(Monetizacion.ESPERA_REINTENTO_PASE)
+			task.wait(Monetizacion.ESPERA_REINTENTO_PASE * 2 ^ (intento - 1))
 		end
 		if not jugador.Parent then
 			return nil

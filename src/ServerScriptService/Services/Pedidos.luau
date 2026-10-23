@@ -200,14 +200,18 @@ function Pedidos.generar(jugador: Player): { Pedido }
 end
 
 -- Si cambio el dia (o nunca hubo pedidos), los de hoy. Si es el mismo dia y
--- tiene VIP pero no su pedido (el pase llego con el dia empezado), se anade
+-- tiene VIP pero no su pedido (el pase llego con el dia empezado), se anade.
+-- El dia solo avanza ("menor que", como Recompensas): un perfil con un dia
+-- guardado por delante del de hoy (un servidor con el reloj algo atrasado
+-- justo al cruzar las 06:00 UTC) no vuelve a generar ni a pagar los de hoy
+-- (revision Q4b, 23 oct)
 function Pedidos.asegurarDia(jugador: Player)
 	local perfil = Perfiles.obtener(jugador)
 	if not perfil or not Pedidos.abiertos(jugador) then
 		return
 	end
 	local hoy = DefinicionesPedidos.dia(Pedidos.ahora())
-	if perfil.pedidos.dia ~= hoy or #perfil.pedidos.lista == 0 then
+	if (tonumber(perfil.pedidos.dia) or 0) < hoy or #perfil.pedidos.lista == 0 then
 		perfil.pedidos = { dia = hoy, lista = Pedidos.generar(jugador), premioCobrado = false }
 		Perfiles.marcarSucio(jugador)
 	elseif tieneVip(jugador) and completarVip(jugador, perfil.pedidos.lista) > 0 then
@@ -299,7 +303,7 @@ function Pedidos.iniciar()
 	-- Al abrirse (paso del tutorial) o al cambiar de dia con la sesion
 	-- abierta; y el espejo de los premios, por si renacio
 	Perfiles.alCambiar:Connect(function(jugador, perfil)
-		if Pedidos.abiertos(jugador) and perfil.pedidos.dia ~= DefinicionesPedidos.dia(Pedidos.ahora()) then
+		if Pedidos.abiertos(jugador) and (tonumber(perfil.pedidos.dia) or 0) < DefinicionesPedidos.dia(Pedidos.ahora()) then
 			Pedidos.asegurarDia(jugador)
 		end
 		refrescarPremios(jugador, perfil)

@@ -10,8 +10,14 @@
 	no haya un primer personaje antes de que corra este script): el primer
 	personaje se carga cuando el perfil ya esta registrado. Asi nada que
 	dependa del perfil (velocidad, grupo de colision por rebirth) ve
-	un personaje sin perfil. Si el perfil no llega nunca, a los
-	15 s se carga igual: un jugador sin personaje es peor que uno sin guardar.
+	un personaje sin perfil. Si el DataStore falla, Guardado registra
+	enseguida un perfil provisional (se juega sin guardar) y el personaje
+	sale. Sin ningun perfil es que Guardado espera la sesion de otro servidor
+	(hasta SESION_ESPERA_ROBO s): el respaldo va 15 s por encima, como
+	Monetizacion.ESPERA_PERFIL. Con los 15 s de antes se jugaban ~45 s sin
+	perfil y lo reciclado se perdia (Economia.ganar no tiene donde sumar;
+	revision Q4b, 23 oct). Si aun asi no llega, se carga igual: un jugador
+	sin personaje es peor que uno sin guardar.
 
 	Llevarlo a la plaza es un salto del servidor: se avisa a Movimiento
 	(permitirSalto, con el destino) para que no lo tome por un teletransporte
@@ -20,14 +26,19 @@
 ]]
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
+
+local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("GameConfig"))
 
 local Servicios = ServerScriptService:WaitForChild("Services")
 local Perfiles = require(Servicios:WaitForChild("Perfiles"))
 local Mundo = require(Servicios:WaitForChild("Mundo"))
 local Movimiento = require(Servicios:WaitForChild("Movimiento"))
 
-local RESPALDO_SIN_PERFIL = 15
+-- (ver cabecera; Client/Carga quita la pantalla de carga a los 90 s pase lo
+-- que pase: tiene que ir por encima)
+local RESPALDO_SIN_PERFIL = GameConfig.SESION_ESPERA_ROBO + 15
 
 Players.CharacterAutoLoads = false
 

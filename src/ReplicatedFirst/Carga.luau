@@ -18,10 +18,14 @@
 	  - el perfil respondio: atributo PerfilListo del Player (nil mientras
 	    carga; true si cargo, false si se juega sin guardar, de lo que ya
 	    avisa el servidor con una notificacion);
-	  - ya hay personaje: AparicionHandler lo crea a los 15 s aunque el
-	    perfil no llegue, y entonces el jugador ya puede moverse.
+	  - ya hay personaje: AparicionHandler lo crea aunque el perfil no
+	    llegue, a los SESION_ESPERA_ROBO + 15 s (75: lo que puede tardar en
+	    soltar la sesion otro servidor), y entonces el jugador ya puede
+	    moverse.
 	Red de seguridad: a los SEGUNDOS_TOPE se quita pase lo que pase, para que
-	un fallo nunca deje a nadie detras de la pantalla.
+	un fallo nunca deje a nadie detras de la pantalla. Va por encima de esos
+	75 s (si no, se quitaria sin personaje todavia); aqui no se puede leer
+	GameConfig antes de game:IsLoaded(), por eso el numero va copiado.
 
 	=== Que se ve ===
 	Fondo marino con studs; el titulo (CARGA.titulo, en mayusculas como las
@@ -134,7 +138,7 @@ local HUECO_CONSEJO = 30
 local SEGUNDOS_PROGRESO = 8 -- sin perfil a los 8 s: CARGA.progreso en el titulo
 local SEGUNDOS_CONSEJO = 6
 local SEGUNDOS_FUNDIDO = 0.6
-local SEGUNDOS_TOPE = 60 -- red de seguridad (ver cabecera)
+local SEGUNDOS_TOPE = 90 -- red de seguridad, por encima de los 75 s del servidor (ver cabecera)
 local SALIDA_TEXTO = 0.18
 local ENTRADA_TEXTO = 0.3
 

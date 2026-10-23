@@ -186,8 +186,11 @@ local LARGO_MAX_ID = 16
 
 -- (objetoId, porMira?): porMira = la recogida automatica de la mira en el
 -- movil (mismas reglas que el clic, sin avisos de rechazo)
+-- Sin perfil (aun cargando) no se recoge ni se lanza, como en los prompts:
+-- lo que se cobrara se perderia (Economia.ganar no tiene donde sumar)
 ReclamarObjetoEvent.OnServerEvent:Connect(function(jugador, objetoId, porMira)
-	if typeof(objetoId) ~= "string" or #objetoId > LARGO_MAX_ID or enCooldown(jugador, "reclamar", GameConfig.COOLDOWN_REMOTE) then
+	if typeof(objetoId) ~= "string" or #objetoId > LARGO_MAX_ID or not Perfiles.obtener(jugador)
+		or enCooldown(jugador, "reclamar", GameConfig.COOLDOWN_REMOTE) then
 		return
 	end
 	Botin.reclamar(jugador, objetoId, if porMira == true then "mira" else "clic")
@@ -196,7 +199,7 @@ end)
 -- (punto, fuerza): lo que no sea un Vector3 y un numero finitos con el punto
 -- en el mapa se ignora sin gastar el cooldown
 LanzarObjetoEvent.OnServerEvent:Connect(function(jugador, punto, fuerza)
-	if not Lanzamiento.argumentosValidos(punto, fuerza) or enCooldown(jugador, "lanzar", 0.4) then
+	if not Lanzamiento.argumentosValidos(punto, fuerza) or not Perfiles.obtener(jugador) or enCooldown(jugador, "lanzar", 0.4) then
 		return
 	end
 	local ok, motivo = Botin.lanzarBolsa(jugador, punto, fuerza)

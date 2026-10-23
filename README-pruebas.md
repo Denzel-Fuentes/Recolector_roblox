@@ -97,7 +97,8 @@ juego publicado cada sospecha llega a la analítica como evento `Sospecha`
 cambiar de servidor, el nuevo espera a que el viejo termine de guardar la
 salida (normalmente unos segundos; si el viejo no la suelta, a los 60 s se la
 queda): mientras, la pantalla de carga sigue ("Cargando tu progreso…" desde
-los 8 s) y a los 15 s el personaje aparece aunque el perfil no haya llegado.
+los 8 s) y el personaje no aparece hasta que llega el perfil (como mucho a
+los 75 s; con el DataStore caído aparece enseguida y se juega sin guardar).
 Si un servidor intenta guardar un perfil que ya se llevó otro, echa al
 jugador con "Tu partida se abrió en otro servidor. Vuelve a entrar para
 seguir jugando." Para probarlo en el juego publicado: jugar un rato, pasar a
