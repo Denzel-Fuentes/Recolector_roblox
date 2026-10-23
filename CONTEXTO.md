@@ -25,7 +25,8 @@ siguiente rebirth, Pedido VIP, día a las 06:00 UTC; unido **sin terminar de
 verificar en Studio**) y las recompensas (R1: calendario de 7 días, regalos
 por minutos activos y bono de regreso); y de la 4, los 6 pases y los 2
 productos de Turbo creados en el Creator Hub con sus ids en `Config/Productos`
-(F1b, 23 oct). El usuario pausó el plan el 23 oct y lo retomó ese mismo día;
+(F1b, 23 oct) y las cinco miniaturas elegidas, subidas y aprobadas en los
+tres idiomas (I1b, 23 oct). El usuario pausó el plan el 23 oct y lo retomó ese mismo día;
 **K1** (catálogo: Turbo solo jugando, VIP, Pack de inicio, ofertas y precio
 real) se unió a master el 23 oct y, con E1 y N1b, quedó **verificado en
 Studio** ese mismo día (la batería entera en verde). La ficha del Creator Hub está hecha y el juego sigue
@@ -480,6 +481,16 @@ Lo no obvio de cada paquete:
   automática del contenido apagada** (las traducciones son las nuestras, ver
   "Idiomas"); cuestionario de madurez enviado (Minimal). Sigue privada:
   hacerla pública es del usuario, primero para 16+ y después Roblox Select.
+- **Miniaturas en el Creator Hub** (23 oct): las del idioma fuente van en
+  Places → el place → Thumbnails → **Experience Detail Page** (la
+  experiencia las hereda del place de inicio; la pestaña Home Page es otra
+  cosa, las personalizadas de la prueba A/B); las de inglés y portugués, en
+  Localization → Translate → el idioma → Information → Thumbnails, cada una
+  con su texto alternativo, y Save. En la del place, guardar un texto
+  alternativo recarga la lista y tira el orden que no se haya guardado:
+  primero los textos y al final ordenar y Save Changes. Máximo 4 MB por
+  imagen (las de hoy pesan 1,7–2,9 MB; una captura nativa a 1920 puede
+  pasarse).
 - **Imágenes de lanzamiento** (I1a, 22 oct): renders de Blender a 512×512 sin
   texto en `thumbnails/` (3 propuestas de icono, la 1 copiada a
   `icon_512.png`; las 20 insignias en bronce, plata y oro; los 6 pases y los 2
@@ -1599,23 +1610,21 @@ a origin/master). Lo que falta, en orden:
    24 h (el cupo se renueva a las 00:00 GMT y se consulta en
    `badges.roblox.com/v1/universes/10766595888/free-badges-quota`). Se
    traducen a en/pt en el Creator Hub al crearlas.
-7. **Miniaturas**: hechas (I1b, 23 oct) y elegidas por el usuario (G10):
-   01 (portada), 02, 03, 05 y 07 en `thumbnails/thumb_*` (las que llevan
-   texto, en `_es`, `_en` y `_pt`; `hoja-miniaturas.png` las enseña juntas).
-   Son capturas de Studio de 1424×801 ampliadas a 1920×1080: algo blandas;
-   para más nitidez, repetirlas con la vista de Studio a 1920 de ancho. **Subida
-   a medias**: en el Creator Hub (Places → el place → Thumbnails → Experience
-   Detail Page, porque la experiencia las hereda del place de inicio) solo
-   están la 01 y la 02_es, en orden inverso y sin texto alternativo
-   (moderación "Completed"); el control de permisos del modo automático paró
-   al agente al editarlas. Falta: subir la 03_es, 05_es y 07_es, ordenarlas
-   (01, 02, 03, 05, 07), los textos alternativos de la ficha §4.3, Save
-   Changes, y la serie entera en Localization → English y Portuguese →
-   Information. La 4, la 6 y la 8 piden varias cuentas (Q1). Ojo: Game
-   details enseñaba el nombre y la descripción en inglés; comprobar en
-   Localization que el idioma fuente sigue siendo el español. Los **pases y
-   productos** ya están (F1b, 23 oct: los 6 pases y los 2 Turbo con su
-   imagen de `thumbnails/` y sus traducciones, ids en `Config/Productos`).
+7. **Miniaturas**: hechas (I1b, 23 oct), elegidas por el usuario (G10) y
+   **subidas** ese mismo día: 01 (portada), 02, 03, 05 y 07 de
+   `thumbnails/thumb_*` (las que llevan texto, en `_es`, `_en` y `_pt`;
+   `hoja-miniaturas.png` las enseña juntas), en ese orden en los tres
+   idiomas, con los textos alternativos de la ficha §4.3 y las 15
+   **aprobadas por moderación** (cómo se suben: §3 "Miniaturas en el
+   Creator Hub"). Son capturas de Studio de 1424×801 ampliadas a 1920×1080:
+   algo blandas; para más nitidez, repetirlas con la vista de Studio a 1920
+   de ancho. Quedan la 4, la 6 y la 8, que piden varias cuentas (Q1), y la
+   pestaña Home Page (las miniaturas personalizadas, la prueba A/B de la
+   ficha §4.1 con la 1, la 2 y la 3), que sigue vacía. El idioma fuente
+   sigue siendo el español (comprobado en Localization el 23 oct). Los
+   **pases y productos** ya están (F1b, 23 oct: los 6 pases y los 2 Turbo
+   con su imagen de `thumbnails/` y sus traducciones, ids en
+   `Config/Productos`).
 8. **Verificación de lanzamiento**: Q0, la regresión completa (la batería de
    CLAUDE.md "Verificar", `("hud")` en PC, táctil y mando, el juego en inglés
    y en portugués, la consola limpia y capturas de cada panel) y Q4b (revisión
