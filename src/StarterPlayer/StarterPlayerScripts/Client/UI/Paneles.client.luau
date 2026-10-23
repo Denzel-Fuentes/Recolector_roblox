@@ -3,12 +3,17 @@
 	Paneles
 	Carga todos los paneles (cada modulo se registra en Menu al cargarse) y
 	pone los atajos globales: Esc / ButtonB cierran el panel abierto, y las
-	teclas de acceso rapido abren la Tienda (Q o T), Rebirth (R) y Pedidos
-	(P) (las que aun no existen se ignoran).
+	teclas de acceso rapido abren la Tienda (Q o T), Rebirth (R), Pedidos
+	(P) y Ajustes, el del boton Sonido (M, de Musica / Music: A1) (las que
+	aun no existen se ignoran).
+
+	Cada boton de panel del HUD necesita su tecla: en PC, sin panel abierto,
+	Camara bloquea el raton en el centro de la pantalla (primera y tercera
+	persona), asi que la botonera no se puede pulsar con el raton (visto en
+	Studio el 22 oct con el boton Sonido, que nacio sin atajo).
 
 	Los paneles se buscan por nombre y se ignoran los que no existan, para que
-	el juego arranque aunque una fase aun no este escrita. Ajustes (el panel
-	del boton Sonido, A1) no tiene atajo de teclado.
+	el juego arranque aunque una fase aun no este escrita.
 
 	Y el sonido de abrir y cerrar ventanas (Client/Sonido): "panelAbrir" al
 	pasar a un panel (tambien de uno a otro), "panelCerrar" al volver a no
@@ -63,6 +68,7 @@ local ATAJOS = {
 	[Enum.KeyCode.T] = "Tienda",
 	[Enum.KeyCode.R] = "Rebirth",
 	[Enum.KeyCode.P] = "Pedidos",
+	[Enum.KeyCode.M] = "Ajustes", -- el boton Sonido
 }
 
 UserInputService.InputBegan:Connect(function(input, procesado)
