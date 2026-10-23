@@ -123,6 +123,7 @@ Paleta.CABECERA_PANEL = {
 	Rebirth = Color3.fromRGB(146, 70, 245),
 	Pedidos = Color3.fromRGB(255, 142, 20),
 	Ajustes = Color3.fromRGB(16, 190, 214), -- el de sonido (cian del kit)
+	Recompensas = Color3.fromRGB(255, 72, 150), -- el del regalo (rosa del kit, el que no tenia ninguna)
 }
 Paleta.CABECERA_DEFECTO = Color3.fromRGB(38, 42, 86)
 -- Los tres primeros puestos de los tablones de ranking (Client/Tablones)

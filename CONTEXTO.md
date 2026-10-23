@@ -1506,9 +1506,12 @@ a origin/master). Lo que falta, en orden:
    insignias); y el panel Oferta es una ventana vacía que nadie abre.
 3. **N1b**: la analítica de las recompensas (`Recompensas.alReclamar`) y de
    las ofertas, con la prueba `analiticaRecompensas`.
-4. Pulido: sonidos de los avisos de `RECOMPENSAS` en `Notificaciones`; el
-   color de la cabecera del panel Recompensas en `Paleta.CABECERA_PANEL`; la
-   píldora del tutorial en táctil cae dentro de la zona del joystick.
+4. Pulido: la píldora del tutorial en táctil cae dentro de la zona del
+   joystick (hay que medirlo en Studio). Hecho el 23 oct: la cabecera del
+   panel Recompensas en rosa (`Paleta.CABECERA_PANEL`). Los avisos de
+   `RECOMPENSAS` no necesitan entrada en `SONIDO_AVISO`: cada cobro ya suena
+   ("regalo") por `RecompensaEvent` "premio" en `UI/Recompensas`, y los
+   informativos ("abiertas", "listo") callan como los demás.
 5. Documentación al cerrar K1 (este documento, CLAUDE.md "Verificar",
    `docs/Juego.md`).
 6. **Insignias**: 10 de 20 creadas y con su id en
