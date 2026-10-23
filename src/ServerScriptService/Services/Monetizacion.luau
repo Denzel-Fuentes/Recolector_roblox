@@ -7,8 +7,12 @@
 	=== Pases ===
 	Al entrar se consulta UserOwnsGamePassAsync para cada pase con id real y se
 	cachea en perfil.pasesCache (para que el cliente pinte "Comprado" sin
-	preguntar). PromptGamePassPurchaseFinished actualiza la cache al instante
-	(registrarCompraPase) y dispara alComprarPase.
+	preguntar). PromptGamePassPurchaseFinished actualiza la cache
+	(registrarCompraPase) y dispara alComprarPase, pero solo despues de que
+	Roblox confirme que el pase es suyo (UserOwnsGamePassAsync, con
+	REINTENTOS_PASE mas si aun dice que no: la compra tarda un momento en
+	verse). El "comprado" del evento no basta (revision P2, 23 oct): no es
+	una prueba de pago y no debe dar nada por si solo.
 
 	MODO DEV: SOLO EN STUDIO, con GameConfig.PASES_DEV_EN_STUDIO, todos los
 	pases cuentan como comprados para poder probar sus efectos sin ids reales.
@@ -22,8 +26,11 @@
 	recibo mientras no se le devuelva PurchaseGranted) y solo puede devolver
 	PurchaseGranted con la compra YA GUARDADA: si el servidor cae despues,
 	Roblox ya no lo reintenta. Por eso:
-	  - si el perfil aun no cargo, se espera (Perfiles.esperar, ESPERA_PERFIL
-	    s); sin perfil guardable -> NotProcessedYet, y Roblox lo reintenta;
+	  - si el perfil aun no cargo, se espera mientras el jugador siga y su
+	    perfil no este registrado (PerfilListo nil), con tope ESPERA_PERFIL:
+	    la carga puede tardar SESION_ESPERA_ROBO s si la sesion la tiene aun
+	    otro servidor (23 oct; eran 10 s y se rendia antes de que llegara);
+	    sin perfil guardable -> NotProcessedYet, y Roblox lo reintenta;
 	  - si perfil.recibos ya tiene el PurchaseId (un reintento) no se da nada
 	    otra vez: solo se vuelve a guardar;
 	  - si no, se otorga y se anota el recibo en el perfil;
@@ -64,10 +71,27 @@ Monetizacion.alComprarPase = Senal.nueva() :: Senal.Senal<Player, string>
 Monetizacion.esStudio = function(): boolean
 	return RunService:IsStudio()
 end
-Monetizacion.ESPERA_PERFIL = 10
+-- Lo que puede tardar en registrarse el perfil (Guardado): la espera de la
+-- sesion de otro servidor y un margen para el robo y la latencia
+Monetizacion.ESPERA_PERFIL = GameConfig.SESION_ESPERA_ROBO + 15
 Monetizacion.jugadorPorId = function(userId: number): Player?
 	return Players:GetPlayerByUserId(userId)
 end
+-- Si Roblox dice que el pase es suyo: true / false, o nil si la consulta
+-- fallo (no se sabe)
+Monetizacion.poseePase = function(userId: number, gamePassId: number): boolean?
+	local ok, tiene = pcall(function()
+		return MarketplaceService:UserOwnsGamePassAsync(userId, gamePassId)
+	end)
+	if not ok then
+		return nil
+	end
+	return tiene == true
+end
+-- Al confirmar una compra de pase: consultas de mas si aun no se ve, y cada
+-- cuanto
+Monetizacion.REINTENTOS_PASE = 2
+Monetizacion.ESPERA_REINTENTO_PASE = 2
 
 local MAX_RECIBOS = 50
 
@@ -142,12 +166,30 @@ function Monetizacion.marcarPase(jugador: Player, idPase: string)
 	Monetizacion.alCambiarPases:Fire(jugador)
 end
 
--- La compra de un pase acaba de completarse (PromptGamePassPurchaseFinished):
--- se anota en la cache y se avisa. Devuelve el pase (nil si el id no es
--- de ninguno del catalogo).
+-- La compra de un pase acaba de completarse (PromptGamePassPurchaseFinished
+-- con "comprado"): se confirma con Roblox (ver cabecera) y solo entonces se
+-- anota en la cache y se avisa. Devuelve el pase (nil si el id no es de
+-- ninguno del catalogo, si Roblox no lo confirma o si el jugador se fue
+-- mientras). Puede ceder (la consulta y las esperas de los reintentos).
 function Monetizacion.registrarCompraPase(jugador: Player, gamePassId: number): Productos.Pase?
 	local pase = Productos.pasePorGamePassId(gamePassId)
 	if not pase then
+		return nil
+	end
+	local confirmado = false
+	for intento = 0, Monetizacion.REINTENTOS_PASE do
+		if intento > 0 then
+			task.wait(Monetizacion.ESPERA_REINTENTO_PASE)
+		end
+		if not jugador.Parent then
+			return nil
+		end
+		if Monetizacion.poseePase(jugador.UserId, gamePassId) == true then
+			confirmado = true
+			break
+		end
+	end
+	if not confirmado or not jugador.Parent then
 		return nil
 	end
 	Monetizacion.marcarPase(jugador, pase.id)

@@ -24,9 +24,10 @@
 
 	Solo se lanza con la BOLSA LLENA (decision del usuario, 29 sep): el boton
 	tactil y la pista "MANTEN F" solo aparecen entonces, y F no hace nada
-	antes. Es una regla de flujo, no de seguridad: el servidor sigue
-	aceptando una bolsa a medias (no da ventaja) y a mano se entrega
-	siempre en el contenedor.
+	antes. Aqui es una regla de flujo; la de seguridad es del servidor, que
+	desde el 22 oct (P3) rechaza una bolsa a medias ("bolsaNoLlena", con
+	burbuja; un cliente modificado farmeaba aciertos con una pieza). A mano
+	se entrega siempre en el contenedor, llena o no.
 
 	El punto de lanzamiento es donde apunta el jugador: raycast desde la camara
 	por el cursor (raton libre) o por el centro de la pantalla (primera

@@ -4,8 +4,9 @@
 	Cablea MarketplaceService con el modulo Monetizacion:
 	  - ProcessReceipt (Developer Products): idempotente, y PurchaseGranted
 	    solo con la compra ya guardada (Monetizacion.procesarRecibo);
-	  - PromptGamePassPurchaseFinished (pases): marca la cache, dispara
-	    Monetizacion.alComprarPase y avisa;
+	  - PromptGamePassPurchaseFinished (pases): Monetizacion.registrarCompraPase
+	    confirma con Roblox que el pase es suyo (el "comprado" del evento no
+	    basta), marca la cache y dispara alComprarPase; aqui se avisa;
 	  - al cargar el perfil, consulta los pases reales.
 
 	El cliente lanza los prompts de compra directamente con MarketplaceService
@@ -32,11 +33,12 @@ MarketplaceService.ProcessReceipt = function(recibo)
 end
 
 MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(jugador, gamePassId, comprado)
-	if not comprado then
+	if not comprado or typeof(gamePassId) ~= "number" then
 		return
 	end
+	-- Cede: consulta a Roblox (y reintenta si aun no ve la compra)
 	local pase = Monetizacion.registrarCompraPase(jugador, gamePassId)
-	if pase then
+	if pase and jugador.Parent then
 		NotificacionEvent:FireClient(jugador, Idioma.mensaje("NOTIFICACIONES.compraRobux", { nombre = Idioma.mensajeNombre("Pases", pase) }), "exito")
 	end
 end)

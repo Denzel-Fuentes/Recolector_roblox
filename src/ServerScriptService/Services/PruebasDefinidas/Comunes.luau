@@ -27,13 +27,15 @@ function Comunes.jugador(): Player
 end
 
 -- Teletransporta al personaje (un poco por encima para que no se hunda). Es
--- un salto del servidor: se avisa a Movimiento, que si no lo tomaria por un
--- teletransporte del cliente y dejaria 2 s sin recoger ni lanzar
+-- un salto del servidor: se avisa a Movimiento con el destino (mide desde
+-- alli), que si no lo tomaria por un teletransporte del cliente y dejaria
+-- 2 s sin recoger ni lanzar
 function Comunes.teletransportar(j: Player, pos: Vector3)
 	local ch = j.Character
 	if ch then
-		Movimiento.permitirSalto(j)
-		ch:PivotTo(CFrame.new(pos + Vector3.new(0, 3, 0)))
+		local destino = pos + Vector3.new(0, 3, 0)
+		Movimiento.permitirSalto(j, destino)
+		ch:PivotTo(CFrame.new(destino))
 	end
 end
 

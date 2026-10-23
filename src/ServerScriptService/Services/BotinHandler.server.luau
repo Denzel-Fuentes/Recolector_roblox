@@ -30,7 +30,8 @@
 	corto; el punto y la fuerza del lanzamiento, numeros finitos con el punto
 	dentro del mapa (Lanzamiento.argumentosValidos; un NaN o un infinito
 	daban una parabola NaN). Tras un movimiento imposible (Movimiento) no se
-	excava; recoger y lanzar ya lo rechazan ObjetosPatio y Lanzamiento.
+	excava; recoger, entregar a mano (23 oct) y lanzar ya lo rechazan
+	ObjetosPatio, Bolsa.depositar y Lanzamiento, y aqui no se avisa de ello.
 ]]
 
 local Players = game:GetService("Players")
@@ -106,6 +107,11 @@ end
 local function reciclar(jugador: Player, material: string?)
 	local resumen, motivo = Bolsa.depositar(jugador, material)
 	if not resumen then
+		-- Recien llegado de un salto imposible (Movimiento): sin aviso, como al
+		-- lanzar; a un cliente legitimo se le pasa en 2 s
+		if motivo == "movimiento" then
+			return
+		end
 		-- Burbuja sobre el contenedor (AvisosMundo), no toast
 		local contenedor = Mundo.contenedorDe(material)
 		local sitio = if contenedor then contenedor.zona.Position + Vector3.new(0, 3, 0) else nil

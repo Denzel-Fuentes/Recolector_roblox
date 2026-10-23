@@ -32,7 +32,14 @@
 	estan en la distancia del tiro.
 
 	Al desconectar: la bolsa se RECICLA sin bonus (auditoria 26 sep: perder
-	el dinero por una caida de conexion es un castigo injusto).
+	el dinero por una caida de conexion es un castigo injusto). Reciclar sin
+	bonus admite un factor: la bolsa caida mas vieja que recicla el tope de
+	Lanzamiento paga x0,5 (decision del usuario, 23 oct: que tirar bolsas al
+	suelo a proposito no rinda mas que llevarlas al contenedor).
+
+	Entregar a mano no se puede justo despues de moverse mas de lo que se
+	puede andando (Movimiento, "movimiento"; 23 oct): era la via que quedaba
+	para teletransportarse al contenedor de su tipo y cobrar x2 al instante.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -51,6 +58,7 @@ local Coleccionables = require(Servicios:WaitForChild("Coleccionables"))
 local Rebirths = require(Servicios:WaitForChild("Rebirths"))
 local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
 local Turbo = require(Servicios:WaitForChild("Turbo"))
+local Movimiento = require(Servicios:WaitForChild("Movimiento"))
 
 local BolsaEvent = Red.evento("BolsaEvent")
 
@@ -191,7 +199,8 @@ function Bolsa.meterVarios(jugador: Player, items: { Item }): boolean
 end
 
 -- Calcula el pago (sin tocar nada) y pasa al perfil lo que no es dinero.
-local function cobrar(jugador: Player, items: { Item }, bonus: number, materialContenedor: string?): ResumenDeposito
+-- `factor` multiplica el total (reciclarSinBonus; 1 si no viene).
+local function cobrar(jugador: Player, items: { Item }, bonus: number, materialContenedor: string?, factor: number?): ResumenDeposito
 	local resumen = Bolsa.resumenVacio()
 	resumen.bonus = bonus
 	resumen.contenedor = materialContenedor or "General"
@@ -217,7 +226,7 @@ local function cobrar(jugador: Player, items: { Item }, bonus: number, materialC
 			end
 		end
 	end
-	resumen.dinero = math.floor(bruto * (1 + bonus) * Bolsa.multiplicadorDinero(jugador) + 0.5)
+	resumen.dinero = math.floor(bruto * (1 + bonus) * (factor or 1) * Bolsa.multiplicadorDinero(jugador) + 0.5)
 	if resumen.dinero > 0 then
 		Economia.ganar(jugador, resumen.dinero)
 	end
@@ -251,10 +260,14 @@ function Bolsa.contenedorAbierto(jugador: Player, materialContenedor: string?): 
 end
 
 -- Deposito por el prompt de un contenedor: entregar a mano, sin bonus.
--- (nil, motivo) si no se pudo: "vacia" o "bloqueado"
+-- (nil, motivo) si no se pudo: "vacia", "bloqueado" o "movimiento" (acaba de
+-- moverse mas de lo que puede andando: ver cabecera)
 function Bolsa.depositar(jugador: Player, materialContenedor: string?): (ResumenDeposito?, string?)
 	if Bolsa.cuenta(jugador) == 0 then
 		return nil, "vacia"
+	end
+	if Movimiento.sospechoso(jugador) then
+		return nil, "movimiento"
 	end
 	if not Bolsa.contenedorAbierto(jugador, materialContenedor) then
 		return nil, "bloqueado"
@@ -263,10 +276,11 @@ function Bolsa.depositar(jugador: Player, materialContenedor: string?): (Resumen
 end
 
 -- Recicla sin bonus, sin senales y sin tocar la bolsa en mano: al
--- desconectar (Perfiles.alSalir, antes del guardado de salida) y para una
--- bolsa perdida que nadie recogio (Lanzamiento).
-function Bolsa.reciclarSinBonus(jugador: Player, items: { Item }): ResumenDeposito
-	local resumen = cobrar(jugador, items, 0)
+-- desconectar (Perfiles.alSalir, antes del guardado de salida) y las bolsas
+-- caidas que recicla Lanzamiento. `factor` multiplica todo (la mas vieja que
+-- recicla el tope de bolsas caidas: x0,5, ver cabecera); 1 si no viene.
+function Bolsa.reciclarSinBonus(jugador: Player, items: { Item }, factor: number?): ResumenDeposito
+	local resumen = cobrar(jugador, items, 0, nil, factor)
 	Perfiles.estadistica(jugador, "objetosReciclados", resumen.objetos)
 	return resumen
 end

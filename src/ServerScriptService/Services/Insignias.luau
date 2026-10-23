@@ -19,7 +19,9 @@
 	(su Badge se creo despues) y, durante la partida, las nuevas, sin volver
 	a preguntar. BadgeService va siempre en pcall y en su propio hilo (puede
 	tardar o fallar; nunca debe frenar el juego). El servicio es sustituible
-	en pruebas (Insignias.servicio).
+	en pruebas (Insignias.servicio). Cada llamada cede: despues se mira que el
+	jugador siga (23 oct): si no, su cache ya se olvido y se volveria a crear
+	para alguien que no esta (y se le preguntaria a Roblox por el).
 ]]
 
 local BadgeService = game:GetService("BadgeService")
@@ -82,6 +84,9 @@ end
 -- los que no estan en la cache y la rellena. Devuelve cuantas llamadas hizo.
 -- Un lote que falla deja sus ids sin saber (se reintentaran).
 function Insignias.consultarBadges(jugador: Player, ids: { number }): number
+	if not jugador.Parent then
+		return 0
+	end
 	local cache = cacheDe(jugador)
 	local faltan = {}
 	for _, id in ids do
@@ -91,6 +96,10 @@ function Insignias.consultarBadges(jugador: Player, ids: { number }): number
 	end
 	local llamadas = 0
 	for inicio = 1, #faltan, Insignias.LOTE do
+		-- (cada lote cede: si se fue entre medias, no se pregunta mas)
+		if not jugador.Parent then
+			break
+		end
 		local lote = table.move(faltan, inicio, math.min(inicio + Insignias.LOTE - 1, #faltan), 1, {})
 		llamadas += 1
 		local ok, resultado = pcall(function()
@@ -116,7 +125,7 @@ end
 -- Otorga el Badge de Roblox de la insignia si existe y no lo tiene ya
 local function otorgarBadge(jugador: Player, def: DefinicionesInsignias.Insignia)
 	local id = def.badgeId
-	if id == 0 then
+	if id == 0 or not jugador.Parent then
 		return
 	end
 	local cache = cacheDe(jugador)
@@ -130,6 +139,7 @@ local function otorgarBadge(jugador: Player, def: DefinicionesInsignias.Insignia
 		if cache[id] == nil then
 			Insignias.consultarBadges(jugador, { id })
 		end
+		-- consultarBadges cede: si se fue, nada mas (su cache ya se olvido)
 		if cache[id] == false and jugador.Parent then
 			local ok, resultado = pcall(function()
 				return Insignias.servicio:AwardBadge(jugador.UserId, id)
@@ -180,6 +190,10 @@ function Insignias.alEntrar(jugador: Player, perfil: Perfiles.Perfil): number
 		end
 	end
 	local llamadas = Insignias.consultarBadges(jugador, ids)
+	-- La consulta cede: si se fue mientras, no se recrea su cache
+	if not jugador.Parent then
+		return llamadas
+	end
 	for _, def in DefinicionesInsignias.LISTA do
 		if perfil.logros[def.id] then
 			otorgarBadge(jugador, def)

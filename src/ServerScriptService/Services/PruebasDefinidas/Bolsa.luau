@@ -287,16 +287,18 @@ function Pruebas.lanzarATipo()
 	end)
 end
 
--- Lanzar la bolsa entera a la zona de acierto desde 20 studs, desde el
--- frente (al norte, -Z): detras esta la trituradora, que ya colisiona
+-- Lanzar la bolsa entera a la zona de acierto desde 21 studs, desde el
+-- frente (al norte, -Z): detras esta la trituradora, que ya colisiona. A 21
+-- y no a 20 (23 oct): 20 es justo el borde del tramo de +40 % y al posarse
+-- tras el teletransporte el personaje a veces lanzaba desde 19,99 (+20 %)
 function Pruebas.lanzarBolsa()
 	local j = jugador()
 	Comunes.yaLanzo(j)
 	local zona = Mundo.zonaAcierto()
-	teletransportar(j, zona.Position + Vector3.new(0, 0, -20))
+	teletransportar(j, zona.Position + Vector3.new(0, 0, -21))
 	task.wait(0.3)
 	local n = Comunes.llenarBolsa(j, { tipo = "basura", nombre = "Chatarra", material = "Metal", valor = 12 })
-	-- n chatarras x12 x(1 + 0,4 desde 20 studs + la racha, al menos 0,1)
+	-- n chatarras x12 x(1 + 0,4 desde 20-29 studs + la racha, al menos 0,1)
 	local minimo = math.floor(n * 12 * 1.5)
 	local dineroAntes = Economia.dinero(j)
 	local aciertosAntes = Perfiles.leerEstadistica(j, "aciertos")
@@ -304,7 +306,7 @@ function Pruebas.lanzarBolsa()
 	local vacia = Bolsa.cuenta(j) == 0
 	task.wait(2.5)
 	local aciertos = Perfiles.leerEstadistica(j, "aciertos")
-	return string.format("lanzarBolsa ok=%s (%s) bolsa (llena, %d) vacia al lanzar=%s aciertos %d->%d dinero %d->%d (%d chatarras x12 x(1 + 0,4 desde 20 studs + racha) >= %d) => %s",
+	return string.format("lanzarBolsa ok=%s (%s) bolsa (llena, %d) vacia al lanzar=%s aciertos %d->%d dinero %d->%d (%d chatarras x12 x(1 + 0,4 desde 21 studs + racha) >= %d) => %s",
 		tostring(ok), motivo, n, tostring(vacia), aciertosAntes, aciertos, dineroAntes, Economia.dinero(j), n, minimo,
 		(ok and vacia and aciertos > aciertosAntes and Economia.dinero(j) - dineroAntes >= minimo) and "OK" or "FALLO")
 end

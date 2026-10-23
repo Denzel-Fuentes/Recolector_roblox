@@ -120,6 +120,11 @@ local function manosDe(jugador: Player, personaje: Model): (BasePart?, CFrame?)
 		RunService.Heartbeat:Wait()
 		RunService.Heartbeat:Wait()
 		conexion:Disconnect()
+		-- Cedio: si se fue mientras, no se guarda nada (PlayerRemoving ya
+		-- limpio sus medidas)
+		if not jugador.Parent then
+			return nil, nil
+		end
 	end
 	local torso, manos, medido = puntoManos(personaje)
 	if torso and manos and medido then

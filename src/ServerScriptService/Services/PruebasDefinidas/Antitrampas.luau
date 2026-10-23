@@ -11,12 +11,16 @@
 	  primeroSinRecord       el primero entra, pero paga la distancia del Brazo
 	                         y no es record ni mejorDistanciaAcierto
 	  topeBolsasCaidas       con una bolsa en el suelo mas que el tope, la mas
-	                         vieja se recicla sola para su dueno, sin bonus
+	                         vieja se recicla sola para su dueno, sin bonus y a
+	                         x0,5 (decision del usuario, 23 oct)
 	  vueloAlSalir           al salir se cobra sin bonus lo que esta en el aire
 	                         (y al llegar ya no paga ni se queda en el suelo) y
-	                         lo que esta en el suelo, una sola vez
+	                         lo que esta en el suelo, una sola vez; y con un
+	                         contexto de Guardado, que eso va en el guardado de
+	                         salida (orden real alSalir -> guardado)
 	  teletransporte         un salto que no dio el servidor deja 2 s sin
-	                         recoger ni lanzar; con permitirSalto, nada
+	                         recoger, entregar a mano ni lanzar, desde ese mismo
+	                         instante; con permitirSalto, nada
 	  camaraCooldown         la vista se escribe como mucho una vez por
 	                         cooldown y la ultima pedida no se pierde
 	  poseSinBucle           (rendimiento, del mismo paquete) sin el bucle de
@@ -35,11 +39,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local GameConfig = require(Shared:WaitForChild("Config"):WaitForChild("GameConfig"))
 local DefinicionesPunteria = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesPunteria"))
 local Geometria = require(Shared:WaitForChild("Utilidades"):WaitForChild("Geometria"))
 local PoseBrazos = require(Shared:WaitForChild("Utilidades"):WaitForChild("PoseBrazos"))
+local Senal = require(Shared:WaitForChild("Utilidades"):WaitForChild("Senal"))
+
+local HttpService = game:GetService("HttpService")
 
 local Servicios = script.Parent.Parent
+local Guardado = require(Servicios:WaitForChild("Guardado"))
 local Perfiles = require(Servicios:WaitForChild("Perfiles"))
 local Economia = require(Servicios:WaitForChild("Economia"))
 local Bolsa = require(Servicios:WaitForChild("Bolsa"))
@@ -203,8 +212,9 @@ function Pruebas.primeroSinRecord()
 end
 
 -- Con una bolsa en el suelo mas que el tope (3), la que se poso antes se
--- recicla sola para su dueno, sin bonus. Cada bolsa lleva piezas de valor k
--- (la k-esima): asi se sabe cual se fue
+-- recicla sola para su dueno, sin bonus y a x0,5 (GameConfig.
+-- MULT_MAL_SEPARADO, decision del usuario 23 oct). Cada bolsa lleva piezas
+-- de valor 10k (la k-esima): asi se sabe cual se fue y lo que pago
 function Pruebas.topeBolsasCaidas()
 	local j = jugador()
 	Comunes.yaLanzo(j)
@@ -217,7 +227,7 @@ function Pruebas.topeBolsasCaidas()
 	local n, lanzadas = 0, 0
 	local dinero0 = Economia.dinero(j)
 	for k = 1, tope + 1 do
-		n = Comunes.llenarBolsa(j, papel(k))
+		n = Comunes.llenarBolsa(j, papel(10 * k))
 		if Botin.lanzarBolsa(j, haciaPatio, 0.5) then
 			lanzadas += 1
 		end
@@ -225,7 +235,8 @@ function Pruebas.topeBolsasCaidas()
 	end
 	task.wait(4.5)
 	local cobrado = Economia.dinero(j) - dinero0
-	local esperado = math.floor(n * 1 * mult + 0.5)
+	local esperado = math.floor(n * 10 * GameConfig.MULT_MAL_SEPARADO * mult + 0.5)
+	local aX1 = math.floor(n * 10 * mult + 0.5)
 	local quedan = ObjetosPatio.bolsasDe(j)
 	local valores, esperados = {}, {}
 	for _, obj in quedan do
@@ -234,13 +245,42 @@ function Pruebas.topeBolsasCaidas()
 	end
 	table.sort(valores)
 	for k = 2, tope + 1 do
-		table.insert(esperados, k)
+		table.insert(esperados, 10 * k)
 	end
 	local lista, listaEsperada = table.concat(valores, ","), table.concat(esperados, ",")
 	Comunes.limpiarBolsasCaidas(j)
-	return string.format("lanzadas %d | en el suelo %d (tope %d), de las bolsas [%s] (esperadas [%s]) | cobrado $%d (esperado $%d: la primera, sin bonus) => %s",
-		lanzadas, #quedan, tope, lista, listaEsperada, cobrado, esperado,
+	return string.format("lanzadas %d | en el suelo %d (tope %d), de las bolsas [%s] (esperadas [%s]) | cobrado $%d (esperado $%d: la primera, sin bonus a x%s; a x1 serian $%d) => %s",
+		lanzadas, #quedan, tope, lista, listaEsperada, cobrado, esperado, tostring(GameConfig.MULT_MAL_SEPARADO), aX1,
 		ok(lanzadas == tope + 1 and #quedan == tope and lista == listaEsperada and cobrado == esperado))
+end
+
+-- Copia como la de un DataStore (JSON ida y vuelta)
+local function copiaJson(valor)
+	if valor == nil then
+		return nil
+	end
+	return HttpService:JSONDecode(HttpService:JSONEncode(valor))
+end
+
+-- Almacen en memoria con la semantica de UpdateAsync (como en Datos);
+-- alLlamar(clave) justo antes de la transformacion
+local function almacenMemoria(alLlamar: ((string) -> ())?)
+	local datos = {}
+	local almacen = {}
+	function almacen:UpdateAsync(clave, fn)
+		if alLlamar then
+			alLlamar(clave)
+		end
+		local nuevo = fn(copiaJson(datos[clave]))
+		if nuevo ~= nil then
+			datos[clave] = copiaJson(nuevo)
+		end
+		return nuevo
+	end
+	function almacen:GetAsync(clave)
+		return copiaJson(datos[clave])
+	end
+	return almacen, datos
 end
 
 -- La salida del jugador (Lanzamiento.cobrarAlSalir, en Perfiles.alSalir):
@@ -248,7 +288,13 @@ end
 --    al llegar ya no paga ni cuenta como acierto;
 -- 2) bolsa en el aire hacia el suelo: se cobra al salir y no se queda en el
 --    suelo de alguien que ya no esta;
--- 3) bolsa ya en el suelo: se recicla al salir.
+-- 3) bolsa ya en el suelo: se recicla al salir;
+-- 4) el orden real: Guardado.guardarSalida con un contexto de prueba (almacen
+--    en memoria y su propia senal alSalir, conectada a cobrarAlSalir como la
+--    del juego): la bolsa que esta en el aire al salir va en lo que se
+--    escribe, y alSalir llega antes del guardado. No se usa la senal real
+--    porque vaciaria tambien la bolsa en mano y publicaria los rankings, ni
+--    el registro real del DataStore (lo soltaria).
 function Pruebas.vueloAlSalir()
 	local j = jugador()
 	Comunes.yaLanzo(j)
@@ -300,12 +346,57 @@ function Pruebas.vueloAlSalir()
 	local quedan3 = #ObjetosPatio.bolsasDe(j)
 	local bien3 = lanzo3 and enSuelo3 == 1 and alSalir3 == sinBonus(n3, 30) and quedan3 == 0
 
+	-- 4)
+	local texto4, bien4 = "sin API (el perfil no cargo: no se guardaria)", true
+	if Perfiles.estaCargado(j) then
+		teletransportar(j, zona.Position + Vector3.new(0, 0, -20))
+		task.wait(0.4)
+		local n4 = Comunes.llenarBolsa(j, papel(40))
+		local clave = Guardado.claveDe(j)
+		local orden = {}
+		local almacen, datos = almacenMemoria(function(c)
+			if c == clave then
+				table.insert(orden, "guardado")
+			end
+		end)
+		local alSalir = Senal.nueva()
+		alSalir:Connect(function(quien)
+			if quien == j then
+				Lanzamiento.cobrarAlSalir(quien)
+				table.insert(orden, "alSalir")
+			end
+		end)
+		local ctx = Guardado.nuevoContexto({
+			almacen = almacen,
+			alSalir = alSalir,
+			expulsar = function() end,
+			notificar = function() end,
+			espera = function() end,
+			sesionesStudioCaducan = false,
+		})
+		datos[clave] = { perfil = {}, sesion = { servidor = ctx.servidor, latido = os.time() } }
+		local dinero0 = Economia.dinero(j)
+		local lanzo4 = Botin.lanzarBolsa(j, zona.Position, 1)
+		task.wait(0.25)
+		local exito, guardo = pcall(Guardado.guardarSalida, j, "salida", ctx)
+		local escrito = datos[clave] and datos[clave].perfil
+		local dineroEscrito = if typeof(escrito) == "table" then escrito.dinero else nil
+		task.wait(2.5) -- lo que tardaria en llegar al contenedor
+		local total4 = Economia.dinero(j) - dinero0
+		local esperado4 = dinero0 + sinBonus(n4, 40)
+		bien4 = exito and guardo == true and lanzo4 and table.concat(orden, ",") == "alSalir,guardado"
+			and dineroEscrito == esperado4 and total4 == sinBonus(n4, 40)
+		texto4 = string.format("lanzo=%s, guardarSalida=%s, orden [%s], dinero escrito $%s (esperado $%d), en total +$%d",
+			tostring(lanzo4), if exito then tostring(guardo) else ("error " .. tostring(guardo)), table.concat(orden, ","),
+			tostring(dineroEscrito), esperado4, total4)
+	end
+
 	Bolsa.vaciar(j)
-	return string.format("1) al contenedor: lanzo=%s, al salir $%d (esperado $%d), en total $%d, aciertos +%d | 2) al suelo: lanzo=%s, al salir $%d (esperado $%d), en total $%d, en el suelo %d | 3) ya en el suelo (%d): al salir $%d (esperado $%d), quedan %d => %s",
+	return string.format("1) al contenedor: lanzo=%s, al salir $%d (esperado $%d), en total $%d, aciertos +%d | 2) al suelo: lanzo=%s, al salir $%d (esperado $%d), en total $%d, en el suelo %d | 3) ya en el suelo (%d): al salir $%d (esperado $%d), quedan %d | 4) con Guardado: %s => %s",
 		tostring(lanzo1), alSalir1, sinBonus(n1, 10), total1, aciertos1,
 		tostring(lanzo2), alSalir2, sinBonus(n2, 20), total2, enSuelo2,
-		enSuelo3, alSalir3, sinBonus(n3, 30), quedan3,
-		ok(bien1 and bien2 and bien3))
+		enSuelo3, alSalir3, sinBonus(n3, 30), quedan3, texto4,
+		ok(bien1 and bien2 and bien3 and bien4))
 end
 
 -- Depuracion (para comprobar la salida de verdad, parando el Play): deja en
@@ -383,11 +474,15 @@ end
 
 -- Un salto que no dio el servidor (como el de un exploit: aqui un PivotTo sin
 -- permitirSalto, desde la plaza a un monton al otro lado del patio) deja
--- SOSPECHA_SEGUNDOS sin recoger ("movimiento") ni lanzar, y se publica en
--- alSospechar; luego todo vuelve. El mismo viaje con permitirSalto
--- (teletransportar) no es sospecha, y con Movimiento.ACTIVO apagado tampoco.
--- La Velocidad va a 0 durante la prueba: limite conocido (40 studs/s, rafaga
--- de 60) y un salto de mas de 100.
+-- SOSPECHA_SEGUNDOS sin recoger ("movimiento"), entregar a mano ni lanzar,
+-- y se publica en alSospechar; luego todo vuelve. Lo primero se mira EN EL
+-- MISMO INSTANTE del salto, sin ceder, antes de que llegue la muestra: el
+-- exploit teletransporta y actua en el mismo frame (23 oct). El mismo viaje
+-- con permitirSalto (teletransportar) no es sospecha, y con
+-- Movimiento.ACTIVO apagado tampoco. La Velocidad va a 0 durante la prueba:
+-- limite conocido y un salto de mas de 100 studs. Antes de cada salto sin
+-- permiso se espera ECO_SEGUNDOS: vuelve al sitio del que el salto
+-- permitido a la plaza lo saco, y eso cuenta como eco hasta entonces.
 function Pruebas.teletransporte()
 	local j = jugador()
 	if not Movimiento.ACTIVO then
@@ -419,25 +514,30 @@ function Pruebas.teletransporte()
 			table.insert(sospechas, datos)
 		end
 	end)
+	-- Vuelve al monton sin permiso y NO cede: quien llama mira en ese instante
 	local function saltoSinPermiso()
 		teletransportar(j, plaza)
-		task.wait(Movimiento.GRACIA_SALTO + 0.4)
+		task.wait(Movimiento.ECO_SEGUNDOS + 0.4)
 		local ch = j.Character
 		if ch then
 			ch:PivotTo(CFrame.new(junto + Vector3.new(0, 3, 0)))
 		end
-		task.wait(0.5)
 	end
 
-	-- 1) Salto sin permiso: sospecha, no recoge ni lanza
+	-- 1) Salto sin permiso y, en el mismo instante: sospecha, no recoge, no
+	-- entrega a mano, no lanza
 	saltoSinPermiso()
 	local sospechoso1 = Movimiento.sospechoso(j)
 	local reclamo1, motivo1 = reclamarCerca(j, m)
 	Comunes.llenarBolsa(j)
+	local mano1, motivoMano1 = Bolsa.depositar(j, nil)
 	local lanzo1, motivoLanzo1 = Botin.lanzarBolsa(j, junto + Vector3.new(0, 0, -20), 0.3)
 	Bolsa.vaciar(j)
 	local nSospechas1 = #sospechas
 	local datos = sospechas[1]
+	-- Y sigue medio segundo despues (ya con la muestra)
+	task.wait(0.5)
+	local sospechoso1b = Movimiento.sospechoso(j)
 
 	-- 2) Pasada la sospecha, todo normal
 	local t0 = os.clock()
@@ -461,6 +561,7 @@ function Pruebas.teletransporte()
 	Movimiento.ACTIVO = false
 	local ok4, err4 = pcall(saltoSinPermiso)
 	local sospechoso4 = Movimiento.sospechoso(j)
+	task.wait(0.5)
 	Movimiento.ACTIVO = true
 	task.wait(0.5)
 	local sospechoso5 = Movimiento.sospechoso(j)
@@ -470,12 +571,14 @@ function Pruebas.teletransporte()
 	Perfiles.marcarSucio(j)
 	Bolsa.vaciar(j)
 	teletransportar(j, plaza)
-	return string.format("monton a %.0f studs de la plaza (excavado=%s) | sin permiso: sospechoso=%s, recoger=%s (%s), lanzar=%s (%s), alSospechar x%d (%s) | a los %.1f s: recoger=%s (%s) | con permiso: sospechoso=%s, recoger=%s (%s), avisos nuevos %d | ACTIVO=false: sospechoso=%s%s, al encender=%s => %s",
-		dm, tostring(excavado), tostring(sospechoso1), tostring(reclamo1), motivo1, tostring(lanzo1), tostring(motivoLanzo1), nSospechas1,
+	return string.format("monton a %.0f studs de la plaza (excavado=%s) | sin permiso, en el mismo instante: sospechoso=%s, recoger=%s (%s), a mano=%s (%s), lanzar=%s (%s), alSospechar x%d (%s); medio segundo despues sospechoso=%s | a los %.1f s: recoger=%s (%s) | con permiso: sospechoso=%s, recoger=%s (%s), avisos nuevos %d | ACTIVO=false: sospechoso=%s%s, al encender=%s => %s",
+		dm, tostring(excavado), tostring(sospechoso1), tostring(reclamo1), motivo1, tostring(mano1 ~= nil), tostring(motivoMano1),
+		tostring(lanzo1), tostring(motivoLanzo1), nSospechas1,
 		if datos then string.format("%.0f studs en %.2f s = %.0f studs/s, limite %.0f, exceso %.0f", datos.distancia, datos.segundos, datos.velocidad, datos.limite, datos.exceso) else "sin datos",
-		duro, tostring(reclamo2), motivo2, tostring(sospechoso3), tostring(reclamo3), motivo3, nuevas3,
+		tostring(sospechoso1b), duro, tostring(reclamo2), motivo2, tostring(sospechoso3), tostring(reclamo3), motivo3, nuevas3,
 		tostring(sospechoso4), if ok4 then "" else " (error: " .. tostring(err4) .. ")", tostring(sospechoso5),
-		ok(excavado and sospechoso1 and not reclamo1 and motivo1 == "movimiento" and not lanzo1 and motivoLanzo1 == "movimiento"
+		ok(excavado and sospechoso1 and not reclamo1 and motivo1 == "movimiento" and mano1 == nil and motivoMano1 == "movimiento"
+			and not lanzo1 and motivoLanzo1 == "movimiento" and sospechoso1b
 			and nSospechas1 >= 1 and datos and datos.velocidad > datos.limite
 			and duro <= Movimiento.SOSPECHA_SEGUNDOS + 1 and reclamo2
 			and not sospechoso3 and reclamo3 and nuevas3 == 0

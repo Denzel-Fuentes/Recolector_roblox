@@ -6,9 +6,10 @@
 	SOSPECHA_SEGUNDOS sin tocar el patio. Nunca expulsa ni le devuelve a su
 	sitio: el movimiento del personaje lo simula su cliente y corregirlo
 	desde aqui pelearia con el lag. Lo que si se puede es que no le sirva:
-	durante la sospecha ObjetosPatio no le deja recoger, BotinHandler no le
-	deja excavar y Lanzamiento no le deja lanzar. Y se publica
-	(alSospechar) para la analitica.
+	durante la sospecha ObjetosPatio no le deja recoger, Bolsa no le deja
+	entregar a mano, BotinHandler no le deja excavar y Lanzamiento no le deja
+	lanzar. Cada sospecha sale en alSospechar, y Analitica la cuenta (evento
+	Sospecha, como mucho uno cada SOSPECHA_CADA s por jugador).
 
 	=== Como se mide (falsos positivos) ===
 	Cada INTERVALO s (MovimientoHandler) se mira cuanto se movio EN
@@ -27,20 +28,38 @@
 	  - la vertical: caer de la recicladora o de una montana es rapido y
 	    legitimo;
 	  - el primer instante de cada personaje (respawn: el nuevo empieza de
-	    cero, con el credito lleno) ni a quien esta muerto;
-	  - durante GRACIA_SALTO s tras un teletransporte del propio servidor
-	    (permitirSalto: la aparicion, las pruebas). Es una ventana y no un
-	    reinicio de una vez porque el cliente aun puede mandar alguna
-	    posicion de antes del salto, y el servidor la veria ir y volver.
-	Margen elegido: hasta 2,5 veces la velocidad de andar sostenida nunca es
-	sospecha (40 studs/s con la Velocidad a 0, 70 al maximo), ni un salto
-	suelto de hasta 1,5 s de ese ritmo (60 / 105 studs). Lo que se coge es lo
-	grosero: cruzar el mapa de un salto, correr a 5x. Un tramposo fino no
-	gana casi nada y un jugador con lag no paga nada.
+	    cero, con el credito lleno) ni a quien esta muerto.
 
-	alSospechar(jugador, datos) sale como mucho una vez cada
-	SOSPECHA_SEGUNDOS por jugador mientras dure (no una por muestra).
-	Interruptor: Movimiento.ACTIVO (apagado, nada es sospecha).
+	sospechoso() no se fia solo de la ultima muestra: mide tambien la
+	posicion de ESE instante contra el credito (sin tocar nada si no hay
+	salto), asi que un teletransporte y una accion en el mismo frame se
+	cogen. Hasta el 23 oct pasaban: la muestra llegaba hasta 0,2 s despues.
+
+	Un salto del propio servidor (permitirSalto con su destino: la aparicion,
+	las pruebas) no cuenta: se mide desde el destino, con el credito lleno.
+	Durante ECO_SEGUNDOS se ignora lo que se vea a menos de RADIO_ECO de donde
+	estaba antes del salto: el cliente aun puede mandar alguna posicion de
+	antes de enterarse, y el servidor lo veria ir y volver. Hasta el 23 oct
+	eran GRACIA_SALTO s sin medir nada (cabia un teletransporte justo detras
+	de reaparecer); sin destino sigue siendo asi.
+
+	Margen (23 oct, medido en Studio con la raiz que ve el servidor cada
+	0,1 s): andando a 1x hay picos de 1,44x en 0,2 s y 1,23x en 1 s (el
+	jitter de la replicacion); sobre una montana recien excavada, 1,75x y
+	1,09x; con la navegacion a 2x, 2,34x y 2,14x. FACTOR_VELOCIDAD 1,8 (era
+	2,5) con RAFAGA_SEGUNDOS 2,1 (era 1,5): el credito guarda lo mismo que
+	antes (3,8 veces la Velocidad: 60 studs a nivel 0, 106 al maximo), asi
+	que un salto suelto se coge igual y un atasco de red de unos 4 s andando
+	no cuenta, pero el ritmo sostenido baja de 2,5x a 1,8x: un speed hack de
+	2,4x se coge en carreras de mas de ~240 studs y uno de 3x en ~150 (antes,
+	nunca y en ~360). 1,8 con 3 s se descarto: el credito subia a 86 / 151
+	studs y con la Velocidad al maximo se podia saltar del patio al
+	contenedor sin que se viera. 1,5 ya marcaba la navegacion a 2x. Andar a
+	2x sostenido gasta el credito poco a poco (13 de 60 studs en 400 studs),
+	nada en lo que mide un recorrido de este mapa.
+
+	Interruptor: Movimiento.ACTIVO (apagado, nada es sospecha). Los numeros
+	son campos del modulo para que las pruebas los puedan medir y cambiar.
 ]]
 
 local Players = game:GetService("Players")
@@ -53,8 +72,8 @@ local Mejoras = require(ServerScriptService:WaitForChild("Services"):WaitForChil
 
 -- Lo que recibe la analitica con cada sospecha
 export type DatosSospecha = {
-	distancia: number, -- studs en horizontal entre las dos muestras
-	segundos: number, -- entre las dos muestras
+	distancia: number, -- studs en horizontal desde la medida anterior
+	segundos: number, -- desde la medida anterior
 	velocidad: number, -- distancia / segundos (studs/s)
 	limite: number, -- studs/s permitidos sostenidos (Velocidad x FACTOR_VELOCIDAD)
 	exceso: number, -- studs que no cubria el credito
@@ -65,10 +84,12 @@ export type DatosSospecha = {
 
 type Estado = {
 	personaje: Model?,
-	pos: Vector3?, -- nil = la siguiente muestra empieza de cero
+	pos: Vector3?, -- desde donde se mide; nil = la siguiente muestra empieza de cero
 	t: number,
 	credito: number,
-	graciaHasta: number,
+	graciaHasta: number, -- salto del servidor sin destino: hasta aqui no se mide
+	origenSalto: Vector3?, -- donde estaba antes del ultimo salto del servidor
+	ecoHasta: number, -- hasta aqui, lo que se vea cerca de origenSalto no cuenta
 	sospechaHasta: number,
 	ultimoAviso: number,
 }
@@ -78,46 +99,158 @@ local Movimiento = {}
 Movimiento.ACTIVO = true
 -- Segundos entre muestras (los usa MovimientoHandler)
 Movimiento.INTERVALO = 0.2
--- Segundos sin tocar el patio tras la ultima muestra imposible
+-- Segundos sin tocar el patio tras la ultima medida imposible
 Movimiento.SOSPECHA_SEGUNDOS = 2
--- Segundos que no se mide tras un salto del servidor (permitirSalto)
+-- Veces la Velocidad efectiva que se puede ir sostenido, y segundos de ese
+-- ritmo que guarda el credito (la rafaga: lag, empujones). Ver cabecera
+Movimiento.FACTOR_VELOCIDAD = 1.8
+Movimiento.RAFAGA_SEGUNDOS = 2.1
+-- Tras un salto del servidor: segundos y studs alrededor de donde estaba en
+-- los que lo que se vea es un eco de antes del salto
+Movimiento.ECO_SEGUNDOS = 3
+Movimiento.RADIO_ECO = 10
+-- Segundos sin medir tras un salto del servidor del que no se sabe el destino
 Movimiento.GRACIA_SALTO = 1
 
 -- (jugador, datos) cada vez que empieza (o sigue, cada SOSPECHA_SEGUNDOS) una
--- sospecha: la escucha la analitica
+-- sospecha: la escucha Analitica
 Movimiento.alSospechar = Senal.nueva() :: Senal.Senal<Player, DatosSospecha>
-
-local FACTOR_VELOCIDAD = 2.5
-local RAFAGA_SEGUNDOS = 1.5
 
 local estados: { [Player]: Estado } = {}
 
 local function estadoDe(jugador: Player): Estado
 	local estado = estados[jugador]
 	if not estado then
-		estado = { personaje = nil, pos = nil, t = 0, credito = 0, graciaHasta = 0, sospechaHasta = 0, ultimoAviso = -math.huge }
+		estado = {
+			personaje = nil,
+			pos = nil,
+			t = 0,
+			credito = 0,
+			graciaHasta = 0,
+			origenSalto = nil,
+			ecoHasta = 0,
+			sospechaHasta = 0,
+			ultimoAviso = -math.huge,
+		}
 		estados[jugador] = estado
 	end
 	return estado
 end
 
--- Studs/s que puede recorrer sostenidos (la Velocidad efectiva x 2,5)
+local function horizontal(a: Vector3, b: Vector3): number
+	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
+end
+
+-- El personaje vivo del jugador y su raiz (nil, nil si no lo hay)
+local function raizViva(jugador: Player): (Model?, BasePart?)
+	local personaje = jugador.Character
+	local root = personaje and personaje:FindFirstChild("HumanoidRootPart")
+	local humanoide = personaje and personaje:FindFirstChildOfClass("Humanoid")
+	if not personaje or not root or not root:IsA("BasePart") or not humanoide or humanoide.Health <= 0 then
+		return nil, nil
+	end
+	return personaje, root
+end
+
+-- Studs/s que puede recorrer sostenidos (la Velocidad efectiva x FACTOR)
 function Movimiento.limite(jugador: Player): number
-	return Mejoras.valor(jugador, "Velocidad") * FACTOR_VELOCIDAD
+	return Mejoras.valor(jugador, "Velocidad") * Movimiento.FACTOR_VELOCIDAD
 end
 
--- El servidor va a mover al personaje (aparicion, pruebas): ese salto y lo
--- que se vea durante `segundos` no cuentan
-function Movimiento.permitirSalto(jugador: Player, segundos: number?)
+-- Mide la posicion de ahora contra el credito. `muestra`: la del bucle, que
+-- mueve la referencia y recarga; si no (sospechoso), solo mira, y solo toca
+-- el estado si encuentra un salto imposible. Devuelve si lo encontro.
+local function medir(jugador: Player, estado: Estado, ahora: number, muestra: boolean): boolean
+	local personaje, root = raizViva(jugador)
+	if not personaje or not root then
+		if muestra then
+			estado.pos = nil
+		end
+		return false
+	end
+	local limite = Movimiento.limite(jugador)
+	local tope = limite * Movimiento.RAFAGA_SEGUNDOS
+	local pos = root.Position
+	local desde = estado.pos
+	if estado.personaje ~= personaje or not desde or ahora < estado.graciaHasta then
+		-- Personaje nuevo, primera muestra o salto del servidor sin destino
+		if muestra then
+			estado.personaje = personaje
+			estado.pos = pos
+			estado.t = ahora
+			estado.credito = tope
+		end
+		return false
+	end
+	local origen = estado.origenSalto
+	if origen and ahora < estado.ecoHasta and horizontal(pos, origen) <= Movimiento.RADIO_ECO then
+		return false -- un eco de antes del ultimo salto del servidor
+	end
+	local segundos = ahora - estado.t
+	local distancia = horizontal(pos, desde)
+	local resto = math.min(estado.credito, tope) + limite * segundos - distancia
+	if resto >= 0 then
+		if muestra then
+			estado.pos, estado.t, estado.credito = pos, ahora, math.min(resto, tope)
+		end
+		return false
+	end
+	-- Sin credito: lo que hiciera ahora no lo alcanzo andando. La referencia
+	-- pasa aqui (la siguiente medida no vuelve a cobrar el mismo salto)
+	estado.pos, estado.t, estado.credito = pos, ahora, 0
+	estado.sospechaHasta = ahora + Movimiento.SOSPECHA_SEGUNDOS
+	if ahora - estado.ultimoAviso >= Movimiento.SOSPECHA_SEGUNDOS then
+		estado.ultimoAviso = ahora
+		Movimiento.alSospechar:Fire(jugador, {
+			distancia = distancia,
+			segundos = segundos,
+			velocidad = if segundos > 0 then distancia / segundos else math.huge,
+			limite = limite,
+			exceso = -resto,
+			desde = desde,
+			hasta = pos,
+			enPatio = jugador:GetAttribute("EnPatio") == true,
+		})
+	end
+	return true
+end
+
+-- El servidor va a mover al personaje a `destino` (la posicion de su raiz:
+-- aparicion, pruebas): ese salto no cuenta, y lo de despues se mide desde
+-- alli (ver cabecera). Sin destino, `segundos` (GRACIA_SALTO) sin medir.
+function Movimiento.permitirSalto(jugador: Player, destino: Vector3?, segundos: number?)
 	local estado = estadoDe(jugador)
-	estado.graciaHasta = os.clock() + (segundos or Movimiento.GRACIA_SALTO)
-	estado.pos = nil
+	local ahora = os.clock()
+	local personaje, root = raizViva(jugador)
+	estado.origenSalto = if root then root.Position else nil
+	estado.ecoHasta = ahora + Movimiento.ECO_SEGUNDOS
+	if destino then
+		estado.personaje = personaje or jugador.Character
+		estado.pos = destino
+		estado.t = ahora
+		estado.credito = Movimiento.limite(jugador) * Movimiento.RAFAGA_SEGUNDOS
+		estado.graciaHasta = 0
+	else
+		estado.pos = nil
+		estado.graciaHasta = ahora + (segundos or Movimiento.GRACIA_SALTO)
+	end
 end
 
--- Si ahora mismo no debe tocar el patio (ver cabecera)
+-- Si ahora mismo no debe tocar el patio: la sospecha de antes o un salto
+-- imposible en este mismo instante (ver cabecera)
 function Movimiento.sospechoso(jugador: Player): boolean
+	if not Movimiento.ACTIVO then
+		return false
+	end
 	local estado = estados[jugador]
-	return Movimiento.ACTIVO and estado ~= nil and os.clock() < estado.sospechaHasta
+	if not estado then
+		return false
+	end
+	local ahora = os.clock()
+	if ahora < estado.sospechaHasta then
+		return true
+	end
+	return medir(jugador, estado, ahora, false)
 end
 
 function Movimiento.olvidar(jugador: Player)
@@ -129,49 +262,11 @@ function Movimiento.muestrear()
 	local ahora = os.clock()
 	for _, jugador in Players:GetPlayers() do
 		local estado = estadoDe(jugador)
-		local personaje = jugador.Character
-		local root = personaje and personaje:FindFirstChild("HumanoidRootPart")
-		local humanoide = personaje and personaje:FindFirstChildOfClass("Humanoid")
-		if not Movimiento.ACTIVO or not personaje or not root or not root:IsA("BasePart") or not humanoide or humanoide.Health <= 0 then
+		if not Movimiento.ACTIVO then
 			estado.pos = nil
 			continue
 		end
-		local limite = Movimiento.limite(jugador)
-		local tope = limite * RAFAGA_SEGUNDOS
-		local pos = root.Position
-		local desde = estado.pos
-		if estado.personaje ~= personaje or not desde or ahora < estado.graciaHasta then
-			-- Personaje nuevo, primera muestra o salto del servidor: de cero
-			estado.personaje = personaje
-			estado.pos = pos
-			estado.t = ahora
-			estado.credito = tope
-			continue
-		end
-		local segundos = ahora - estado.t
-		local distancia = Vector3.new(pos.X - desde.X, 0, pos.Z - desde.Z).Magnitude
-		estado.pos, estado.t = pos, ahora
-		local resto = math.min(estado.credito, tope) + limite * segundos - distancia
-		if resto >= 0 then
-			estado.credito = math.min(resto, tope)
-			continue
-		end
-		-- Sin credito: lo que hiciera ahora no lo alcanzo andando
-		estado.credito = 0
-		estado.sospechaHasta = ahora + Movimiento.SOSPECHA_SEGUNDOS
-		if ahora - estado.ultimoAviso >= Movimiento.SOSPECHA_SEGUNDOS then
-			estado.ultimoAviso = ahora
-			Movimiento.alSospechar:Fire(jugador, {
-				distancia = distancia,
-				segundos = segundos,
-				velocidad = if segundos > 0 then distancia / segundos else math.huge,
-				limite = limite,
-				exceso = -resto,
-				desde = desde,
-				hasta = pos,
-				enPatio = jugador:GetAttribute("EnPatio") == true,
-			})
-		end
+		medir(jugador, estado, ahora, true)
 	end
 end
 

@@ -23,8 +23,10 @@
 	recicladora, la tapa del contenedor) donde no se alcanza se deja en el
 	suelo junto al contenedor, del lado del que lanzo. Cada jugador tiene
 	como mucho TOPE_BOLSAS_CAIDAS en el suelo: con una mas, la mas vieja se
-	recicla sola para el, sin bonus, y se le avisa (P3, 22 oct: sin tope, un
-	cliente que lanzara sin parar llenaria el patio de modelos).
+	recicla sola para el, sin bonus y a x0,5 (MULT_MAL_SEPARADO), y se le
+	avisa (P3, 22 oct: sin tope, un cliente que lanzara sin parar llenaria el
+	patio de modelos). El x0,5 es decision del usuario (23 oct): a x1, tirar
+	bolsas al suelo a proposito cobraba sin andar hasta el contenedor.
 
 	Al salir (Perfiles.alSalir, que Guardado dispara ANTES del guardado de
 	salida; aqui se cobra sin ceder) se cobra para el, sin bonus, lo que
@@ -301,18 +303,20 @@ function Lanzamiento.recordServidor(): number
 	return recordServidor
 end
 
--- Recicla para su dueno, sin bonus, una bolsa caida (al salir, o la mas
--- vieja al pasar el tope). Devuelve lo cobrado, o nil si ya no estaba (la
--- recogio alguien en el mismo instante: mismo cerrojo que el reclamo).
-local function reciclarCaida(dueno: Player, obj: TiposPatio.Objeto): number?
+-- Recicla para su dueno, sin bonus, una bolsa caida (al salir, x1; la mas
+-- vieja al pasar el tope, x0,5: `factor`). Devuelve lo cobrado, o nil si ya
+-- no estaba (la recogio alguien en el mismo instante: mismo cerrojo que el
+-- reclamo).
+local function reciclarCaida(dueno: Player, obj: TiposPatio.Objeto, factor: number?): number?
 	if not ObjetosPatio.retirar(obj.id, dueno) then
 		return nil
 	end
-	return Bolsa.reciclarSinBonus(dueno, obj.item.contenido or {}).dinero
+	return Bolsa.reciclarSinBonus(dueno, obj.item.contenido or {}, factor).dinero
 end
 
 -- Con una bolsa caida mas que el tope, las mas viejas (las que se posaron
--- antes: menor libreEn) se reciclan solas para su dueno y se le avisa
+-- antes: menor libreEn) se reciclan solas para su dueno a x0,5 y se le avisa
+-- (el texto dice "sin bonus" y lo cobrado: sigue siendo cierto)
 local function aplicarTope(dueno: Player)
 	local caidas = ObjetosPatio.bolsasDe(dueno)
 	local sobran = #caidas - Lanzamiento.TOPE_BOLSAS_CAIDAS
@@ -323,7 +327,7 @@ local function aplicarTope(dueno: Player)
 		return (a.item.libreEn or 0) < (b.item.libreEn or 0)
 	end)
 	for i = 1, sobran do
-		local dinero = reciclarCaida(dueno, caidas[i])
+		local dinero = reciclarCaida(dueno, caidas[i], GameConfig.MULT_MAL_SEPARADO)
 		if dinero then
 			NotificacionEvent:FireClient(dueno, Idioma.mensaje("PATIO.bolsaViejaReciclada", { dinero = Idioma.dinero(dinero) }), "aviso")
 		end

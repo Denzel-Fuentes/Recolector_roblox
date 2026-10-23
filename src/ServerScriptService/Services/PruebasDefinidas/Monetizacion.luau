@@ -1,10 +1,10 @@
 --!nonstrict
 --[[
 	Pruebas de monetizacion, admin e insignias (P2, 22 oct): los recibos son
-	idempotentes y solo se confirman ya guardados, esperan al perfil, la
-	compra de un pase dispara alComprarPase, el modo dev de pases y los
-	comandos de admin solo existen en Studio, y los Badges se consultan en
-	lotes con cache.
+	idempotentes (tambien dos a la vez) y solo se confirman ya guardados,
+	esperan al perfil, la compra de un pase dispara alComprarPase solo si
+	Roblox la confirma, el modo dev de pases y los comandos de admin solo
+	existen en Studio, y los Badges se consultan en lotes con cache.
 
 	Usan ids de prueba inyectados un momento (un ProductId para el Turbo, un
 	BadgeService falso) y contextos de Guardado con un almacen en memoria:
@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextChatService = game:GetService("TextChatService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local GameConfig = require(Shared:WaitForChild("Config"):WaitForChild("GameConfig"))
 local Productos = require(Shared:WaitForChild("Config"):WaitForChild("Productos"))
 local DefinicionesInsignias = require(Shared:WaitForChild("Config"):WaitForChild("DefinicionesInsignias"))
 
@@ -170,7 +171,9 @@ end
 
 -- Sin perfil: si el jugador no esta, NotProcessedYet al momento; si esta
 -- pero su perfil no llega, espera ESPERA_PERFIL s antes de rendirse (antes
--- se rendia al instante); con el perfil ya cargado no espera
+-- se rendia al instante; desde el 23 oct, por defecto lo que puede tardar
+-- de verdad una carga: SESION_ESPERA_ROBO + 15); con el perfil ya cargado
+-- no espera
 function Pruebas.reciboSinPerfil()
 	local j = jugador()
 	local p = Perfiles.obtener(j)
@@ -213,7 +216,7 @@ function Pruebas.reciboSinPerfil()
 		return "error: " .. tostring(err) .. " => FALLO"
 	end
 	local bien = r.fuera == NO_AUN and r.fueraTardo < 0.2 and r.sinPerfil == NO_AUN and r.sinPerfilTardo >= 0.55
-		and esperaDefecto == 10 and (r.conPerfil == nil or (r.conPerfil == GRANTED and r.conPerfilTardo < 1))
+		and esperaDefecto >= GameConfig.SESION_ESPERA_ROBO and (r.conPerfil == nil or (r.conPerfil == GRANTED and r.conPerfilTardo < 1))
 	return string.format("no esta: %s en %.2f s | sin perfil: %s tras esperar %.2f s (por defecto %d s) | con perfil: %s en %.2f s => %s",
 		decision(r.fuera), r.fueraTardo, decision(r.sinPerfil), r.sinPerfilTardo, esperaDefecto,
 		if r.conPerfil then decision(r.conPerfil) else "sin API", r.conPerfilTardo or 0, ok(bien))
@@ -264,25 +267,76 @@ function Pruebas.reciboGuardaAntes()
 		table.concat(orden, ","), tostring(enGuardado), ok(bien))
 end
 
--- La compra de un pase (PromptGamePassPurchaseFinished) lo marca y dispara
--- alComprarPase con su id; un gamePassId que no es del catalogo, nada
+-- La compra de un pase (PromptGamePassPurchaseFinished con "comprado") solo
+-- lo marca y dispara alComprarPase si Roblox confirma que es suyo
+-- (UserOwnsGamePassAsync, sustituido aqui por Monetizacion.poseePase):
+--   - confirmado a la primera: marcado, alComprarPase con su id;
+--   - un evento fingido (Roblox dice que no las 1 + REINTENTOS_PASE veces):
+--     nada, ni cache ni senal;
+--   - Roblox aun no lo ve y a la segunda si: marcado (reintento);
+--   - la consulta falla (pcall) todas las veces: nada;
+--   - un gamePassId que no es del catalogo: nada, sin preguntar.
 function Pruebas.compraPase()
 	local j = jugador()
 	local p = Perfiles.obtener(j)
 	local pase = Productos.PASE_POR_ID.EstelaArcoiris
 	local idAntes, cacheAntes = pase.gamePassId, p.pasesCache.EstelaArcoiris
+	local poseeAntes, esperaAntes = Monetizacion.poseePase, Monetizacion.ESPERA_REINTENTO_PASE
 	local recibidos = {}
 	local conexion = Monetizacion.alComprarPase:Connect(function(quien, idPase)
 		table.insert(recibidos, if quien == j then idPase else "otro")
 	end)
+	local consultas = 0
+	local respuestas = {} -- lo que dira Roblox en cada consulta (se van gastando)
+	local function respuestaDeRoblox(lista)
+		respuestas = lista
+		consultas = 0
+	end
 	local r = {}
 	local exito, err = pcall(function()
 		pase.gamePassId = 990000002
+		Monetizacion.ESPERA_REINTENTO_PASE = 0.05
+		Monetizacion.poseePase = function(_userId, gamePassId)
+			consultas += 1
+			if gamePassId ~= 990000002 then
+				return false
+			end
+			local siguiente = table.remove(respuestas, 1)
+			if siguiente == "error" then
+				return nil
+			end
+			return siguiente == true
+		end
+		-- confirmado a la primera
+		respuestaDeRoblox({ true })
 		r.pase = Monetizacion.registrarCompraPase(j, 990000002)
 		r.marcado = p.pasesCache.EstelaArcoiris == true
+		r.consultas1 = consultas
+		r.senales1 = #recibidos
+		-- fingido: Roblox dice que no siempre
+		p.pasesCache.EstelaArcoiris = nil
+		respuestaDeRoblox({ false, false, false, false })
+		r.fingido = Monetizacion.registrarCompraPase(j, 990000002)
+		r.marcadoFingido = p.pasesCache.EstelaArcoiris == true
+		r.consultasFingido = consultas
+		r.senalesFingido = #recibidos - r.senales1
+		-- aun no se ve, a la segunda si
+		respuestaDeRoblox({ false, true })
+		r.tarde = Monetizacion.registrarCompraPase(j, 990000002)
+		r.marcadoTarde = p.pasesCache.EstelaArcoiris == true
+		r.consultasTarde = consultas
+		-- la consulta falla siempre
+		p.pasesCache.EstelaArcoiris = nil
+		respuestaDeRoblox({ "error", "error", "error", "error" })
+		r.conError = Monetizacion.registrarCompraPase(j, 990000002)
+		r.marcadoError = p.pasesCache.EstelaArcoiris == true
+		-- ajeno al catalogo
+		respuestaDeRoblox({})
 		r.desconocido = Monetizacion.registrarCompraPase(j, 990000003)
+		r.consultasDesconocido = consultas
 	end)
 	conexion:Disconnect()
+	Monetizacion.poseePase, Monetizacion.ESPERA_REINTENTO_PASE = poseeAntes, esperaAntes
 	pase.gamePassId = idAntes
 	p.pasesCache.EstelaArcoiris = cacheAntes
 	Perfiles.marcarSucio(j)
@@ -290,10 +344,76 @@ function Pruebas.compraPase()
 	if not exito then
 		return "error: " .. tostring(err) .. " => FALLO"
 	end
-	local bien = r.pase ~= nil and r.pase.id == "EstelaArcoiris" and r.marcado and r.desconocido == nil
-		and #recibidos == 1 and recibidos[1] == "EstelaArcoiris"
-	return string.format("compra del pase: %s, en la cache=%s, alComprarPase [%s] | gamePassId ajeno: %s => %s",
-		r.pase and r.pase.id or "nil", tostring(r.marcado), table.concat(recibidos, ","), tostring(r.desconocido), ok(bien))
+	local intentos = 1 + Monetizacion.REINTENTOS_PASE
+	local bien = r.pase ~= nil and r.pase.id == "EstelaArcoiris" and r.marcado and r.consultas1 == 1
+		and r.fingido == nil and not r.marcadoFingido and r.consultasFingido == intentos and r.senalesFingido == 0
+		and r.tarde ~= nil and r.marcadoTarde and r.consultasTarde == 2
+		and r.conError == nil and not r.marcadoError
+		and r.desconocido == nil and r.consultasDesconocido == 0
+		and table.concat(recibidos, ",") == "EstelaArcoiris,EstelaArcoiris"
+	return string.format("confirmado: %s, en la cache=%s (%d consulta) | fingido: %s, en la cache=%s, %d consultas, senales %d | a la segunda: %s, en la cache=%s (%d consultas) | consulta con error: %s, en la cache=%s | gamePassId ajeno: %s (%d consultas) | alComprarPase [%s] => %s",
+		r.pase and r.pase.id or "nil", tostring(r.marcado), r.consultas1,
+		tostring(r.fingido), tostring(r.marcadoFingido), r.consultasFingido, r.senalesFingido,
+		r.tarde and r.tarde.id or "nil", tostring(r.marcadoTarde), r.consultasTarde,
+		tostring(r.conError), tostring(r.marcadoError),
+		tostring(r.desconocido), r.consultasDesconocido, table.concat(recibidos, ","), ok(bien))
+end
+
+-- Dos procesarRecibo del MISMO recibo a la vez (Roblox lo reintenta mientras
+-- el primero aun guarda): se otorga una sola vez, los dos responden Granted y
+-- el recibo queda en lo guardado. El guardado tarda (0,3 s en el almacen de
+-- prueba) para que el segundo llegue en mitad del primero. Funciona porque
+-- mirar perfil.recibos, otorgar y anotar el recibo va sin ceder: el segundo
+-- ya lo encuentra anotado y solo espera a que quede guardado.
+function Pruebas.reciboConcurrente()
+	local j = jugador()
+	if not Perfiles.estaCargado(j) then
+		return "el perfil no cargo del DataStore (no se podria guardar) => SIN API"
+	end
+	local p = Perfiles.obtener(j)
+	local antes = foto(p)
+	local ctx, datos, registro = contextoConJugador(j, {
+		alLlamar = function()
+			task.wait(0.3)
+		end,
+	})
+	local recibo = reciboDePrueba(j)
+	local r = {}
+	local exito, err = pcall(conPrueba, ctx, function()
+		p.turboHasta = 0
+		local compras = p.estadisticas.comprasRobux or 0
+		local listos = 0
+		task.spawn(function()
+			r.uno = Monetizacion.procesarRecibo(recibo)
+			listos += 1
+		end)
+		task.spawn(function()
+			r.dos = Monetizacion.procesarRecibo(recibo)
+			listos += 1
+		end)
+		local limite = os.clock() + 5
+		while listos < 2 and os.clock() < limite do
+			task.wait(0.05)
+		end
+		r.turbo = Turbo.restante(j)
+		r.compras = (p.estadisticas.comprasRobux or 0) - compras
+		r.veces = 0
+		for _, id in p.recibos do
+			if id == recibo.PurchaseId then
+				r.veces += 1
+			end
+		end
+	end)
+	local guardadoPerfil = datos[Guardado.claveDe(j)].perfil
+	local enGuardado = typeof(guardadoPerfil) == "table" and table.find(guardadoPerfil.recibos or {}, recibo.PurchaseId) ~= nil
+	devolver(j, p, antes)
+	if not exito then
+		return "error: " .. tostring(err) .. " => FALLO"
+	end
+	local bien = r.uno == GRANTED and r.dos == GRANTED and math.abs(r.turbo - 900) <= 1 and r.compras == 1 and r.veces == 1
+		and enGuardado and registro.escrituras >= 1
+	return string.format("a la vez: %s y %s | Turbo %d s (una compra: 900), compras +%d, recibo %d vez en el perfil | %d guardado(s), recibo en lo guardado=%s => %s",
+		decision(r.uno), decision(r.dos), r.turbo or -1, r.compras or -1, r.veces or -1, registro.escrituras, tostring(enGuardado), ok(bien))
 end
 
 -- ===========================================================================

@@ -14,9 +14,9 @@
 	15 s se carga igual: un jugador sin personaje es peor que uno sin guardar.
 
 	Llevarlo a la plaza es un salto del servidor: se avisa a Movimiento
-	(permitirSalto) para que no lo tome por un teletransporte del cliente
-	(el personaje nace donde Roblox lo pone y una muestra podria caer entre
-	eso y el PivotTo).
+	(permitirSalto, con el destino) para que no lo tome por un teletransporte
+	del cliente (el personaje nace donde Roblox lo pone y una muestra podria
+	caer entre eso y el PivotTo) y mida desde la plaza.
 ]]
 
 local Players = game:GetService("Players")
@@ -38,8 +38,9 @@ local function cargarSiFalta(jugador: Player)
 end
 
 local function alAparecer(jugador: Player, personaje: Model)
-	Movimiento.permitirSalto(jugador)
-	personaje:PivotTo(Mundo.cframeAparicion())
+	local destino = Mundo.cframeAparicion()
+	Movimiento.permitirSalto(jugador, destino.Position)
+	personaje:PivotTo(destino)
 	local humanoide = personaje:WaitForChild("Humanoid", 5) :: Humanoid?
 	if humanoide then
 		humanoide.Died:Connect(function()
