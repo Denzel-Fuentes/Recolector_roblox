@@ -1,13 +1,13 @@
 --!strict
 --[[
 	Insignias (ModuleScript)
-	Unica responsabilidad: dar las 16 insignias (Config/DefinicionesInsignias)
+	Unica responsabilidad: dar las 20 insignias (Config/DefinicionesInsignias)
 	cuando el perfil cumple su condicion: se anotan en perfil.logros (el
 	panel las ensena desde ahi) y, si la insignia tiene badgeId, se otorga el
 	Badge de Roblox.
 
 	Se comprueban cada vez que el perfil cambia (Perfiles.alCambiar, como
-	mucho 4 veces por segundo por jugador): son 16 comparaciones de numeros
+	mucho 4 veces por segundo por jugador): son 20 comparaciones de numeros
 	que ya estan en el perfil, mas barato que engancharse a cada senal que
 	mueve una estadistica, y ningun modulo tiene que acordarse de avisar.
 

@@ -2,8 +2,33 @@
 
 Réplica mecánica de KOTAMON para Roblox, low-poly de partes con arte por
 capas sobre un esqueleto whitebox (ver §3 "Arte del mundo"). El diseño
-completo está en `docs/GDD.md`; este documento es lo que NO se deduce del
-código: qué hay, cómo se trabaja y por qué se decidió lo no obvio.
+completo está en `docs/GDD.md`, la economía vigente en
+`docs/Economia-v4.md` (aprobada el 22 oct) y la ficha del Creator Hub en
+`docs/Ficha-lanzamiento.md`; lo que ve el jugador, en `docs/Juego.md`. Este
+documento es lo que NO se deduce del código: qué hay, cómo se trabaja y por
+qué se decidió lo no obvio.
+
+**22–23 oct 2026: plan de lanzamiento por agentes** (aprobado por el usuario
+el 22 oct; los porqués en §3 "Lanzamiento por agentes", lo que falta en §5).
+Esta vez no hubo lotes sino **paquetes**: una sesión orquesta, lanza un
+agente por paquete con sus archivos y sus pruebas
+(`PruebasDefinidas/<Área>`), le da su turno de Studio para verificar, pasa la
+revisión y hace un commit local por paquete. **Hecho y en master**
+(subido a origin/master): la fase 0 (la v3 commiteada con el tag
+`base-lanzamiento`; el mundo re-horneado, W1), la 1 (C1 limpieza del copy;
+P1 guardado v4 con cola y bloqueo de sesión; P2 recibos que se guardan antes
+de confirmar y admin solo en Studio; P3 anti-trampas, con su revisión de
+seguridad P3b), la 2 (L1 pantalla de carga, N1 analítica, A1 audio) y parte
+de la 3: la **economía v4** con su contrato (C3: copy, perfil v5,
+`Actividad`, `costeSiguiente`), el ritmo (E1: R1 en ~58 min, pedidos en % del
+siguiente rebirth, Pedido VIP, día a las 06:00 UTC; unido **sin terminar de
+verificar en Studio**) y las recompensas (R1: calendario de 7 días, regalos
+por minutos activos y bono de regreso); y de la 4, los 6 pases y los 2
+productos de Turbo creados en el Creator Hub con sus ids en `Config/Productos`
+(F1b, 23 oct). El usuario pausó el plan el 23 oct y lo retomó ese mismo día;
+**K1** (catálogo: Turbo solo jugando, VIP, Pack de inicio, ofertas y precio
+real) está **a medias, fuera de master**. La ficha del Creator Hub está hecha
+y el juego sigue **privado**.
 
 **3 oct 2026: v3 para lanzar** (decisiones del usuario, ver §3 "Lanzamiento:
 v3"): **cinco contenedores** (uno por tipo de basura, del color de su tipo,
@@ -49,39 +74,68 @@ mundo vestido; pendientes los paneles (lotes 12–13 de la UI), la prueba con
 | **Celebraciones** en vez del toast al cobrar (5 oct): "¡DENTRO!"/"¡RECICLADO!" grande con rebote en el color del contenedor, el dinero contando y volando al contador, píldoras del desglose y destellos + anillo sobre el contenedor; y un **"+1"** en el mundo por cada objeto recogido (billete "+1 $", tesoro "¡TESORO!", bolsa "+N"), sin encadenar | `CelebracionEvent` (Lanzamiento, BotinHandler), `RecogidaEvent` (ObjetosPatio.alRecoger con posición), `UI/Celebraciones.client`, `EfectoRecogida.client` | cliente `("celebracion", "Papel")`, `("mas1")` |
 | Patio compartido: 18 **colinas** de basura (2x3 cuadrantes, 2 chicas de 20 piezas + 1 grande de 60 por cuadrante); al activar, la colina se sustituye por una **montaña de basura real con física**, **revuelta** (`TablasProbabilidad.MEZCLA.patio` 40/35/15/10 papel/plástico/metal/orgánico, sin los tipos que el excavador no tiene); billetes 5 %, tesoros 1 %; la grande trae un tesoro seguro; **cada pieza es del color de su tipo** en uno de 5 tonos (`Paleta.TIPO`/`BASURA`, 3 oct); **solo se recoge con clic** (o la mira en táctil), reclamo atómico, **prioridad del excavador 10 s**, un montón terminado **vuelve a los 45 s** | `Services/Botin.luau` (fachada) → `GeneradorBotin`, `ObjetosPatio`, `FisicaBasura`, `Montones`, `Lanzamiento` + `BotinHandler` | verificado (`montonPiezas`, `reacomodo`, `sinRecogidaAutomatica`, `variedadBasura`, `coloresBasura`, `materialPorRebirth`, `variedadPiezas`) |
 | **Cinco contenedores** (3 oct): 4 de tipo (Papel celeste, Plástico amarillo, Metal plomo, Orgánico verde) en fila al este de la caseta y el **general azul** (el volquete de la recicladora). Premio por separar: en el de su tipo cada pieza de basura paga **x2**, en el de otro x0,5, en el general x1; billetes y tesoros x1 en todos. La bolsa entera va al contenedor donde cae (lanzada) o al del prompt (a mano) | `Utilidades/Contenedores`, `Bolsa.factorContenedor`, `Lanzamiento` (una caja y una boca por contenedor), `ConstructorMundo.cajaContenedor`, `ArteMundo.contenedorColor` | verificado (`pagoSeparado`, `lanzarATipo`, capturas) |
-| Puntería: **mantener F carga y lanza la bolsa entera**, el alcance lo da la mejora **Brazo** (25 → 70 studs); al entrar paga el **bonus por distancia** (+20 % desde 10 studs … +150 % desde 60) más la **racha** (+10 % por acierto seguido, tope +50 %); el **primer lanzamiento siempre entra**; los 5 primeros llevan **línea de trayectoria**; récord personal y del servidor en el feed; si falla, racha a 0 y la bolsa queda en el suelo para **su dueño** hasta que vuelva a por ella (no se recicla sola desde el 29 sep; si cae en alto se baja junto al contenedor); **solo se lanza con la bolsa llena** (29 sep: el botón táctil y la pista "MANTÉN F" solo salen entonces) | `Services/Lanzamiento.luau`, `Config/DefinicionesPunteria`, `Utilidades/Trayectoria`, `Client/LineaTrayectoria` | verificado (`bonusDistancia`, `racha`, `primeroEntra`, `pagoFormula`, `lanzarBolsa`, `lanzarBolsaFallo`, `bolsaProtegida`, `brazoLimita`, `("trayectoria")`) |
-| Primera persona automática en el patio con retícula (punto), manos+bolsa en 2D (Frames), brazos extendidos (cliente y servidor) sujetando una bolsa abierta soldada entre las manos | `Services/Patio.luau`, `Utilidades/PoseBrazos`, `Client/Camara.client`, `Client/UI/Manos.client`, `Escena.client` | verificado (`enPatio`, capturas) |
-| HUD: botonera de 4 (Tienda Q, Rebirth R, Pedidos P, Cámara V), píldora del dinero arriba-dcha con el **Turbo** (x2 y el tiempo) y el **pedido más avanzado** debajo, barras de fuerza y **bolsa** (sin números, "¡LLENA!" en rojo), pista de lanzar (abajo-dcha) y de recoger (abajo-izq; en táctil bajo los contadores: pisaba las barras) | `Client/UI/HUD.client.luau` | verificado (`("hud")` sin avisos en PC y táctil forzada, 3 oct) |
-| Sistema de diseño en **Fusion 0.3** (`Client/UI/Kit`): Ventana, Boton, Tarjeta, Pestanas, Pildora, Barra, Insignia, Icono, Escala; prompts y carteles del mundo (el prompt de Doña Chatarra abre la tienda; sus diálogos se quitaron el 29 sep) | `Client/UI/Kit/*`, `Prompts.client`, `Escena.client` | verificado |
-| **Mundo v6** (3 oct: los 4 contenedores de tipo en fila, la solera ensanchada al este, el volquete general en azul, un poste movido; v5 el 29 sep): sin parcelas ni máquina de refrescos, valla a 24 studs del patio por los tres lados, suelo de tierra en el patio abierto y del color de su material en las zonas del norte, barreras "Rebirth 1 · Zona de metal" / "Rebirth 2 · Zona de orgánico", punto de aparición en la plaza; tienda SHOP y recicladora de Blender, vallas, postes, camión, Doña Chatarra vestida, iluminación cartoon | `ServerStorage/Herramientas/ArteMundo.luau` + `ConstructorMundo` v6 | verificado (horneado v6 el 3 oct: 1.132 instancias, 18 ranuras con `Zona`, 8 barreras, 5 `Contenedor` (4 con `Material`); capturas); **guardar el place** |
-| Bolsa: todo lo recogido ocupa hueco (billetes incluidos), **sólo el contenedor paga**; entregar a mano no da bonus, lanzar sí | `Services/Bolsa.luau` | verificado (`billeteEnBolsa`, `sinDineroAlRecoger`, `salirRecicla`) |
-| **Rebirths**: con las 4 mejoras al máximo y el dinero del requisito en mano ($50k, 200k, 800k, 3,2M, 12,8M; luego ×4) se reinician dinero y mejoras y el dinero pasa a ×1,5 / 2 / 2,5 / 3 / 3,5 (luego +0,5); el 1 abre la zona de metal, el 2 la de orgánico, el 3 regala la **Bolsa plateada** (era la segunda mascota). Panel con requisito, barra y lo que abre; barrita de progreso bajo el botón del HUD | `Config/DefinicionesRebirths`, `Services/Rebirths` + `RebirthsHandler`, `Client/UI/Rebirth.luau` | verificado (`rebirthTabla`, `renacerRequisitos`, `renacer`, capturas) |
-| **4 mejoras × 10 niveles** (Bolsa 10→40, Alcance 6→16, Velocidad 16→28, Brazo 25→70), coste base × 1,6^nivel, total $118.030; en la tienda el nivel es una **barra de 10 cuadros** (`Kit/Segmentos`) sin valores ni studs (3 oct) | `Config/DefinicionesMejoras`, `Services/Mejoras.luau` | verificado (`mejorasV2`, captura) |
-| **Perfil v3** (rebirths, pedidos, logros, cosméticos, Turbo, vista de cámara); DataStore `ReciclatasPerfiles_v3`; `completar` borra los campos de las mascotas (`OBSOLETOS`) | `Services/Perfiles.luau`, `DataService` | verificado (`perfilV3`); el place ya está publicado y en Studio carga del DataStore real (`cargado=true`) |
-| **Aparición** en la plaza mirando al patio (sin base), también al morir | `Services/AparicionHandler.server.luau`, `Mundo.cframeAparicion` | verificado (`aparicion`) |
-| Tutorial jugable de **8 pasos** (patio, excavar, llenar, lanzar al general, mejora, **separar**, **un pedido**, **meta Rebirth 1**); flecha (Beam) y una **píldora** arriba-izq ("Paso 6/8 · …", abre el panel del paso) | `Config/DefinicionesTutorial`, `Services/Tutorial.luau`, `Client/UI/Tutorial.client` | verificado (`tutorial`, capturas) |
-| **Pedidos del día** (L7): 3 retos (el primero de puntería; "lejos" adaptado al Brazo, "material" a las zonas abiertas), se cobran solos ($250/500/900 × rebirth); los tres dan **10 min de Turbo**. Se abren al comprar la primera mejora | `Config/DefinicionesPedidos`, `Services/Pedidos` + `PedidosHandler`, `Client/UI/Pedidos` | verificado (`pedidosDia`, `pedidoSeparadas`, `premioTurbo`, captura) |
-| **16 insignias** (L7): en el perfil (`logros`) y como Badge si tienen id; tarjeta de logro al conseguirlas; pestaña Insignias del panel Pedidos | `Config/DefinicionesInsignias`, `Services/Insignias` | verificado (`insignias`); los Badges se crean en el Dashboard |
-| Tienda (L8): pestañas **Mejoras / Pases / Estilo**. Pases: Dinero x2, Bolsa XL (+10 huecos), Turbo 15 min (producto). Estilo: Bolsa plateada (Rebirth 3), Bolsa dorada y Estela arcoíris (pases); los 2 trajes de pago se quitaron el 5 oct. Con id 0 el botón dice "Próximamente" | `Client/UI/Tienda.luau`, `Config/Productos`, `Config/DefinicionesCosmeticos`, `Services/Cosmeticos`, `Services/Turbo`, `TiendaHandler` | verificado (`paseDineroX2`, `paseBolsaXL`, `turboAcumula`, `cosmeticoBolsa`, capturas) |
-| **Cámara** (L9): primera persona en el patio por defecto; **V** o el botón Cámara pasa a **tercera persona** sobre el hombro (raton al centro, el personaje gira con la cámara; las manos 2D se ocultan). Se guarda en el perfil | `Client/Camara.client`, `PatioHandler` (CamaraEvent) | verificado (`("camara","tercera")`, captura) |
+| Puntería: **mantener F carga y lanza la bolsa entera**, el alcance lo da la mejora **Brazo** (25 → 70 studs); al entrar paga el **bonus por distancia** (+20 % desde 10 studs … +150 % desde 60) más la **racha** (+10 % por acierto seguido, tope +50 %); el **primer lanzamiento siempre entra**, pero desde el 22 oct paga como mucho la distancia del Brazo y no cuenta para récords; los 5 primeros llevan **línea de trayectoria**; récord personal y del servidor en una tarjeta (el del servidor, también en el feed de los demás); si falla, racha a 0 y la bolsa queda en el suelo **30 s solo para su dueño** y después para cualquiera (no se recicla sola desde el 29 sep; si cae en alto se baja junto al contenedor). **Solo se lanza con la bolsa llena**: desde el 29 sep el botón táctil y la pista "MANTÉN F" solo salen entonces, y desde el 22 oct (P3) lo impone el servidor; como mucho **3 bolsas caídas** por jugador (con una más, la más vieja se recicla sola, sin bonus y a x0,5). El vuelo se integra con el paso exacto (§3 "Lanzamiento por agentes") | `Services/Lanzamiento.luau`, `Config/DefinicionesPunteria`, `Utilidades/Trayectoria`, `Client/LineaTrayectoria` | verificado (`bonusDistancia`, `racha`, `primeroEntra`, `pagoFormula`, `lanzarBolsa`, `lanzarBolsaFallo`, `bolsaProtegida`, `bolsaLibre`, `brazoLimita`, `lanzarSoloLlena`, `primeroSinRecord`, `topeBolsasCaidas`, `("trayectoria")`) |
+| Primera persona por defecto (en todo el mapa desde el 6 oct) con retícula (punto); en el patio (atributo `EnPatio`), manos+bolsa en 2D (Frames) y brazos extendidos sujetando una bolsa abierta soldada entre las manos (la pose la pinta cada cliente; el bucle del servidor, solo en Studio desde el 22 oct) | `Services/Patio.luau`, `Utilidades/PoseBrazos`, `Client/Camara.client`, `Client/UI/Manos.client`, `Escena.client` | verificado (`enPatio`, `poseSinBucle`, capturas) |
+| HUD: **botonera 2×3** (22 oct; era de 4), cada botón con su tecla: Tienda **Q** (o T), Rebirth **R**, Pedidos **P**, Cámara **V**, Sonido **M** (el panel Ajustes) y Recompensas **G** (con un punto rojo si hay una casilla del calendario por cobrar). En PC, sin panel abierto, el ratón está bloqueado al centro y la botonera solo se usa con su tecla. Píldora del dinero arriba-dcha con el **Turbo** (x2 y el tiempo; "x2 en pausa" cuando K1 lo pause) y el **pedido más avanzado** debajo, barras de fuerza y **bolsa** (sin números, "¡LLENA!" en rojo), pista de lanzar (abajo-dcha) y de recoger (abajo-izq; en táctil bajo los contadores: pisaba las barras) | `Client/UI/HUD.client.luau`, `UI/Paneles.client` (teclas) | verificado (`("hud")` sin avisos en PC y táctil forzada, 3 oct; con la botonera de 6, A1); falta `("hud")` con el punto rojo (§5) |
+| Sistema de diseño en **Fusion 0.3** (`Client/UI/Kit`): Ventana, Boton, Tarjeta, Pestanas, Pildora, Barra, Segmentos, Insignia, Icono, Interruptor (A1), Escala; prompts y carteles del mundo (el prompt del tendero, "Reciclador", abre la tienda; sus diálogos se quitaron el 29 sep) | `Client/UI/Kit/*`, `Prompts.client`, `Escena.client` | verificado |
+| **Mundo v6** (3 oct: los 4 contenedores de tipo en fila, la solera ensanchada al este, el volquete general en azul, un poste movido; v5 el 29 sep; sin barreras desde el 5 oct; re-horneado el 22 oct, W1: placas de los contenedores traducidas y las cajas de cartón de la caseta con su marrón fijo): sin parcelas ni máquina de refrescos, valla a 24 studs del patio por los tres lados, cada contenedor de color con su trituradora, punto de aparición en la plaza con los 3 tablones de ranking; tienda SHOP y recicladora de Blender, vallas, postes, camión, el tendero vestido, iluminación cartoon | `ServerStorage/Herramientas/ArteMundo.luau` + `ConstructorMundo` v6 | verificado (W1, 22 oct: 1.054 instancias, 18 ranuras con `Zona`, 0 barreras, 5 `Contenedor` (4 con `Material`), 5 `RecicladoraArte`, 3 `PantallaRanking`; capturas); **guardar el place** tras hornear |
+| Bolsa: todo lo recogido ocupa hueco (billetes incluidos), **sólo el contenedor paga**; entregar a mano no da bonus de lanzamiento (el de separar sí), lanzar sí. Al salir, lo de la mano, las bolsas caídas y las que vuelan se cobran sin bonus en `Perfiles.alSalir`, antes del guardado de salida (22 oct) | `Services/Bolsa.luau`, `Lanzamiento.cobrarAlSalir` | verificado (`billeteEnBolsa`, `sinDineroAlRecoger`, `salirRecicla`, `vueloAlSalir`) |
+| **Rebirths** (economía v4, 22 oct): con las 4 mejoras al máximo y el dinero del requisito en mano ($15k, 100k, 250k, 500k, 800k, 1,2M, 1,8M, 2,5M, 3,5M, 5M; desde el 11, ×1,4 en dos cifras significativas) se reinician dinero y mejoras y el dinero pasa a x1,5 / 2 / 3 / 4 / 5 … x10 (luego +1). El 1 abre la basura de metal, el 2 la orgánica, el 3 regala la **Bolsa plateada** (era la segunda mascota), el 4 la **Bolsa de hielo**, el 5 la **Estela de fuego** y la insignia Reciclador de élite, del 6 al 9 solo sube el multiplicador y el 10 da la insignia Leyenda del reciclaje. Panel con requisito, barra y el icono y el texto de lo que abre; barrita de progreso bajo el botón del HUD | `Config/DefinicionesRebirths`, `Services/Rebirths` + `RebirthsHandler`, `Client/UI/Rebirth.luau` | verificado (`rebirthTabla`, `renacerRequisitos`, `renacer`, capturas); los números v4 y `rebirthsAbren`, en Lune: falta Studio (§5) |
+| **4 mejoras × 10 niveles** (Bolsa 10→40, Alcance 6→16, Velocidad 16→28, Brazo 25→70), coste base × **1,35**^nivel (economía v4; era 1,6): las 4 al máximo $35.485 (eran $118.030); en la tienda el nivel es una **barra de 10 cuadros** (`Kit/Segmentos`) sin valores ni studs (3 oct) | `Config/DefinicionesMejoras`, `GameConfig.FACTOR_COSTE_MEJORA`, `Services/Mejoras.luau` | verificado (`mejorasV2`, captura); con 1,35, en Lune: falta Studio |
+| **Economía v4** (aprobada el 22 oct, `docs/Economia-v4.md`; números en §4): el jugador medio hace el R1 en ~58 min y el R5 en ~7 h 26 min jugando seguido (antes 3 h y 66 h). Todo premio en dinero es un % del **coste del siguiente rebirth** (`costeSiguiente`: su requisito más las 4 mejoras de 0 a 10, $50.485 con 0 rebirths) en dos cifras significativas (`redondear`), calculado al cobrar y sin pases ni Turbo | `Config/DefinicionesRebirths` (`costeSiguiente`, `redondear`) | `ritmoR1` (57,9 min), `costeSiguiente`, `premioAlCobrar` en Lune: falta Studio (§5) |
+| **Persistencia** (22 oct, P1): `Services/Guardado` es lo único que habla con el DataStore: cola por jugador (el guardado de salida nunca se descarta), `BindToClose` que espera todo lo que está en vuelo (hasta 25 s), `guardarAhora` para los recibos y **bloqueo de sesión** propio con un token por carga (latido en cada autoguardado de 120 s; caduca a los 600 s; una sesión ajena viva se roba a los 60 s; si al guardar ya no es suya, no escribe y expulsa con el texto en su idioma). **Perfil v5** en `ReciclatasPerfiles_v4` (perfiles desde cero el 22 oct; `_Studio` en Studio) con migraciones versión a versión; `Perfiles.alSalir` (antes del guardado de salida), `Perfiles.anterior` (el perfil tal como llegó), `alMinuto` y el atributo `PerfilListo` | `Services/Guardado.luau`, `Services/Perfiles.luau`, `DataService.server` (solo cableado) | verificado (`perfilV5`, `estado`, las de `Datos`); parar y volver a Play conserva el progreso |
+| **Aparición** en la plaza mirando al patio (sin base), también al morir; el personaje se carga cuando llega el perfil (o a los 15 s sin él) y su salto a la plaza se avisa a `Movimiento` | `Services/AparicionHandler.server.luau`, `Mundo.cframeAparicion` | verificado (`aparicion`) |
+| Tutorial jugable de **8 pasos** (patio, excavar, llenar, lanzar al general, mejora, **separar**, **un pedido**, **meta Rebirth 1**); flecha (Beam) y una **píldora** arriba-izq ("Paso 6/8 · …", abre el panel del paso). Cada paso completado sale en `Tutorial.alCompletar` (el embudo de la analítica; el 5 abre pedidos y recompensas) | `Config/DefinicionesTutorial`, `Services/Tutorial.luau`, `Client/UI/Tutorial.client` | verificado (`tutorial`, capturas) |
+| **Pedidos del día** (L7; economía v4 el 22 oct): 3 retos (el primero de puntería; "lejos" adaptado al Brazo, "material" a los tipos abiertos) que se cobran solos y pagan el **1,5 / 2 / 3 %** del coste del siguiente rebirth según la dificultad ($760 / 1.000 / 1.500 con 0 rebirths), calculado al cobrar; los tres dan **10 min de Turbo**; con el pase VIP, un **4.º pedido** ("Pedido VIP", paga como difícil, no cuenta para el Turbo). El día cambia a las **06:00 UTC**. Se abren al comprar la primera mejora | `Config/DefinicionesPedidos`, `Services/Pedidos` + `PedidosHandler`, `Client/UI/Pedidos` | verificado (`pedidosDia`, `pedidoSeparadas`, `premioTurbo`, captura); con la v4 y `pedidoVip`, en Lune: falta Studio |
+| **Recompensas** (22–23 oct, R1): panel propio con el botón del regalo (**G**), pestañas Calendario y Regalos. **Calendario** de 7 casillas, una por día jugado y con botón (2 % · 2 % · Turbo 10 min · 3 % · 3 % · Turbo 15 min · 4 %; saltarse un día no reinicia nada; la 7.ª da la insignia Constante, que regala la Bolsa de cartón (ponérsela llega con K1); desde la 2.ª vuelta suma Turbo 15 min). **Regalos** solos por minutos activos del día (5/10/20/30/45/60: 0,5 % · 0,5 % · 1 % · Turbo 5 min · 1 % · 2 %; un minuto es activo con 3 acciones). **Bono de regreso** al entrar tras 3 días sin jugar (Turbo 15 min + 4 %) o 14 (Turbo 30 min + 8 %), con ventana de bienvenida. Se abre con la primera mejora; el panel se abre solo al entrar si hay algo que cobrar | `Config/DefinicionesRecompensas`, `Services/Recompensas` + `RecompensasHandler`, `Services/Actividad` + `ActividadHandler`, `Client/UI/Recompensas.luau` | verificado (las 8 de `Recompensas`, `actividad`); faltan repetirlas con la curva v4, las capturas del panel y `("hud")` con el punto (§5) |
+| **20 insignias** (16 del L7 y 4 de la economía v4: rebirth5, rebirth10, semanaCompleta, pedidos30): en el perfil (`logros`) y como Badge si tienen id (10 creadas en Roblox; 5 gratis al día); al entrar se consultan en lotes (`CheckUserBadgesAsync`) con caché de la sesión; tarjeta al conseguirlas; pestaña Insignias del panel Pedidos | `Config/DefinicionesInsignias`, `Services/Insignias` | verificado (`insignias`, `insigniasLote`); faltan 10 Badges (§5) |
+| **Tablones de ranking** en la plaza (8 oct): Dinero ganado, Racha máxima y Bolsas encestadas, histórico y semanal (desde el lunes 00:00 UTC); stores `Ranking_v2_*` desde el 22 oct (tablones limpios para el lanzamiento); se publican en `alSalir` y el cierre espera las escrituras | `Config/DefinicionesRankings`, `Services/Rankings` + `RankingsHandler`, `Client/Tablones.client` | verificado (`rankings`, `rankingsDatastore`, `("tablones")`) |
+| Tienda (L8): pestañas **Mejoras / Pases / Estilo**. Pases (catálogo de la economía v4; creados en Roblox el 23 oct, F1b, con sus ids en `Config/Productos`): Pack de inicio 99 (compra única), Dinero x2 199, Bolsa XL 149 (+10 huecos), VIP 249, Estela arcoíris 99 y Bolsa dorada 99; productos Turbo 15 min (49) y Turbo 60 min (149). Estilo: bolsas plateada (Rebirth 3), de hielo (R4), de cartón (insignia Constante), del reciclador (Pack) y dorada (pase); estelas arcoíris (pase), de fuego (R5) y VIP (pase); los 2 trajes de pago se quitaron el 5 oct. El precio sale de Config. **K1 (en curso, §5)** trae el precio real, las etiquetas de origen nuevas, los efectos del VIP y del Pack y las ofertas | `Client/UI/Tienda.luau`, `Config/Productos`, `Config/DefinicionesCosmeticos`, `Services/Cosmeticos`, `Services/Turbo`, `TiendaHandler` | verificado (`paseDineroX2`, `paseBolsaXL`, `turboAcumula`, `cosmeticoBolsa`, capturas); K1 sin terminar |
+| **Cámara** (L9): primera persona por defecto; **V** o el botón Cámara pasa a **tercera persona** sobre el hombro (ratón al centro, el personaje gira con la cámara; las manos 2D se ocultan), en todo el mapa desde el 6 oct. Se guarda en el perfil; `CamaraEvent` con cooldown desde el 22 oct (la última vista pedida no se pierde) | `Client/Camara.client`, `PatioHandler` (CamaraEvent), `Patio.elegirVista` | verificado (`("camara","tercera")`, `camaraCooldown`, captura) |
 | Figuritas (6 fijas) y cintas: **pospuestas** (`FUNCIONES`; los trajes, gratis y de pago, se quitaron el 5 oct) | `Config/DefinicionesColeccionables`, `Services/Coleccionables.luau` | apagados |
-| Monetización: 6 pases y 1 producto (L8), ProcessReceipt idempotente con otorgadores registrados por producto (`Turbo` registra el suyo), modo dev (apagado por defecto: `/pases on`) | `Services/Monetizacion.luau`, `Config/Productos` | escrito y probado con modo dev; **ids reales pendientes** (§5) |
-| Admin por chat (`/dar dinero`, `/maxmejoras`, `/pases`, `/rebirths n`, `/tutorial n`, `/repoblar`, `/reset`) | `Services/AdminHandler.server.luau` | escrito |
+| **Monetización** (P2, 22 oct): los pases se cachean al entrar y una compra solo cuenta si Roblox la confirma (`UserOwnsGamePassAsync`, P3b) y sale en `alComprarPase`; `ProcessReceipt` idempotente, con otorgadores registrados por producto (`Turbo` registra los suyos), **espera al perfil** (hasta `SESION_ESPERA_ROBO` + 15 s) y solo devuelve `PurchaseGranted` con la compra ya guardada (`guardarAhora`); modo dev de pases solo en Studio (apagado por defecto: `/pases on`) | `Services/Monetizacion.luau`, `Config/Productos` | verificado (las 8 de `Monetizacion`); ids reales desde el 23 oct (F1b); falta una compra real de cada uno (Q3, §5) |
+| **Anti-trampas** (P3 y su revisión P3b, 22–23 oct): el servidor solo lanza bolsas llenas, recorta el primer tiro al Brazo, pone tope a las bolsas caídas, exige argumentos de lanzamiento finitos y dentro del mapa y cooldown a la cámara. **`Movimiento`** vigila la velocidad horizontal con un crédito (Velocidad × 1,8, ráfaga de 2,1 s): quien se mueve más de lo que puede andando pasa **2 s** sin recoger, excavar, entregar a mano ni lanzar, sin aviso y **sin expulsión nunca**; los saltos del propio servidor se avisan con `permitirSalto` | `Services/Movimiento` + `MovimientoHandler`, `Lanzamiento`, `ObjetosPatio`, `Bolsa`, `BotinHandler` | verificado (las de `Antitrampas`); falta medirlo con varios jugadores (Q1, `README-pruebas.md`) |
+| Admin por chat **solo en Studio** (22 oct; sin autocompletar y todos los de la sesión son admin): `/dar dinero n` (acotado; no cuenta como dinero ganado), `/maxmejoras`, `/pases on` u `off`, `/rebirths n`, `/tutorial n`, `/repoblar`, `/reset`. En el juego publicado no hay comandos ni admins, tampoco el creador | `Services/Admin.luau`, `AdminHandler.server` | verificado (`adminOculto`, `modoDevSoloStudio`) |
+| **Audio** (22 oct, A1; decisión del usuario: los recomendados de `docs/Audio-propuesta.md`, de la biblioteca con licencia de Roblox): `Config/Sonidos` (un id por clave; id 0 la calla), efectos 2D y 3D con voces reutilizadas, música del patio en orden aleatorio con fundido cruzado (y la del Turbo, como mucho dos veces) que baja en celebraciones, rebirths e insignias; botón **Sonido (M)** con Música y Efectos, que valida y guarda el servidor (`AjustesEvent`, `perfil.ajustes`) | `Config/Sonidos`, `Client/Sonido.luau`, `Musica.client`, `SonidosMundo.client`, `UI/Ajustes.luau`, `Services/Ajustes` + `AjustesHandler` | verificado (`ajustesValidos`, `("modulo","Sonido","listar")`); el usuario los escucha jugando y cambia los que no le gusten |
+| **Pantalla de carga** (22 oct, L1): desde el primer fotograma del cliente hasta que el perfil responde (`PerfilListo`) o hay personaje, con red de seguridad a los 60 s; los cinco contenedores saltando por turnos, título y consejos traducidos ("Cargando tu progreso…" a los 8 s); precarga iconos y sonidos sin retener a nadie | `src/ReplicatedFirst/Carga.luau` + `PantallaCarga.client` | verificado (23/23 precargas, carga lenta simulada, es/en; `("modulo","Carga",...)`) |
+| **Analítica** (22 oct, N1): embudo de inicio de 9 pasos (entrar y los 8 del tutorial), fuentes y sumideros del Dinero con el saldo final, progresión por rebirth y eventos propios (Acierto, Fallo, Rebirth, Insignia, CompraPase, CompraProducto, Sesion, PerfilNoCargado, Sospecha), todo en pcall y en tramos; la plataforma la manda el cliente una vez. En Studio no se envía (`Analitica.registro`) | `Services/Analitica` + `AnaliticaHandler`, `Client/Telemetria.client`, `AnaliticaEvent` | verificado (las 7 de `Analitica`); los datos reales, tras publicar (24–48 h) |
+| **Idiomas** (7 oct): español (original y respaldo), inglés y portugués con módulos Luau, sin LocalizationTable ni traducción automática de Roblox; el servidor manda mensajes y no texto (salvo el `Kick`) | `Config/Traducciones/{en,pt}`, `Utilidades/Idioma`, `TraducirMundo.client` | verificado (`idioma`, `("idioma")`) |
 
 ## 2. Cómo se trabaja
 
 ### Sincronizar código a Studio
 
-Flujo normal: `rojo serve default.project.json --port 34872` y **Connect** en el
+Flujo normal: `herramientas/rojo-serve-bucle.ps1` (un `rojo serve
+default.project.json --port 34872` que se relanza solo si se cae; Rojo no
+está en el PATH y el script usa `~/.aftman/bin/rojo.exe`) y **Connect** en el
 plugin de Rojo. Rojo 7 crea `X.luau` → ModuleScript, `X.server.luau` → Script,
-`X.client.luau` → LocalScript, `X.model.json` → instancia.
+`X.client.luau` → LocalScript, `X.model.json` → instancia; desde el 22 oct
+`src/ReplicatedFirst` va al servicio.
 
-Flujo de emergencia (cuando no se puede pulsar Connect, p. ej. trabajando por
-MCP): `herramientas/servir-fuentes.ps1` sirve `src/` por HTTP en
-`localhost:8123` y `herramientas/instalar-desde-http.luau`, ejecutado en la
-barra de comandos (o `execute_luau`) sobre el DataModel Edit, crea/actualiza el
-mismo árbol con las mismas reglas. Es idempotente y sólo escribe `Source` si
-cambió; cuando el plugin de Rojo se conecte no verá diferencias.
+Rojo 7.7.0 (y 7.7.1) se cae cuando un editor guarda con un archivo temporal y
+lo renombra, que es lo que hace la herramienta Edit de los agentes
+("called Result::unwrap() on an Err value ... NotFound", rojo-rbx/rojo#1338;
+el arreglo, PR #1319, aún no está en ninguna versión). El bucle lo relanza,
+pero **el plugin no se reconecta solo**: hasta que alguien pulse Connect, lo
+editado no llega a Studio. Por eso los agentes sincronizan por HTTP.
+
+Por HTTP (agentes, MCP, o cuando no se puede pulsar Connect):
+`herramientas/servir-fuentes.ps1` sirve el repo en `localhost:8123` y
+`herramientas/instalar-desde-http.luau`, ejecutado en la barra de comandos (o
+`execute_luau`) sobre el DataModel Edit, crea/actualiza el mismo árbol con las
+mismas reglas: borra lo que sobre en las carpetas gestionadas y en
+`ReplicatedFirst` (un LocalScript viejo ahí correría el primero en cada
+cliente) y normaliza los finales de línea CRLF→LF como Rojo (con
+`core.autocrlf` el disco va en CRLF, y sin eso cada pasada reescribía ~140
+`Source` que Rojo volvía a parchear). Es idempotente y sólo escribe `Source` si
+cambió: una segunda pasada da 0 cambios, y cuando el plugin de Rojo se
+conecte no verá diferencias.
+
+Studio se abre por shell (`RobloxStudioBeta.exe -task EditPlace -placeId
+139915415713937 -universeId 10766595888`; la línea entera en CLAUDE.md), no
+con `open_application` de computer use, que el 22 oct abrió tres veces una
+instancia nueva en la página de inicio. Computer use queda para pulsar
+Connect en el plugin y Start en Test → Clients and Servers.
 
 ### El mundo
 
@@ -91,10 +145,12 @@ cambió; cuando el plugin de Rojo se conecte no verá diferencias.
 `ArteMundo`). **Tras construir hay que guardar el place.** `SetupMundo` sólo
 lo adopta; si falta, lo construye en runtime como fallback y avisa. Todo se
 localiza por tags/atributos, nunca por nombre: `RanuraMonton` (18, con
-`Tamano`, `Cuadrante` y `Material`), `BarreraCuadrante` (8, con `Cuadrante`
-y `Rebirth`), `PuntoAparicion`, `Contenedor`, `Limite`, `SoloDecorado`,
-`FigurinaFija` (solo con `FIGURINAS`); atributo `NPC`. Mundo v4 (26 sep):
-~1.050 instancias.
+`Tamano`, `Cuadrante` y `Zona`), `BarreraCuadrante` (con `Cuadrante` y
+`Rebirth`; ninguna desde el 5 oct, el código aún las respeta),
+`PuntoAparicion`, `Contenedor` (+ `Material` en los 4 de tipo),
+`RecicladoraArte`, `PantallaRanking`, `Limite`, `SoloDecorado`,
+`FigurinaFija` (solo con `FIGURINAS`); atributo `NPC`. Mundo v6 re-horneado
+el 22 oct: 1.054 instancias.
 
 Lo generado por IA vive **en el place**, no en git: las variantes de
 material de `MaterialService` (`MontanaBasura` es la única en uso; `CespedCartoon` y
@@ -110,18 +166,21 @@ del MCP y renombrar.
 ### Trabajar por el MCP de Studio
 
 El hilo de `execute_luau` (Edit) **puede** crear partes, escribir `Source` y
-propiedades, y leer `Source`; **no puede** hacer `require` de módulos del
-juego, usar HttpService, crear/reparentar scripts ni invocar
-BindableFunctions/RemoteEvents (le faltan capacidades: "LoadUnownedAsset",
-"Network", "RobloxScript"). De ahí:
+propiedades, y leer `Source`; en septiembre **no podía** hacer `require` de
+módulos del juego, usar HttpService, crear/reparentar scripts ni invocar
+BindableFunctions/RemoteEvents (le faltaban capacidades: "LoadUnownedAsset",
+"Network", "RobloxScript"). El 22–23 oct los agentes ya corrían por ese hilo
+el instalador HTTP (`loadstring` + `HttpService`) y `EjecutarPrueba:Invoke`;
+si una capacidad vuelve a faltar, quedan los rodeos de abajo:
 
 - Hornear desde el MCP: `herramientas/hornear-desde-mcp.luau`, un `require`
   que carga cada módulo con `loadstring(modulo.Source)` y `setfenv`.
-- Sincronizar código sin el plugin de Rojo: `multi_edit` crea y edita
-  scripts y `Source = [==[...]==]` por `execute_luau` reescribe los
-  existentes; se comprueba con una huella (largo, suma de bytes y suma
-  ponderada por posición) igual en local y en Studio. **Con Rojo conectado no
-  usar `multi_edit`**: aplica el mismo cambio dos veces (pasó con `Paleta`).
+- Sincronizar código sin el plugin de Rojo: el instalador HTTP (arriba).
+  Desde el plan del 22 oct ya no se usa `multi_edit` ni `Source = [==[...]==]`
+  por `execute_luau` para escribir código (antes se comprobaba con una huella:
+  largo, suma de bytes y suma ponderada por posición): con Rojo conectado
+  `multi_edit` aplica el mismo cambio dos veces (pasó con `Paleta`), y el
+  código que no sale de los archivos de `src/` se salta la revisión.
 - Pruebas: por atributos (`Prueba` / `PruebaCliente`, ver arriba).
 - `screen_capture` acepta `camera_position` / `look_at_position` en Edit;
   en Play, mover `workspace.CurrentCamera` (Scriptable) desde el cliente.
@@ -133,23 +192,249 @@ BindableFunctions/RemoteEvents (le faltan capacidades: "LoadUnownedAsset",
 ### Probar
 
 - `ServerStorage.EjecutarPrueba:Invoke(nombre, ...)` (sólo Studio) ejecuta las
-  pruebas de `Services/PruebasDefinidas/` (por área: Patio, Bolsa, Progreso) DENTRO de la VM del servidor.
+  pruebas de `Services/PruebasDefinidas/` (un módulo por área: Patio, Bolsa,
+  Progreso, Datos, Monetizacion, Antitrampas, Analitica, Economia,
+  Recompensas…; la lista entera en CLAUDE.md "Verificar") DENTRO de la VM del servidor.
   Existe porque la barra de comandos / execute_luau corren en la VM del plugin y
-  allí `require` devuelve copias vacías de los módulos.
-- `ReplicatedStorage.EjecutarPruebaCliente:Invoke("abrir", "Album")` abre
-  paneles desde la VM del cliente.
+  allí `require` devuelve copias vacías de los módulos. Desde el 22 oct las
+  que mueven al jugador pasan por `Comunes.teletransportar` (si no,
+  `Movimiento` lo toma por un salto del cliente) y las que lanzan, por
+  `Comunes.llenarBolsa` (el servidor solo lanza bolsas llenas).
+- `ReplicatedStorage.EjecutarPruebaCliente:Invoke("abrir", "Tienda")` abre
+  paneles desde la VM del cliente; `("modulo", nombre, accion, ...)` llama a
+  `require(nombre).prueba[accion]` de un ModuleScript del cliente (o de
+  `ReplicatedFirst`): así se prueban `Sonido`, `Carga` y `Recompensas` sin
+  tocar `PruebasCliente`, que desde el 22 oct ya no se edita.
 - Si el hilo del MCP no puede invocar BindableFunctions ("additional values for
   the Capabilities property", visto en Studio tras reabrir el place), la misma
   prueba se lanza por atributos (ese hilo tampoco puede crear ni mover scripts
   ni usar HttpService: para sincronizar codigo en ese caso solo queda el plugin
-  de Rojo; `multi_edit` del MCP sirve para parches pequenos): `ServerStorage:SetAttribute("Prueba",
+  de Rojo): `ServerStorage:SetAttribute("Prueba",
   "3:montonPiezas")` (número de orden + nombre|args) y el texto queda en el
   atributo `Resultado`; en el cliente `ReplicatedStorage` con `PruebaCliente` /
   `ResultadoCliente`. El número evita ejecuciones dobles con señales diferidas.
 - Multijugador: Studio → Test → *Clients and Servers* (2 jugadores). Ver
-  `README-pruebas.md`.
+  `README-pruebas.md` (también qué mirar de `Movimiento` y del bloqueo de
+  sesión). En Studio las sesiones de otro Play se dan por caducadas: no hay
+  que esperar entre un Play y el siguiente.
 
 ## 3. Decisiones no obvias (y por qué)
+
+### Lanzamiento por agentes (22–23 oct)
+
+Petición del usuario: analizar todo lo que falta para lanzar y trabajarlo
+con los agentes. Una auditoría de tres frentes (el código, el place en
+Studio y el producto frente al GDD y a otros simuladores) concluyó que el
+bucle estaba completo y el mundo íntegro, pero que no se podía abrir: pases,
+producto e insignias con id 0, la ficha vacía, Max players en 60, un
+guardado frágil (un guardado se descartaba si coincidía con otro, el cierre
+no esperaba, no había bloqueo de sesión y la compra no se guardaba), Studio
+escribiendo en el DataStore real y ni un sonido; en el producto, un R1 a las
+2–4 h, nada nuevo tras el R3 y ninguna recompensa por volver. El plan
+aprobado (`de-acuerdo-analiza-el-soft-rossum.md`, en los planes de Claude
+Code, fuera del repo) lo reparte en fases (0 punto de partida, 1
+endurecimiento, 2 producto base, 3 economía y retención, 4 imágenes y
+Creator Hub, 5 verificación, 6 lanzamiento en dos tiempos) y paquetes.
+
+**Decisiones del usuario** (22 oct): commit por paquete verificado y push al
+cerrar cada fase; el Creator Hub lo hace `roblox-publisher` en su Chrome y se
+para antes de fijar precios, enviar el cuestionario, hacerla pública o gastar
+Robux; pulir antes de abrir (lo social y los códigos, después); el R1 en
+45–60 min, con el número que recalcule `game-designer` y apruebe él;
+**perfiles desde cero** en `ReciclatasPerfiles_v4` y rankings v2 (el store
+v3 se abandona, no se borra); **admin solo en Studio**; permiso para
+re-hornear; insignias gratis, 5 al día (Roblox cobra 100 Robux por cada una
+más).
+
+**Cómo se trabajó.** Una sesión orquesta: lanza cada agente con su brief, le
+da **turno de Studio** (hay uno solo con MCP; hasta 3 paquetes de código a
+la vez si no comparten archivos) y une su trabajo. Cada paquete edita solo
+sus archivos, pide las claves de texto que le falten en vez de inventarlas,
+pone sus pruebas en su `PruebasDefinidas/<Área>` y cierra con sus pruebas y
+las que afecta, la consola limpia, la revisión de `code-reviewer` y un
+commit local. Los archivos calientes tienen un solo dueño en cada momento;
+`Textos` y sus traducciones solo los tocan las "ventanas de copy" C1, C2 y
+C3, que añaden de una vez las claves de su fase en los tres idiomas (van
+antes que el código: `Idioma.mensaje` falla con una clave que no existe).
+Los agentes en worktree no pueden escribir en la carpeta principal:
+devuelven sus archivos y el orquestador los une.
+
+Lo no obvio de cada paquete:
+
+- **W1, re-horneado** (22 oct): las placas de los contenedores salen
+  traducidas y con la tilde bien ("ORGÁNICO"). Además `ArteMundo.caja`
+  tomaba `Paleta.BASURA.Papel[1]`, que sigue al color del tipo: desde que el
+  papel pasó a celeste (6 oct) las 6 cajas de la caseta salían celestes;
+  ahora llevan `Paleta.MUNDO.CARTON`. Mismos conteos (1.054).
+- **C1, copy y limpieza**: fuera 7 textos sin uso (`HUD.lanzar`, `HUD.cerrar`,
+  `PATIO.figurinaYaTienes`, `TIENDA.comprar`, `TIENDA.equipado`,
+  `NOTIFICACIONES.guardado`, `NOTIFICACIONES.tesoro`), los iconos gema, sobre,
+  contenedorDorado y pocion y el glifo gema (los glifos sobre y
+  contenedorDorado se habían quedado y se borraron el 23 oct); `sinRestos`
+  falla si vuelven.
+- **P1, guardado v4** (y los arreglos de su revisión, el mismo día):
+  `Services/Guardado` hereda el guardado de `DataService` (que queda como
+  cableado), sigue sin ProfileStore y pone el bloqueo de sesión dentro de
+  `UpdateAsync` (ver "Persistencia propia" más abajo). Lo no obvio:
+  - un **token por carga**: con la carga lenta, salir y volver a entrar en el
+    MISMO servidor no pierde la sesión (lo que queda del Player viejo ya no
+    se la quita al nuevo);
+  - el robo de una sesión viva se cancela si el jugador se va o el servidor
+    cierra, y espera 60 s (por encima del peor caso de una salida lenta;
+    robar antes dejaría sin guardar lo último jugado allí);
+  - un perfil de una **versión más nueva** que el código (lo escribió un
+    servidor ya actualizado) se juega sin guardar (`versionNueva`);
+  - la carga en segundo plano tras un fallo conserva el provisional si no
+    había partida y, si la había, la sustituye y avisa (`progresoRecuperado`);
+  - en Studio las sesiones de otro Play ("Studio-…") se dan por caducadas;
+  - `Perfiles.alSalir` llega **antes** del guardado de salida y sustituye al
+    `task.wait(0.2)` de `PlayerRemoving`; `Perfiles.anterior` es el perfil
+    tal como llegó (`registrar` pisa `ultimaSesion`); el atributo
+    `PerfilListo` (nil cargando, true o false) es lo que espera la pantalla de
+    carga, y `ServerStorage.SimularCargaLenta` (solo Studio) retrasa la carga.
+- **P2, monetización**: Roblox deja de reintentar un recibo confirmado, así
+  que `PurchaseGranted` solo con la compra **guardada**; si el guardado
+  falla, `NotProcessedYet` y lo otorgado queda anotado (el reintento no lo
+  repite). Antes un `/pases on` en el juego publicado daba todos los pases a
+  todo el servidor: el modo dev y los comandos solo existen en Studio (sin
+  autocompletar; `/dar` acotado y fuera de las estadísticas, para no ensuciar
+  rankings ni insignias). Las insignias se consultan con
+  `CheckUserBadgesAsync` en lotes de 10 y caché de la sesión.
+- **P3, anti-trampas** (y su revisión de seguridad **P3b**, 23 oct):
+  - Antes solo el cliente exigía la bolsa llena y uno modificado farmeaba
+    aciertos, rachas, pedidos e insignias con una pieza: ahora lo exige el
+    servidor.
+  - Tope de 3 bolsas caídas por jugador (sin tope, un cliente que lanzara sin
+    parar llenaría el patio de modelos): con una más, la más vieja se recicla
+    sola sin bonus y **a x0,5** (decisión del usuario, 23 oct: a x1, tirar
+    bolsas al suelo cobraba sin andar hasta el contenedor).
+  - El primer tiro sigue entrando siempre, pero paga como mucho la distancia
+    del Brazo y no cuenta para récords: un novato que lanzaba desde el patio
+    cobraba +150 % y se llevaba "Francotirador" con un récord imposible de
+    batir.
+  - Al salir se cobra sin bonus también lo que está en el aire, en `alSalir`
+    (en `PlayerRemoving` no había orden con el guardado: se cobraba quizá
+    después de guardar, o la bolsa se quedaba en el suelo de alguien que ya
+    no estaba).
+  - **`Movimiento`** nunca expulsa ni devuelve al personaje a su sitio (lo
+    simula su cliente, y corregirlo pelearía con el lag): hace que el salto no
+    sirva. Mide con un **crédito** de distancia y no muestra a muestra, para
+    que el lag (el personaje parece quieto y luego llega todo el camino) y los
+    empujones de la física no cuenten; la vertical no se mide. Margen medido
+    en Studio (P3b): andando hay picos de 1,44x, sobre una montaña recién
+    excavada 1,75x; `FACTOR_VELOCIDAD` 2,5 → **1,8** con ráfaga de 2,1 s (el
+    crédito guarda lo mismo y el ritmo sostenido baja). P3b además:
+    `sospechoso` mide la posición de ese instante (un teletransporte y una
+    acción en el mismo frame ya se cogen), `permitirSalto` mide desde el
+    destino y la entrega a mano también se bloquea.
+  - **Un bug real del vuelo**: se integraba con Euler y la bolsa quedaba
+    0,5·g·t·dt por debajo del arco de la línea de ayuda (0,4 studs corta a 60
+    fps, 0,8 a 30): acertar dependía de los fps del servidor (`lanzarATipo`
+    pasaba 2 de cada 6). Ahora paso exacto (`pos += vel·dt + g·dt²/2`): 7 de 7.
+  - El bucle de la pose de brazos del servidor solo corre en Studio: en un
+    juego publicado nadie mira la vista del servidor (`poseSinBucle`).
+- **L1, pantalla de carga**: el servidor solo crea el personaje con el perfil
+  cargado, y con el DataStore lento se veían hasta 15 s de nada justo en el
+  primer minuto. Vive en `ReplicatedFirst` sin Fusion ni el Kit (corre antes
+  de que llegue `ReplicatedStorage`, y ningún `require` de ahí antes de
+  `game:IsLoaded()`: un ModuleScript que falla al cargarse queda roto para
+  todo el cliente), con los colores **copiados** de `Paleta` (el gancho
+  `("modulo", "Carga", "estado")` los compara). `PreloadAsync` con el texto `rbxassetid` pedía otro
+  tipo de asset (22 de 23 iconos fallaban): precarga una `ImageLabel` o un
+  `Sound` por id. El consejo de la tecla F no sale en táctil ni con mando, y
+  en móvil el consejo crece dentro de una zona fija (`AutomaticSize` solo
+  crece dentro de su padre).
+- **N1, analítica**: todo en pcall (si AnalyticsService falla, el juego
+  sigue; un aviso por minuto como mucho) y los campos en tramos (Roblox
+  admite 3 campos propios y 8.000 combinaciones por experiencia). En Studio
+  el servicio de verdad escribe una línea "event fired" por llamada (49 en
+  una tanda de pruebas): `ENVIAR_EN_STUDIO` va apagado y las pruebas miran
+  `Analitica.registro`. Lo que Bolsa recicla sin señal (al salir, por el
+  tope de bolsas) se cuadra al salir como `Reciclaje_SinBonus`: una fuente de
+  dinero nueva que no pase por `Analitica` saldrá ahí. Roblox aún no enseña
+  `LogProgressionCompleteEvent` en ningún gráfico: el rebirth va también como
+  evento propio. La plataforma la dice el cliente y el servidor la valida;
+  nada del cliente se reenvía tal cual.
+- **A1, audio** (decisión del usuario: los recomendados de
+  `docs/Audio-propuesta.md`, de la biblioteca con licencia de Roblox, que él
+  escuchará jugando y cambiará en `Config/Sonidos`): nadie más crea `Sound`s;
+  un toque reutiliza voces de una plantilla por clave. Lo que suena en un
+  cliente no se replica: los 3D que oyen todos (bolsa lanzada, golpes,
+  recicladoras) los reproduce cada cliente al ver el evento. Hasta que llega
+  el primer perfil la música está a 0 (no se sabe si el jugador la quitó).
+  El botón Sonido nació sin tecla y en PC no se podía abrir (sin panel, el
+  ratón está bloqueado al centro): desde entonces **cada botón de panel lleva
+  su tecla**, M en este.
+- **C2 y C3, copy y contrato**: secciones `CARGA`, `SONIDO`, `RECOMPENSAS` y
+  `OFERTAS` y los nombres nuevos en `DEF`, en los tres idiomas. En portugués,
+  "cheio/encher" del saco pasa a "lotado/lotar" (en Brasil "encher o saco" es
+  fastidiar). C2 añadió el gancho `("modulo", nombre, accion, ...)` de
+  `PruebasCliente`. C3 dejó el contrato de E1, R1 y K1 sin lógica de juego:
+  perfil v5 (`turboRestante`, `recompensas`, `ofertas`, `compras`; completar
+  clave a clave a cualquier profundidad); `Services/Actividad`, sin
+  dependencias de otros servicios porque la requiere `Turbo` (y `Bolsa`
+  requiere `Turbo`); `costeSiguiente` con las mejoras **desde cero** y no con
+  las que le faltan al jugador (un premio solo cambia al renacer, no baja al
+  comprar mejoras) y `redondear` (dos cifras significativas, como el
+  documento); el botón Recompensas en el sexto hueco con la tecla **G** (E es
+  de los prompts; F, Q, T, R, P, V y M ya estaban) y su punto rojo arriba a la
+  izquierda (la tecla va arriba a la derecha). Las recompensas tienen **panel
+  y botón propios** (el documento las ponía en una pestaña de Pedidos).
+  `Oferta` quedó como ventana vacía sin botón ni tecla: la abrirá el servidor.
+- **E1, ritmo** (números en §4): el factor de las mejoras baja a 1,35 con los
+  mismos costes base (con 1,6 el 76 % del gasto estaba en los tres últimos
+  niveles y el final de cada tramo se hacía eterno); multiplicadores redondos
+  (x3, x4, x5…) porque con +0,5 renacer valía un 17–20 % y dejaba de notarse;
+  los pedidos pasan a un % del siguiente rebirth (antes, ~1 % del R1: nadie lo
+  notaba), calculado al cobrar (si renace a media tarde, lo pendiente vale lo
+  del rebirth nuevo). **El día cambia a las 06:00 UTC** (decisión del
+  usuario): a medianoche UTC los pedidos cambiaban a las 19–21 h en
+  Latinoamérica, en plena tarde de juego; a las 06:00 es de madrugada en
+  América y por la mañana en España. **Pedido VIP**: con el pase, un 4.º
+  pedido de las plantillas que no salieron, que paga como difícil y no cuenta
+  para el Turbo de los tres; si el pase llega con el día empezado, se añade al
+  momento (`Monetizacion.alCambiarPases`). Otras decisiones del usuario al
+  aprobar la economía: el Turbo solo correrá mientras se juega (K1), VIP a
+  249, y el tramo desde el R3 se lanza tal cual y se mide.
+- **R1, recompensas**: saltarse un día del calendario no reinicia nada (con
+  público infantil, perder lo acumulado por no entrar es presión, y Roblox
+  pide no presionar a los menores). Los regalos cuentan los minutos activos
+  **del día** y no de la sesión (por sesión, entrar y salir cada 5 min
+  rendiría más que jugar); `Actividad.alAccion` llega como mucho una vez por
+  segundo, así que "3 acciones en un minuto" son 3 segundos con algo hecho y
+  un autoclicker no suma más. El regreso se mira una vez por perfil con
+  `Perfiles.anterior` (no depende de que otro oyente ya tocara
+  `ultimoDiaJugado`) y nunca a un jugador nuevo. Al cobrar, primero el estado
+  y después el pago: lo peor es no cobrar, nunca cobrar dos veces; un día
+  guardado por delante del de hoy (si cambia la hora del día) tampoco deja
+  cobrar dos veces.
+- **Estado transitorio del Turbo** (hasta K1): `Services/Turbo` sigue con la
+  hora de fin (`perfil.turboHasta`, tiempo real), pero desde la v5 del perfil
+  `turboHasta` es OBSOLETO y `completar` lo borra al cargar; la migración solo
+  pasó a `turboRestante` el que quedaba en los perfiles v4, y nada lee aún
+  `turboRestante`. Por eso un Turbo en marcha **no sobrevive a salir y
+  volver**, y las pruebas de pedidos restauran a mano un `turboHasta` que no
+  estaba (`premioTurbo` dejaba 660 s de Turbo que doblaban el dinero de las
+  siguientes: `salirRecicla` daba $124 en vez de $62).
+- **Ficha y Creator Hub** (22 oct, `docs/Ficha-lanzamiento.md`; decisiones
+  del usuario): nombre **"Recíclatas: Lanza la Basura"** (en "Throw the
+  Trash", pt "Jogue o Lixo"), que sustituye a "Garbage Collector" (chocaba
+  con *Garbage Collector Simulator*, con el término de programación y con el
+  nombre que el juego enseña dentro); descripciones en los tres idiomas;
+  género Simulación → **Simulador incremental** (solo se cambia cada 3 meses:
+  bloqueado hasta el 18 nov); PC, móvil y tableta (consola apagada hasta una
+  pasada con mando); **Max players 6**; servidores privados a 50 Robux al
+  mes; el icono de la propuesta 1; idioma fuente español con **la traducción
+  automática del contenido apagada** (las traducciones son las nuestras, ver
+  "Idiomas"); cuestionario de madurez enviado (Minimal). Sigue privada:
+  hacerla pública es del usuario, primero para 16+ y después Roblox Select.
+- **Imágenes de lanzamiento** (I1a, 22 oct): renders de Blender a 512×512 sin
+  texto en `thumbnails/` (3 propuestas de icono, la 1 copiada a
+  `icon_512.png`; las 20 insignias en bronce, plata y oro; los 6 pases y los 2
+  productos con recorte circular); el `.blend` de trabajo
+  (`thumbnails/blender/`) explica cómo volver a renderizarlas.
+- **Herramientas**: Rojo en bucle, el instalador HTTP con LF y
+  `ReplicatedFirst`, y Studio abierto por shell (§2 "Sincronizar código").
 
 ### Tablones de ranking en la plaza (8 oct)
 
@@ -175,9 +460,12 @@ con el modelo del usuario "Leader Board".
   `estadisticaMaxima`). Lo jugado antes de que existiera esto no cuenta para
   la primera semana.
 - `Services/Rankings`: un OrderedDataStore por ranking y periodo
-  (`Ranking_v1_<id>_Historico` / `_S<semana>`; en Studio con `_Studio` para
-  que las pruebas no ensucien los del juego). Escribe cada 2 min solo lo que
-  cambió (y al salir), lee cada 2 min el top 100 (una página: cada cliente
+  (`Ranking_v<VERSION>_<id>_Historico` / `_S<semana>`; en Studio el prefijo
+  lleva `_Studio` para que las pruebas no ensucien los del juego). Desde el
+  22 oct `DefinicionesRankings.VERSION` = 2: tablones limpios para el
+  lanzamiento, con los perfiles v4 desde cero. Escribe cada 2 min solo lo que
+  cambió (y al salir, en `Perfiles.alSalir`, antes del guardado; al cerrar el
+  servidor se esperan las escrituras), lee cada 2 min el top 100 (una página: cada cliente
   ve su puesto aunque no esté en el top 10) y los DisplayName del top 10
   por `UserService` en lote. `RankingsHandler` lo manda a todos
   (`RankingsEvent`).
@@ -217,10 +505,13 @@ formateados, "+35 %", "+36 %"…, y llena la tabla de basura).
   contenedores. `TraducirMundo.client` y `Prompts.client` lo usan; lo que no
   lo tiene se traduce por búsqueda inversa del literal (`Idioma.literal`:
   "Excavar" → "Dig", "Patio de basura ↑").
-- **Las placas de los contenedores ("PAPEL · x2") necesitan re-hornear el
-  mundo** para llevar su atributo; hasta entonces salen en español (y con
-  la tilde mal, "ORGáNICO", que el horneado nuevo también arregla con
-  `Idioma.mayusculas`).
+- Las placas de los contenedores ("PAPEL · x2") llevan su atributo desde el
+  re-horneado del 22 oct (W1); antes salían en español y con la tilde mal
+  ("ORGáNICO", que el horneado arregla con `Idioma.mayusculas`).
+- **Excepción (22 oct): `Player:Kick`** solo admite texto plano, así que el
+  servidor resuelve él el aviso de la sesión abierta en otro servidor:
+  `Idioma.resolver(Idioma.mensaje(...), Idioma.normalizar(jugador.LocaleId))`
+  (Guardado).
 - Se quedan en español a propósito las figuritas y las cintas (pospuestas)
   y el rótulo "SHOP" (las letras son de la malla).
 - Para probar otro idioma en Studio: atributo `IdiomaStudio = "en"` en
@@ -228,9 +519,12 @@ formateados, "+35 %", "+36 %"…, y llena la tabla de basura).
   quitarlo después), o Test → Player Emulator → Locale.
   `LocalizationService.ForcePlayModeGameLocaleId` por script **no** cambia
   `Player.LocaleId`.
-- En el Creator Dashboard (Localization) hay que activar inglés y portugués
-  y traducir a mano el nombre, la descripción, los pases, el producto y las
-  insignias: esos textos los enseña Roblox, no el juego (ver §5).
+- En el Creator Dashboard (Localization) se traducen a mano el nombre, la
+  descripción, los pases, los productos y las insignias: esos textos los
+  enseña Roblox, no el juego. Hecho el 22 oct: el nombre y la descripción en
+  los tres idiomas, el español como idioma fuente, la traducción automática
+  del contenido apagada y las 10 insignias creadas; los pases, los productos y
+  las insignias que faltan se traducen al crearlos (§5).
 
 ### Fuera los trajes (5 oct)
 
@@ -242,7 +536,8 @@ personaje (BodyColors + accesorio), `PonerTrajeEvent` y los campos
 `trajes`/`trajePuesto` del perfil (`Perfiles.completar` los borra de uno
 guardado, OBSOLETOS). La pestaña Estilo queda con los diseños de bolsa y
 la estela. `TablasProbabilidad.COLECCIONABLE` pasa a figurita 60 / cinta
-40 (misma proporción que 50/35). `sinRestos` y `perfilV3` lo comprueban.
+40 (misma proporción que 50/35). `sinRestos` y `perfilV3` (hoy `perfilV5`)
+lo comprueban.
 
 ### Lanzamiento: v3 (3 oct)
 
@@ -297,11 +592,13 @@ Decisiones mías donde no se concretó (revisables):
 - **Insignias** (L7): 16 por estadísticas del perfil (y "mejoras al
   máximo"), comprobadas en cada publicación del perfil (`Perfiles.
   alCambiar`, ≤ 4/s): barato y ningún módulo tiene que avisar. Badge solo
-  con id ≠ 0; quien ya la tenía la recibe al entrar cuando se rellene.
+  con id ≠ 0; quien ya la tenía la recibe al entrar cuando se rellene. (Son
+  20 desde la economía v4, 22 oct.)
 - **Catálogo** (L8, precios provisionales): Dinero x2 199, Bolsa XL 149,
   Estela arcoíris 99, Bolsa dorada 99, Turbo 15 min 49 (producto, se
   acumula). El Rebirth 3 regala la Bolsa plateada (era la segunda
-  mascota). `PASES_DEV_EN_STUDIO` pasa a false: con Dinero x2 en Studio
+  mascota). La economía v4 (22 oct) mantiene esos precios y añade el Pack de
+  inicio (99), el VIP (249) y el Turbo 60 min (149). `PASES_DEV_EN_STUDIO` pasa a false: con Dinero x2 en Studio
   las pruebas de pago fallarían (`/pases on` para probarlos).
 - **Tutorial** (L9): tres pasos más (separar ≥ 3 bien y más bien que mal,
   un pedido, el Rebirth 1, que queda como meta a la vista); se enseña en
@@ -345,7 +642,7 @@ este documento al día):
 | L7 | Pedidos diarios y 16 insignias (3 oct: el premio de los tres es un Turbo, ya no fragmentos) | hecho |
 | L8 | Tienda, pases y cosméticos (Dinero x2, Bolsa XL, estela, diseños de bolsa, Turbo; sin Tercera mascota) | hecho |
 | L9 | Tutorial "primeros 15 minutos" (8 pasos con píldora) y cámara primera/tercera | hecho |
-| L10 | Medición (viaje y acierto) con jugadores; GDD y Juego.md al día | pendiente (tras publicar) |
+| L10 | Medición (viaje y acierto) con jugadores; GDD al día (`docs/Juego.md` se reescribió el 23 oct) | pendiente (tras publicar; la regla de recalibración en §4) |
 
 **Qué se borró en el L1 y por qué:** energía y refrescos (peaje sin
 decisiones), gemas, Sobre, Contenedor Dorado, Pase de la Suerte y Montón extra
@@ -516,6 +813,9 @@ módulos de una responsabilidad, sin ciclos, y `Botin` quedó como **fachada**
 | `Iman` | la única recogida sin clic | ObjetosPatio, FisicaBasura, Montones |
 | `Lanzamiento` | la puntería | ObjetosPatio, Bolsa, Mundo |
 
+(Tabla del lote 7: desde la v2 no hay `Energia` y desde el 3 oct tampoco
+`Iman` ni `Mascotas`; los demás módulos siguen igual.)
+
 La regla que evita ciclos: **quien retira un objeto no sabe quién lo cuenta**.
 `ObjetosPatio.reclamar` dispara `alRetirar`; `Montones` descuenta y agota,
 `FisicaBasura` despierta a los vecinos. Antes `quitarObjeto` llamaba a los dos
@@ -548,6 +848,9 @@ estaba llena y se liberó el bloqueo. Prueba: `reclamoAtomico`.
 
 ### Nada se recoge por pasar encima: clic, o el Imán
 
+(El Imán se fue con las mascotas el 3 oct: hoy solo se recoge con el clic o,
+en táctil, con la mira y el botón RECOGER. Lo del Imán queda como historia.)
+
 Decisión del usuario (lote 4): sin la mejora Imán **nada** entra en la bolsa
 por cercanía; cada objeto se recoge con clic, y **manteniendo el clic** (dedo
 en táctil, X en gamepad) se recoge en cadena lo que pase por la mira, una
@@ -564,9 +867,10 @@ lo arrastra con `PivotTo`, y cuando un objeto **arrastrado** llega a
 reclamar, el modelo vuela 0,25 s al torso del jugador (feedback del clic) y se
 destruye al llegar. La bolsa caída también se recoge con clic.
 
-### El pity es por jugador y persiste
+### El pity es por jugador y persiste (histórico)
 
-Cada monton sin Rara+ suma 1; una Rara+ lo resetea. La probabilidad se calcula
+(Sin pity ni rarezas desde la v2 y sin mascotas desde el 3 oct; queda como
+historia.) Cada monton sin Rara+ suma 1; una Rara+ lo resetea. La probabilidad se calcula
 en `TablasProbabilidad.probabilidadRara` (8% + 2%·pity, tope 60%; el Pase de la
 Suerte sube el paso a 3%). Medido con 300 montones grandes: pity 0 → 6%, pity
 10 → 37%, pity 26 → 57% (teóricos 8/28/60). Los fragmentos usan tabla plana con
@@ -574,17 +878,42 @@ sesgo del 50% hacia mascotas a medias para que el ensamblaje converja.
 
 ### `TablasProbabilidad` es la única fuente de odds
 
-Servidor (`Tienda`, `GeneradorBotin`) y cliente (`Probabilidades`) leen el mismo módulo
-de ReplicatedStorage; `verificar()` hace assert al cargar de que cada tabla
-suma 100. Es el requisito de política de Roblox sobre ítems aleatorios pagados.
+El servidor (`GeneradorBotin`) lo lee de ReplicatedStorage, para que
+cualquier número que se enseñe al jugador sea el que se usa de verdad;
+`verificar()` hace assert al cargar de que cada tabla suma 100. Era el
+requisito de política de Roblox sobre ítems aleatorios pagados (lo leían
+también `Tienda` y el panel `Probabilidades`, que ya no existen); hoy no se
+vende nada aleatorio.
 
 ### Persistencia propia, sin ProfileStore
 
-Cero dependencias (no hay Wally). Reglas: todo en `pcall` con reintentos; un
-perfil que no cargó nunca se guarda (`Perfiles.estaCargado`); `UpdateAsync`;
-autosave 120 s; `PlayerRemoving` espera 0,2 s para guardar DESPUÉS de que
-Bolsa/Parcelas toquen el perfil. Sin bloqueo de sesión: migrar a ProfileStore
-si algún día hay servidores concurrentes escribiendo el mismo perfil.
+Cero dependencias (no hay Wally). Desde el 22 oct (P1) todo vive en
+`Services/Guardado` y `DataService` solo cablea. Reglas: todo en `pcall` con
+reintentos y avisos con `warn` (un DataStore caído no impide jugar); un
+perfil que no cargó nunca se guarda (`Perfiles.estaCargado`: se juega con el
+de por defecto y se reintenta cargar en segundo plano, a los 30 s y luego el
+doble, hasta 5 min), ni uno de una versión más nueva que el código;
+`UpdateAsync`; autoguardado cada 120 s; **cola por clave** (nunca dos
+operaciones de la misma clave a la vez; lo que se pide guardar durante otro
+guardado se junta en una ronda que escribe lo más nuevo; la salida nunca se
+descarta y, si falla, se reintenta sin soltar el turno); `BindToClose` hace
+salir a todos y espera hasta 25 s a todo lo que está en vuelo.
+
+**Bloqueo de sesión** propio (antes no había: se apuntó migrar a ProfileStore
+el día que hubiera servidores concurrentes, y abrir el juego es ese día). El
+registro es `{ perfil, sesion = { servidor, token, latido } }` y todo se
+decide dentro de `UpdateAsync`: una sesión de otro servidor con el latido de
+hace 600 s o más es de un servidor que murió y se toma; una viva (el jugador
+acaba de cambiar de servidor y el otro aún guarda su salida) se reintenta
+cada 5 s sin escribir y se roba a los 60 s; al guardar, si la sesión ya no es
+la de esta carga, no se escribe y se expulsa al jugador ("Tu partida se abrió
+en otro servidor"). La sesión va al lado del perfil, nunca al cliente.
+
+Hasta el 22 oct `PlayerRemoving` esperaba 0,2 s para guardar después de que
+Bolsa tocara el perfil; ahora `Perfiles.alSalir` va antes del guardado de
+salida y sus oyentes no ceden. El contexto (almacén, reloj, tiempos,
+expulsión) es inyectable: las pruebas de `Datos` usan un almacén en memoria
+con la semántica de `UpdateAsync` y claves de prueba.
 
 ### El dinero sólo sale del contenedor (lote 8)
 
@@ -603,19 +932,24 @@ tabla de precios. Consecuencias:
 - El HUD no muestra `n/cap`: la bolsa es una **barra vertical junto a la de
   fuerza** que se llena, y en rojo pulsando dice "¡LLENA!" (`Textos.HUD`).
   La bolsa 2D de las manos también crece con el llenado.
-- Siguen dando $ sin pasar por el contenedor: vender mascotas/duplicados a
-  Doña Chatarra (en la caseta) y la recompensa de cada logro. No son botín.
+- Dan $ sin pasar por el contenedor los premios, que no son botín: los
+  pedidos y, desde el 22 oct, el calendario, los regalos por jugar y el bono
+  de regreso (`Economia.ganar`, sin pases ni Turbo). Hasta la v2 también
+  vender mascotas y los logros.
 
 ### La bolsa no persiste, y al salir se recicla sin bonus
 
-Al desconectar (`Bolsa.reciclarSinBonus`): lo que vale dinero se paga SIN el
-+25 % ni el +50 %, y mascotas, fragmentos y coleccionables van al perfil si
-caben. Las bolsas propias que estén en el suelo, igual. Hasta el 26 sep el
+Al desconectar (`Bolsa.reciclarSinBonus`): lo que vale dinero se paga sin
+bonus de lanzamiento (entonces, sin el +25 % ni el +50 %), y los
+coleccionables van al perfil si caben. Las bolsas propias que estén en el
+suelo, igual. Hasta el 26 sep el
 dinero se perdía (se temía un atajo: salir y volver en vez de caminar al
 contenedor); la auditoría lo revirtió porque castigaba las caídas de
-conexión, y sin bonus y con la vuelta a entrar el atajo no compensa.
+conexión, y sin bonus y con la vuelta a entrar el atajo no compensa. Desde
+el 22 oct (P3) se hace en `Perfiles.alSalir`, antes del guardado de salida,
+e incluye las bolsas que están en el aire (`Lanzamiento.cobrarAlSalir`).
 
-### Las pasivas sólo actúan exhibidas (apagadas desde el 26 sep)
+### Las pasivas sólo actúan exhibidas (histórico: apagadas el 26 sep, borradas con las mascotas el 3 oct)
 
 Las 6 mascotas del exhibidor daban +2/4/6% al reciclar su material. Con
 `FUNCIONES.EXHIBIR_PASIVAS` apagada exhibir es solo para presumir; el efecto
@@ -623,11 +957,14 @@ jugable de una mascota es llevarla de acompañante.
 
 ### Modo dev de pases
 
-En Studio, `GameConfig.PASES_DEV_EN_STUDIO` hace que todos los Game Passes
-cuenten como comprados sin tocar el perfil (viaja en `extras` del snapshot, no
-en `pasesCache`, para no envenenar perfiles). `/pases off` lo apaga para probar
-sin ellos. Los ids reales (0 = placeholder) se rellenan en `Config/Productos` y
-`Config/DefinicionesLogros` (badges) al publicar.
+En Studio, `GameConfig.PASES_DEV_EN_STUDIO` (apagado por defecto desde el
+lote 8) hace que todos los Game Passes cuenten como comprados sin tocar el
+perfil (viaja en `extras` del snapshot, no en `pasesCache`, para no envenenar
+perfiles). `/pases on` u `off` lo cambia en la sesión. **Solo en Studio**
+desde el 22 oct (P2): fuera, `fijarModoDev` no hace nada y `modoDev()` es
+siempre false (antes un `/pases on` en el juego publicado daba todos los pases
+a todo el servidor). Los ids reales (0 = placeholder) se rellenan en
+`Config/Productos` y `Config/DefinicionesInsignias` (badgeId).
 
 ### Arte del mundo por capas (16 sep)
 
@@ -988,11 +1325,13 @@ como "disponible" cuando le queda menos del 25 % de sus objetos.
 
 ### La bolsa se lanza entera, y si falla es de su dueño
 
-Mantener F carga la fuerza (1,2 s = 70 studs); al soltar, la bolsa sale con
-TODO lo que llevaba hacia donde apuntas. Si entra en el Contenedor se recicla
-con +50 % (y +25 % más si iba llena) y cuenta para Puntería. Si falla cae como
+Mantener F carga la fuerza (1,2 s = el alcance del Brazo, hasta 70 studs); al
+soltar, la bolsa sale con TODO lo que llevaba hacia donde apuntas (solo si va
+llena: desde el 22 oct lo exige el servidor). Si entra en un contenedor se
+recicla con el bonus de distancia y de racha (§4; hasta la v2, +50 % y +25 %
+más si iba llena) y cuenta para Puntería. Si falla cae como
 objeto `bolsa` que **solo su dueño** puede recoger (`item.duenoId`; 30 s,
-ver abajo). Hasta
+ver abajo; como mucho 3 caídas por jugador desde el 22 oct). Hasta
 el 29 sep, si no volvía a por ella en 20 s se reciclaba sola sin bonus; el
 usuario lo quitó: ahora espera en el suelo, y si queda en alto (techo de la
 recicladora, tapa del contenedor) se baja junto al contenedor del lado del
@@ -1011,7 +1350,9 @@ en rojo latiendo, y "¡LIBRE!" en verde). Pruebas `bolsaProtegida` y
 cuenta para Puntería.
 
 La parábola se integra paso a paso en el servidor (`PivotTo`, sin física de
-Roblox: determinista y el servidor decide el acierto) y desde el 16 sep
+Roblox: determinista y el servidor decide el acierto; desde el 22 oct con el
+paso exacto de una aceleración constante, porque con Euler la bolsa quedaba
+por debajo de la línea de ayuda, §3 "Lanzamiento por agentes") y desde el 16 sep
 **bota** al caer (petición del usuario): hasta 3 botes conservando el 40 %
 de la velocidad vertical y el 55 % de la horizontal, y contra la pared del
 contenedor sale despedida hacia fuera con el 30 %. La altura del suelo se
@@ -1045,7 +1386,9 @@ brazo quede recto) se escribe en `Transform` cada `RunService.Stepped`. La
 escribe cada cliente para todos los personajes con `EnPatio` (`Escena.client`)
 **y también el servidor** (`Patio`): `Transform` no se replica y la vista de
 servidor de Studio (donde el usuario miraba a su personaje) mostraba los brazos
-caídos y la bolsa a un lado. La bolsa abierta (`ModelosObjetos.bolsaAbierta`,
+caídos y la bolsa a un lado. Desde el 22 oct ese bucle del servidor solo
+corre en Studio: en un juego publicado nadie mira la vista del servidor, y la
+bolsa se suelda igual entre las manos medidas (`poseSinBucle`). La bolsa abierta (`ModelosObjetos.bolsaAbierta`,
 bola con boca clara e interior oscuro, crece con el llenado) se suelda al torso
 entre las manos **medidas de verdad** 0,2 s después de entrar (el largo real
 del brazo no se deduce bien de los tamaños de las partes: los rig attachments
@@ -1061,76 +1404,160 @@ hacia donde mira la cámara en cada paso de física y pisa cualquier CFrame).
 
 ### Modelos por código
 
-`Utilidades/ModelosMascota` construye las mascotas (forma por familia de
-material y `forma`, tamaño por rareza, estado visible:
-torcida/apagada/reflectante/neón, manchas si está sucia; eran 41 hasta el
-26 sep, ahora 10) y sus fragmentos;
-`ModelosObjetos` la basura (16 formas: 4 por material), billetes, tesoros,
-figurinas, cintas y bolsas; `ModelosMonton` la colina; todos sobre
-`Primitivas`. Sirven al mundo y a los ViewportFrames del álbum: un solo
-vocabulario visual.
+`ModelosObjetos` construye la basura (16 formas: 4 por material), billetes,
+tesoros, figurinas, cintas y bolsas; `ModelosMonton` la colina; todos sobre
+`Primitivas`: un solo vocabulario visual para el mundo y los ViewportFrames.
+(`Utilidades/ModelosMascota` construía las mascotas y sus fragmentos; se
+borró con ellas el 3 oct.)
 
-## 4. Números de calibración (punto de partida)
+## 4. Números de calibración (economía v4)
 
-Los objetivo son los del Diseño v2 (salen de una simulación de 400 partidas;
-el juego real será más lento). Estado tras el L1:
+Los de la economía v4 (aprobada el 22 oct; el modelo, los tres perfiles de
+jugador y los porqués en `docs/Economia-v4.md`, que sustituye a la
+calibración del Diseño v2). Mandan los de `Config`; esto es para leerlos de
+un vistazo. Lo primero que hay que medir con jugadores (L10) es η (la
+fracción de la sesión que se pasa en el bucle) y el tiempo por pieza. Regla
+del documento (§7.3): con 200 jugadores en el R1 y dos semanas de datos, si
+la mediana de PC (M minutos hasta el R1) se sale de 45–60, multiplicar los 4
+costes base y los 10 requisitos por k = 52 / M, una sola vez, y anotarlo
+aquí.
 
-- 4 mejoras al máximo: $118.030 (Bolsa 150, Alcance 120, Velocidad 200,
-  Brazo 180 de base, × 1,6^nivel, redondeo a la unidad).
-- Bolsa 10 (+3/nivel), alcance 6 (+1/nivel), velocidad 16 (+1,2/nivel),
-  brazo 25 (+4,5/nivel) studs.
+- Mejoras: coste base 150 / 120 / 200 / 180 (Bolsa, Alcance, Velocidad,
+  Brazo) × 1,35^nivel, redondeo a la unidad: el nivel 10 de Bolsa cuesta
+  $2.234 y las 4 al máximo **$35.485** (eran $118.030 con 1,6). Valores:
+  Bolsa 10 (+3/nivel), Alcance 6 (+1), Velocidad 16 (+1,2), Brazo 25 (+4,5)
+  studs.
+- Rebirths: requisito en mano $15.000 / 100.000 / 250.000 / 500.000 /
+  800.000 / 1,2M / 1,8M / 2,5M / 3,5M / 5M con multiplicador x1,5 / 2 / 3 /
+  4 / 5 / 6 / 7 / 8 / 9 / 10; desde el 11, requisito ×1,4 (dos cifras
+  significativas) y +1. Coste del siguiente rebirth (`costeSiguiente`,
+  requisito + $35.485): $50.485 / 135.485 / 285.485 / 535.485 / 835.485 con
+  0 … 4 rebirths.
+- Ritmo modelado del jugador medio de PC, jugando seguido, sin pases ni
+  recompensas: R1 en **58 min** (`ritmoR1`: 57,9), R2 2:09, R3 3:36, R4 5:23
+  y R5 **7:26** (h:min acumulados); el eficiente hace el R1 en 38 min y el
+  casual o de móvil en 82. Con las recompensas y 20 min al día, el R1 llega
+  al empezar la 3.ª sesión (~42 min jugados). Con Dinero x2, todo a la mitad.
 - Montones: 12 chicos de 20 piezas y 6 grandes de 60 (uno por cuadrante,
   con un tesoro garantizado); una tirada por pieza: basura 94 %, billete 5 %,
-  tesoro 1 %; 90 % del material del cuadrante. Valor por pieza: Papel 5,
-  Plástico 7, Metal 15, Orgánico 25; billete ×6 y tesoro ×40 de su material.
+  tesoro 1 %; tipo de basura 40 / 35 / 15 / 10 % papel / plástico / metal /
+  orgánico, sin los que el excavador no tiene abiertos (con 0 rebirths, 53 /
+  47). Valor por pieza: Papel 5, Plástico 7, Metal 15, Orgánico 25; billete
+  ×6 y tesoro ×40 de su material. La basura paga x2 en el contenedor de su
+  tipo, x0,5 en el de otro y x1 en el general. La primera bolsa (10 piezas,
+  al general, sin bonus) sale a ~$97.
 - Reposición: 45 s después de que un montón baje del 25 % (o se vacíe) se
-  retiran sus restos y vuelve la colina. Prioridad del excavador: 10 s.
+  retiran sus restos y vuelve la colina. Prioridad del excavador: 10 s. Un
+  montón a medias por jugador y como mucho 360 piezas sueltas en el patio.
 - Lanzamiento: 1,2 s de carga = el alcance del Brazo. Bonus al entrar: <10
   studs 0; 10–19 +20 %; 20–29 +40 %; 30–44 +70 %; 45–59 +100 %; 60–70 +150 %;
-  racha +10 % por acierto seguido (tope +50 %). Pago = valor de las piezas ×
-  (1 + distancia + racha) × rebirth (× mascotas y pases en L6 y L8). Una
-  bolsa de 10 de plástico desde 25 studs, sin racha: $105. Bolsa perdida:
-  20 s hasta reciclarse sola.
+  racha +10 % por acierto seguido (tope +50 %). Pago = valor de las piezas
+  (con el factor de separar) × (1 + distancia + racha) × multiplicador del
+  rebirth × 2 con Dinero x2 × 2 con Turbo. Bolsa fallada: 30 s solo de su
+  dueño, después de cualquiera; como mucho 3 caídas por jugador (con una
+  más, la más vieja se recicla sola, sin bonus y a x0,5).
+- Pedidos: 1,5 / 2 / 3 % de `costeSiguiente` (fácil / medio / difícil):
+  $760 / 1.000 / 1.500 con 0 rebirths y $2.000 / 2.700 / 4.100 con 1. Los
+  tres del día suman ~6,5 % del siguiente rebirth y dan 10 min de Turbo; el
+  Pedido VIP paga como difícil.
+- Recompensas: calendario 2 % · 2 % · Turbo 10 min · 3 % · 3 % · Turbo 15 min
+  · 4 % (+ Turbo 15 min en la 7.ª desde la 2.ª vuelta); regalos a los 5 / 10
+  / 20 / 30 / 45 / 60 minutos activos del día: 0,5 % · 0,5 % · 1 % · Turbo 5
+  min · 1 % · 2 % (minuto activo: 3 acciones o más); regreso tras 3 días
+  Turbo 15 min + 4 %, tras 14 Turbo 30 min + 8 %. Jugando 20 min al día, todo
+  suma ~10 % del siguiente rebirth y ~13 min de Turbo al día. Ningún premio
+  en dinero lo multiplican pases ni Turbo.
+- Turbo: x2 a lo reciclado; 10 min por los pedidos, 15 y 60 min por Robux,
+  30 min con el Pack de inicio (K1). Hoy corre en tiempo real; con K1 solo
+  correrá jugando (en pausa tras 120 s sin actividad; los botones de compra
+  se apagan con más de 3 h guardadas).
+- Precios en Robux (así se crearon en Roblox el 23 oct; los dos Turbo con
+  precio fijo, sin el precio gestionado de Roblox, que pedía aceptar un
+  acuerdo: decisión del usuario): Turbo 15 min 49 · Pack de inicio 99 ·
+  Estela arcoíris 99 · Bolsa dorada 99 · Bolsa XL 149 · Turbo 60 min 149 ·
+  Dinero x2 199 · VIP 249.
 
 ## 5. Pendiente
 
-- **Para lanzar (lo hace el usuario en Studio / Creator Dashboard)**:
-  1. **Guardar y publicar el place** (File → Publish to Roblox): el mundo
-     v6 se horneó el 3 oct y vive solo en el place.
-  2. Game Settings → Security: **Enable Studio Access to API Services**
-     (ya parece activo: en Studio el perfil carga) y Places → **Max
-     players 6**.
-  3. Crear en el Creator Dashboard los **4 pases** (Dinero x2, Bolsa XL,
-     Estela arcoíris, Bolsa dorada),
-     el **producto** Turbo 15 min y las **16 insignias**, y rellenar sus ids
-     en `Config/Productos` y `Config/DefinicionesInsignias`.
-  4. Cuestionario de madurez, icono, miniaturas, descripción y género;
-     después, **público**.
-  5. **Idiomas** (Creator Dashboard → la experiencia → Localization):
-     idioma fuente español; añadir inglés y portugués; traducir el nombre,
-     la descripción y los pases, el producto y las insignias (los textos
-     están en `Config/Traducciones`, sección `DEF`). **No** activar
-     Automatic Text Capture ni la traducción automática del juego.
-  6. **Re-hornear el mundo** para que las placas de los contenedores se
-     traduzcan (§3 "Idiomas"), y guardar el place.
-  7. **Guardar el place** tras colocar los tablones de ranking: el modelo
-     `ServerStorage.Arte.LeaderBoard` y `Mundo.Tablones` solo viven ahí.
-- Probar con dinero real una compra de cada tipo en el servidor publicado.
-- **L10**: medir con jugadores (viaje, acierto, uso de los contenedores de
-  tipo) y calibrar.
-- **Guardar el place** tras hornear (el mundo, las variantes de
-  MaterialService y `ServerStorage.Arte` viven ahí; el `.rbxl` no va en git).
-- Arte 2D del usuario para la UI en `assets/ui/` (iconos); hasta entonces,
-  glifos dibujados.
-- Arte pendiente: el avatar; iconos propios para los tipos de basura
-  (`setPapel`… y `camara` usan glifos dibujados).
-- Fijar **Max players = 6** en Game Settings / Creator Dashboard
-  (`Players.MaxPlayers` es de solo lectura por script).
-- Publicar el place y activar *Studio Access to API Services* para probar el
-  DataStore; crear pases, productos y badges y rellenar sus ids.
-- Prueba con 2+ jugadores del patio compartido (riesgo "tibio" del GDD §14).
-- Calibrar la economía con jugadores: tiempo de viaje y tasa de acierto (PC
-  y móvil) antes que nada.
+Estado el 23 oct (el plan se pausó y se retomó ese mismo día; master subido
+a origin/master). Lo que falta, en orden:
+
+1. **Verificar E1 en Studio**: sus pruebas (`ritmoR1`, `costeSiguiente`,
+   `rebirthsAbren`, `pedidoVip`, `premioAlCobrar`, y al día `mejorasV2`,
+   `rebirthTabla`, `renacer`, `pedidosDia`, `pedidoSeparadas`) y las de R1
+   con la curva v4, más capturas de los paneles Pedidos (con el Pedido VIP)
+   y Rebirth; en Lune pasaron 21 de 21. De R1 faltan también las capturas del
+   panel Recompensas en PC y táctil y `("hud")` con el punto rojo.
+2. **K1, catálogo: EN CURSO, sin terminar.** Está en la rama local
+   `worktree-agent-a3be3b78723d5bfff` (commit de trabajo `a7b80ce`, con master
+   unido después), no en master: el Turbo por segundos que solo bajan jugando
+   (`turboRestante`, pausa a los 120 s sin actividad con el atributo
+   `TurboPausado`, tope de compra de 3 h), el Pack de inicio (30 min de Turbo
+   una sola vez, `compras.packInicio`), el VIP (atributo `VIP`, la corona sobre
+   la cabeza y la etiqueta), el precio real de Roblox en la tienda
+   (`GetProductInfo` con caché) con el VIP y el Pack arriba, las etiquetas de
+   origen nuevas de Estilo, las ofertas (`DefinicionesOfertas`,
+   `Services/Ofertas`, `UI/Oferta`) y sus pruebas. **Mientras no entre, en
+   master**: el Turbo corre en tiempo real y no sobrevive a salir y volver
+   (§3 "Lanzamiento por agentes", estado transitorio); el Pack de inicio no da
+   su Turbo; no se pinta la corona VIP; la tienda enseña el precio de
+   `Config`; la Bolsa de cartón de la insignia Constante no se puede poner
+   (`Cosmeticos.tiene` y la tienda aún no le pasan a `loTiene` las
+   insignias); y el panel Oferta es una ventana vacía que nadie abre.
+3. **N1b**: la analítica de las recompensas (`Recompensas.alReclamar`) y de
+   las ofertas, con la prueba `analiticaRecompensas`.
+4. Pulido: sonidos de los avisos de `RECOMPENSAS` en `Notificaciones`; el
+   color de la cabecera del panel Recompensas en `Paleta.CABECERA_PANEL`; la
+   píldora del tutorial en táctil cae dentro de la zona del joystick.
+5. Documentación al cerrar K1 (este documento, CLAUDE.md "Verificar",
+   `docs/Juego.md`).
+6. **Insignias**: 10 de 20 creadas y con su id en
+   `Config/DefinicionesInsignias` (primerReciclaje, primerAcierto,
+   primerTesoro, racha5, tiro30, dinero10k, piezas1000, separadas500,
+   mejoraMax, rebirth1). Faltan tiro60, racha10, piezas10000, dinero1M,
+   todasMax, rebirth3 y las 4 nuevas (rebirth5, rebirth10, semanaCompleta,
+   pedidos30); las imágenes están en `thumbnails/`. Roblox da 5 gratis cada
+   24 h (el cupo se renueva a las 00:00 GMT y se consulta en
+   `badges.roblox.com/v1/universes/10766595888/free-badges-quota`). Se
+   traducen a en/pt en el Creator Hub al crearlas.
+7. **Miniaturas** (I1b: 1920×1080, sin texto; los planos en
+   `docs/Ficha-lanzamiento.md` §4; necesitan Studio), la elección y el orden
+   del usuario (G10) y subirlas. Los **pases y productos** ya están (F1b,
+   23 oct: los 6 pases y los 2 Turbo con su imagen de `thumbnails/` y sus
+   traducciones, ids en `Config/Productos`).
+8. **Verificación de lanzamiento**: Q0, la regresión completa (la batería de
+   CLAUDE.md "Verificar", `("hud")` en PC, táctil y mando, el juego en inglés
+   y en portugués, la consola limpia y capturas de cada panel) y Q4b (revisión
+   de todo el diff desde `base-lanzamiento`); **el usuario publica el place**;
+   Q1, multijugador con 2–3 clientes (`README-pruebas.md`); Q2, un móvil real,
+   y Q3, una compra real de cada tipo (estas dos, del usuario).
+9. **Abrir**: T1, pública para mayores de 16 (el usuario se verifica o hace
+   una compra con dinero real y la hace pública con la ficha completa; tag
+   `v1.0`); L10, calibración de 1–2 semanas con los datos del Dashboard
+   (regla de §4); y T2, Roblox Select (cuestionario completo, 2FA,
+   verificación de identidad, la tasa o Premium y 250 partidas de jugadores
+   de 16+ muy implicados en 60 días).
+
+Hecho en el Creator Hub (22 oct, §3 "Lanzamiento por agentes"): nombre y
+descripciones es/en/pt, género, dispositivos, Max players 6, servidores
+privados, icono, idioma fuente y traducción automática apagada, y el
+cuestionario de madurez enviado (Minimal); el 23 oct, los 6 pases y los 2
+productos de Turbo (F1b). Sigue privada.
+
+Siguen valiendo de antes:
+- **Guardar el place** tras cada horneado: el mundo, las variantes de
+  `MaterialService`, `ServerStorage.Arte` (con `LeaderBoard`) y los tablones
+  viven ahí; el `.rbxl` no va en git.
+- Arte 2D propio para la UI en `assets/ui/` (siguen dibujados `lata`,
+  `camara`, `sonido`, `regalo`, `calendario`, los `set*`, las manos…) y el
+  avatar.
+- La prueba con 2+ jugadores del patio compartido (el riesgo "tibio" del GDD
+  §14) es la Q1.
+- Para después del lanzamiento: lo social (amigos, grupo, invitar) y los
+  códigos; contenido después del R3 (las zonas ricas ya están definidas en
+  `TablasProbabilidad.MEZCLA` y `GameConfig.ZONAS`); figuritas y cintas;
+  premios semanales de ranking y títulos sobre el personaje; cooperación en
+  el patio; consola; iconos propios para los glifos; promoción de pago.
 
 ### Tienda "SHOP" de Blender (24 sep)
 
@@ -1143,7 +1570,7 @@ sufijo (`Tienda_Menta`…) en `ArteMundo.tiendaDeMalla`. La cabina whitebox
 sigue siendo la colisión. Sin la malla, `ArteMundo.caseta` usa la cabaña de
 partes con el rótulo `Textos.MUNDO.tienda`.
 
-### Base del jugador de Blender (25 sep)
+### Base del jugador de Blender (25 sep; histórico: la base se quitó con la v2)
 
 Parcela rediseñada (petición del usuario, referencia: bases de simuladores
 actuales tipo Steal a Brainrot) y simplificada al mínimo: arco de entrada
