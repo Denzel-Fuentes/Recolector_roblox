@@ -42,7 +42,8 @@
 	reintentos, sin crecer para siempre.
 
 	=== Economia v4 (K1, 22 oct) ===
-	- Cada compra con Robux (un producto otorgado, un pase confirmado) deja
+	- Cada compra con Robux (un producto otorgado, un pase confirmado o un
+	  pase que aparece al entrar, comprado en la web) deja
 	  perfil.compras.ultimaRobux = os.time(): en las 24 h siguientes no sale
 	  ninguna oferta (Config/DefinicionesOfertas, nada de encadenar compras).
 	- El atributo VIP del Player dice si tiene el pase VIP (tambien con el
@@ -172,7 +173,7 @@ function Monetizacion.refrescarPases(jugador: Player)
 	if not perfil then
 		return
 	end
-	local cambio = false
+	local cambio, nuevo = false, false
 	for _, pase in Productos.PASES do
 		if pase.gamePassId ~= 0 then
 			local ok, tiene = pcall(function()
@@ -181,8 +182,14 @@ function Monetizacion.refrescarPases(jugador: Player)
 			if ok and tiene ~= (perfil.pasesCache[pase.id] == true) then
 				perfil.pasesCache[pase.id] = if tiene then true else nil
 				cambio = true
+				nuevo = nuevo or tiene == true
 			end
 		end
+	end
+	-- Un pase que aparece al entrar se compro fuera (la web) o en una sesion
+	-- que no llego a guardarse: tambien es una compra para la regla de 24 h
+	if nuevo then
+		anotarCompra(jugador)
 	end
 	if cambio then
 		Perfiles.marcarSucio(jugador)

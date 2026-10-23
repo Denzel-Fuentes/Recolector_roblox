@@ -25,6 +25,7 @@ local GameConfig = require(Config:WaitForChild("GameConfig"))
 local Productos = require(Config:WaitForChild("Productos"))
 local DefinicionesCosmeticos = require(Config:WaitForChild("DefinicionesCosmeticos"))
 local DefinicionesOfertas = require(Config:WaitForChild("DefinicionesOfertas"))
+local Senal = require(Shared:WaitForChild("Utilidades"):WaitForChild("Senal"))
 
 local Servicios = script.Parent.Parent
 local Perfiles = require(Servicios:WaitForChild("Perfiles"))
@@ -58,6 +59,40 @@ local function guid(): string
 	return HttpService:GenerateGUID(false)
 end
 
+-- Pedidos mete el Pedido VIP en cuanto ve el pase (Monetizacion.
+-- alCambiarPases), y con el modo dev lo ve todo el servidor: se apuntan los
+-- pedidos de cada perfil y al acabar se quitan los VIP nuevos
+local function pedidosAntes(): { [Player]: { [any]: boolean } }
+	local antes = {}
+	for quien, perfil in Perfiles.todos() do
+		local vistos = {}
+		for _, pedido in perfil.pedidos.lista do
+			vistos[pedido] = true
+		end
+		antes[quien] = vistos
+	end
+	return antes
+end
+local function quitarVipNuevos(antes)
+	for quien, perfil in Perfiles.todos() do
+		local vistos = antes[quien] or {}
+		local lista = perfil.pedidos.lista
+		for i = #lista, 1, -1 do
+			if lista[i].vip and not vistos[lista[i]] then
+				table.remove(lista, i)
+				Perfiles.marcarSucio(quien)
+			end
+		end
+	end
+end
+
+-- Quieto (Actividad.olvidar): mientras la prueba cuenta segundos de Turbo,
+-- no corre aunque acabara de hacer algo (p. ej. otra prueba con depositos)
+local function quieto(j)
+	Actividad.olvidar(j)
+	Turbo.sincronizar(j)
+end
+
 -- Lo que tocan las compras simuladas, para dejarlo como estaba
 local function foto(p)
 	return {
@@ -67,6 +102,7 @@ local function foto(p)
 		packInicio = p.compras.packInicio,
 		pasesCache = table.clone(p.pasesCache),
 		modoDev = Monetizacion.modoDev(),
+		pedidos = pedidosAntes(),
 	}
 end
 local function devolver(j, p, f)
@@ -77,6 +113,7 @@ local function devolver(j, p, f)
 	p.pasesCache = f.pasesCache
 	Monetizacion.fijarModoDev(f.modoDev)
 	Monetizacion.alCambiarPases:Fire(j)
+	quitarVipNuevos(f.pedidos)
 	Turbo.sincronizar(j)
 	Perfiles.marcarSucio(j)
 end
@@ -89,7 +126,9 @@ end
 -- pausa (TurboPausado) y deja de bajar, aunque sigue valiendo x2; otra
 -- accion lo reanuda; al salir se para y al volver espera a la primera
 -- accion; al acabarse corriendo avisa alAcabar con ganado = true si era de
--- Turbo.anadir. Con el reloj de Actividad sustituido: cuentas exactas
+-- Turbo.anadir. Con el reloj de Actividad sustituido: cuentas exactas. Sus
+-- acciones de mentira no avisan por Actividad.alAccion (contarian como un
+-- minuto activo para los regalos de R1): la senal se cambia un momento
 function Pruebas.turboPausa()
 	local j = jugador()
 	local p = Perfiles.obtener(j)
@@ -98,6 +137,14 @@ function Pruebas.turboPausa()
 	end
 	local turboAntes = p.turboRestante
 	local relojAntes = Actividad.ahora
+	local alAccionAntes = Actividad.alAccion
+	Actividad.alAccion = Senal.nueva()
+	local avisosReales = 0
+	local conexionAccion = alAccionAntes:Connect(function(quien)
+		if quien == j then
+			avisosReales += 1
+		end
+	end)
 	local t = 10000
 	local r = {}
 	local acabados = {}
@@ -162,7 +209,9 @@ function Pruebas.turboPausa()
 		r.acabado = Turbo.restante(j) == 0 and j:GetAttribute("TurboPausado") == false
 	end)
 	conexion:Disconnect()
+	conexionAccion:Disconnect()
 	Actividad.ahora = relojAntes
+	Actividad.alAccion = alAccionAntes
 	Actividad.olvidar(j)
 	p.turboRestante = turboAntes
 	Turbo.entrar(j)
@@ -178,15 +227,15 @@ function Pruebas.turboPausa()
 	local bien = r.inicioPausado and igual(r.quieto, 600) and r.corre and igual(r.tras60, 540) and igual(r.tras200, 480)
 		and r.pausado and r.multiplicador == 2 and igual(r.enPausa, 480) and r.reanudado and igual(r.tras30, 450)
 		and igual(r.fuera, 450) and igual(r.vuelta, 450) and r.vueltaPausado and r.acabado
-		and #acabados == 1 and acabados[1] == true and Turbo.PAUSA == 120
+		and #acabados == 1 and acabados[1] == true and Turbo.PAUSA == 120 and avisosReales == 0
 	local avisos = {}
 	for _, ganado in acabados do
 		table.insert(avisos, if ganado then "ganado" else "comprado")
 	end
-	return string.format("al entrar en pausa=%s | 30 s quieto: %s | accion: corre=%s, +60 s: %s | 200 s quieto: %s (para a los 120), en pausa=%s, x%s | +500 s en pausa: %s | otra accion: corre=%s, +30 s: %s | fuera +1000 s: %s | al volver +100 s: %s, en pausa=%s | uno ganado de 20 s, +25 s: acabado=%s, alAcabar [%s] => %s",
+	return string.format("al entrar en pausa=%s | 30 s quieto: %s | accion: corre=%s, +60 s: %s | 200 s quieto: %s (para a los 120), en pausa=%s, x%s | +500 s en pausa: %s | otra accion: corre=%s, +30 s: %s | fuera +1000 s: %s | al volver +100 s: %s, en pausa=%s | uno ganado de 20 s, +25 s: acabado=%s, alAcabar [%s] | minutos activos falsos: %d => %s",
 		tostring(r.inicioPausado), tostring(r.quieto), tostring(r.corre), tostring(r.tras60), tostring(r.tras200),
 		tostring(r.pausado), tostring(r.multiplicador), tostring(r.enPausa), tostring(r.reanudado), tostring(r.tras30),
-		tostring(r.fuera), tostring(r.vuelta), tostring(r.vueltaPausado), tostring(r.acabado), table.concat(avisos, ","), ok(bien))
+		tostring(r.fuera), tostring(r.vuelta), tostring(r.vueltaPausado), tostring(r.acabado), table.concat(avisos, ","), avisosReales, ok(bien))
 end
 
 -- Con 3 h guardadas no se puede comprar mas (Turbo.puedeComprar: la Tienda
@@ -198,6 +247,7 @@ function Pruebas.turboTope()
 	local antes = foto(p)
 	local r = {}
 	local exito, err = pcall(function()
+		quieto(j)
 		p.turboRestante = GameConfig.TURBO_TOPE_COMPRA - 1
 		r.debajo = Turbo.puedeComprar(j)
 		p.turboRestante = GameConfig.TURBO_TOPE_COMPRA
@@ -223,6 +273,7 @@ function Pruebas.turboProductos()
 	local antes = foto(p)
 	local r = {}
 	local exito, err = pcall(function()
+		quieto(j)
 		p.turboRestante = 0
 		p.compras.ultimaRobux = 0
 		local recibo15 = "PruebaT15-" .. guid()
@@ -261,6 +312,7 @@ function Pruebas.packInicioUnaVez()
 	local cargadoAntes = Perfiles.estaCargado
 	local r = {}
 	local exito, err = pcall(function()
+		quieto(j)
 		Monetizacion.fijarModoDev(false)
 		p.turboRestante = 0
 		p.compras.packInicio = false
@@ -303,12 +355,24 @@ end
 
 -- El VIP: el atributo VIP del Player (la corona y la etiqueta del chat los
 -- pinta cada cliente) y la Estela VIP; sin el pase, ni una ni otra (la
--- estela puesta se quita). El 4.o pedido del VIP es de otro paquete
+-- estela puesta se quita). El 4.o pedido del VIP es de E1 (Pedidos): aqui
+-- solo se mira que el que mete al ver el pase no se quede en el perfil
+local function cuantosVip(p): number
+	local n = 0
+	for _, pedido in p.pedidos.lista do
+		if pedido.vip then
+			n += 1
+		end
+	end
+	return n
+end
+
 function Pruebas.vipVentajas()
 	local j = jugador()
 	local p = Perfiles.obtener(j)
 	local antes = foto(p)
 	local estelaAntes = p.estela
+	local vipAntes = cuantosVip(p)
 	local r = {}
 	local exito, err = pcall(function()
 		Monetizacion.fijarModoDev(false)
@@ -334,6 +398,7 @@ function Pruebas.vipVentajas()
 	p.estela = estelaAntes
 	devolver(j, p, antes)
 	Cosmeticos.alCambiar:Fire(j)
+	local vipDespues = cuantosVip(p)
 	if not exito then
 		return "error: " .. tostring(err) .. " => FALLO"
 	end
@@ -341,9 +406,10 @@ function Pruebas.vipVentajas()
 	local estela = DefinicionesCosmeticos.ESTELA_POR_ID.VIP
 	local config = pase.precioRobux == 249 and pase.icono == "corona" and estela ~= nil and estela.pase == "VIP"
 	local bien = config and r.sinAtributo and r.sinEstela and r.conAtributo and r.conEstela and r.puesta and r.quitado and r.modoDev
-	return string.format("Config 249, corona, Estela VIP del pase=%s | sin pase: VIP=false %s, sin estela %s | con el pase: VIP=true %s, estela %s, puesta %s | reembolso: %s | modo dev: %s => %s",
+		and vipDespues == vipAntes
+	return string.format("Config 249, corona, Estela VIP del pase=%s | sin pase: VIP=false %s, sin estela %s | con el pase: VIP=true %s, estela %s, puesta %s | reembolso: %s | modo dev: %s | Pedidos VIP antes %d, despues %d => %s",
 		tostring(config), tostring(r.sinAtributo), tostring(r.sinEstela), tostring(r.conAtributo), tostring(r.conEstela),
-		tostring(r.puesta), tostring(r.quitado), tostring(r.modoDev), ok(bien))
+		tostring(r.puesta), tostring(r.quitado), tostring(r.modoDev), vipAntes, vipDespues, ok(bien))
 end
 
 -- Los cosmeticos de la economia v4: la Bolsa de carton con la insignia
@@ -451,9 +517,12 @@ end
 -- los 3 primeros minutos, una a la vez, solo cuenta si se ensena (lo
 -- caducado y lo descartado no), un "Ahora no" la aparta 7 dias, 1 por
 -- sesion, la segunda del Pack en la 4.a sesion, 24 h tras una compra, los
--- intentos con la bolsa llena (solo llena de verdad) y el Turbo tras acabarse
--- uno ganado (solo el primer deposito, solo las opciones con id). Y basura
--- por el remote
+-- intentos con la bolsa llena (solo llena de verdad), el Turbo tras acabarse
+-- uno ganado (solo el primer deposito, solo las opciones con id), que al
+-- ensenarse se vuelvan a pasar las reglas (un Turbo que llega mientras
+-- espera la anula), que una compra cancele la que espera y que abrir otro
+-- panel encima la cierre sin rechazo. Y basura por el remote. Al acabar
+-- vuelve la sesion de ofertas de verdad
 function Pruebas.ofertaReglas()
 	local partes, malos = {}, {}
 
@@ -541,9 +610,17 @@ function Pruebas.ofertaReglas()
 		ahora = Ofertas.ahora,
 		reloj = Ofertas.reloj,
 		enviar = Ofertas.enviarCliente,
+		-- Los ids los fija la prueba (los reales, F1b, no le sirven: el
+		-- Turbo 60 sin id es parte de lo que mira)
 		idPack = Productos.PASE_POR_ID.PackInicio.gamePassId,
 		idBolsaXL = Productos.PASE_POR_ID.BolsaXL.gamePassId,
 		idTurbo15 = Productos.PRODUCTO_POR_ID.Turbo15.productId,
+		idTurbo60 = Productos.PRODUCTO_POR_ID.Turbo60.productId,
+		-- En Studio las ofertas no salen solas (Ofertas, cabecera): aqui si
+		esStudio = Ofertas.esStudio,
+		-- La sesion de ofertas de verdad (sus ofertas vistas, sus 3 minutos):
+		-- la prueba trabaja en otras y al acabar vuelve esta
+		sesion = Ofertas.sesion(j),
 	}
 	local enviados = {}
 	local reloj, ahora = 1000, AHORA
@@ -558,8 +635,13 @@ function Pruebas.ofertaReglas()
 		Ofertas.enviarCliente = function(_quien, datos)
 			table.insert(enviados, datos)
 		end
+		Ofertas.esStudio = function()
+			return false
+		end
 		Productos.PASE_POR_ID.PackInicio.gamePassId = 990000011
 		Productos.PASE_POR_ID.BolsaXL.gamePassId = 990000012
+		Productos.PRODUCTO_POR_ID.Turbo15.productId = 0
+		Productos.PRODUCTO_POR_ID.Turbo60.productId = 0
 		Monetizacion.fijarModoDev(false)
 		p.ofertas = { porId = {}, historial = {} }
 		p.compras.ultimaRobux = 0
@@ -583,8 +665,9 @@ function Pruebas.ofertaReglas()
 		-- Una a la vez
 		local _, motivo2 = Ofertas.momento(j, "deposito")
 		r.pendiente = motivo2
-		-- No se ensena en sus 60 s: caduca y no cuenta
-		reloj += 70
+		-- No se ensena en sus 60 s (y el margen para la latencia): caduca y
+		-- no cuenta
+		reloj += 80
 		r.caducada = not Ofertas.responder(j, "mostrada", d1.token) and p.ofertas.porId.PackInicio == nil
 		-- Otra vez: ensenada, cuenta una vez
 		r.otra = Ofertas.momento(j, "deposito")
@@ -668,14 +751,54 @@ function Pruebas.ofertaReglas()
 		Ofertas.turboAcabado(j, false)
 		local turboComprado = Ofertas.momento(j, "deposito")
 		r.turboComprado = turboComprado == nil
+		-- Sesion 7: mientras espera su momento le llega Turbo (los tres
+		-- pedidos, un regalo): al ensenarse ya no vale, no cuenta y se cancela
+		local function sesionNueva(n: number)
+			ahora += DIA
+			p.estadisticas.sesiones = n
+			Ofertas.reiniciarSesion(j)
+			reloj += 240
+		end
+		sesionNueva(7)
+		Ofertas.turboAcabado(j, true)
+		Ofertas.momento(j, "deposito")
+		local d6 = enviados[#enviados]
+		p.turboRestante = 120
+		local mostrada6 = Ofertas.responder(j, "mostrada", d6.token)
+		local cancelada6 = enviados[#enviados]
+		r.revalida = d6.id == "Turbo" and not mostrada6 and cancelada6.cancelar == d6.token and p.ofertas.porId.Turbo == nil
+			and Ofertas.sesion(j).actual == nil
+		p.turboRestante = 0
+		-- Sesion 8: una compra cualquiera (no lo ofrecido) con la oferta aun
+		-- esperando su momento la cancela: 24 h sin ofertas tras una compra
+		sesionNueva(8)
+		Ofertas.turboAcabado(j, true)
+		Ofertas.momento(j, "deposito")
+		local d7 = enviados[#enviados]
+		Ofertas.compra(j, "VIP")
+		local cancelada7 = enviados[#enviados]
+		r.cancelaCompra = d7.id == "Turbo" and cancelada7.cancelar == d7.token and Ofertas.sesion(j).actual == nil
+			and not Ofertas.responder(j, "mostrada", d7.token)
+		-- Sesion 9: abrir otro panel encima ("cerrada") la cierra sin rechazo
+		sesionNueva(9)
+		Ofertas.turboAcabado(j, true)
+		Ofertas.momento(j, "deposito")
+		local d8 = enviados[#enviados]
+		local mostrada8 = Ofertas.responder(j, "mostrada", d8.token)
+		local cerrada8 = Ofertas.responder(j, "cerrada", d8.token)
+		local regTurbo = p.ofertas.porId.Turbo
+		r.cerradaSinRechazo = d8.id == "Turbo" and mostrada8 and cerrada8 and regTurbo ~= nil and regTurbo.vistas == 1
+			and regTurbo.rechazos == 0 and Ofertas.sesion(j).actual == nil
 	end)
 	-- Todo como estaba
 	Ofertas.ahora = guardados.ahora
 	Ofertas.reloj = guardados.reloj
 	Ofertas.enviarCliente = guardados.enviar
+	Ofertas.esStudio = guardados.esStudio
 	Productos.PASE_POR_ID.PackInicio.gamePassId = guardados.idPack
 	Productos.PASE_POR_ID.BolsaXL.gamePassId = guardados.idBolsaXL
 	Productos.PRODUCTO_POR_ID.Turbo15.productId = guardados.idTurbo15
+	Productos.PRODUCTO_POR_ID.Turbo60.productId = guardados.idTurbo60
 	p.ofertas = guardados.ofertas
 	p.tutorial = guardados.tutorial
 	p.estadisticas.sesiones = guardados.sesiones
@@ -684,7 +807,7 @@ function Pruebas.ofertaReglas()
 	Bolsa.vaciar(j)
 	Bolsa.meterVarios(j, guardados.contenido)
 	devolver(j, p, antes)
-	Ofertas.reiniciarSesion(j)
+	Ofertas.fijarSesion(j, guardados.sesion)
 	if not exito then
 		return "error: " .. tostring(err) .. " => FALLO"
 	end
@@ -693,6 +816,7 @@ function Pruebas.ofertaReglas()
 		and r.trasAhoraNo == "ahoraNo" and r.segunda == "PackInicio" and r.comprar and r.cerrada
 		and r.vacia and r.intentos == 5 and r.rapido and r.trasCompra == "trasCompra" and r.bolsaXL == "BolsaXL" and r.descartada
 		and r.turbo == "Turbo" and r.turboUnBoton and r.turboSoloPrimero and r.turboComprado
+		and r.revalida and r.cancelaCompra and r.cerradaSinRechazo
 	if not viajeOk then
 		local claves = {}
 		for k, v in r do
@@ -701,11 +825,11 @@ function Pruebas.ofertaReglas()
 		table.sort(claves)
 		table.insert(malos, "viaje: " .. table.concat(claves, " "))
 	end
-	table.insert(partes, string.format("viaje: minuto 1 %s, minuto 4 %s, pendiente %s, caducada sin contar=%s, ensenada cuenta 1=%s, Ahora no=%s, 2.a de la sesion %s, al dia siguiente %s, 2.a vez en la 4.a sesion %s y comprada=%s, bolsa llena %d/5 (vacia no=%s), tras una compra %s, Bolsa XL %s, descartada no cuenta=%s, Turbo %s (1 boton=%s, solo el primer deposito=%s, el comprado no=%s)",
+	table.insert(partes, string.format("viaje: minuto 1 %s, minuto 4 %s, pendiente %s, caducada sin contar=%s, ensenada cuenta 1=%s, Ahora no=%s, 2.a de la sesion %s, al dia siguiente %s, 2.a vez en la 4.a sesion %s y comprada=%s, bolsa llena %d/5 (vacia no=%s), tras una compra %s, Bolsa XL %s, descartada no cuenta=%s, Turbo %s (1 boton=%s, solo el primer deposito=%s, el comprado no=%s), Turbo que llega mientras espera la anula=%s, una compra cancela la pendiente=%s, otro panel encima cierra sin rechazo=%s",
 		tostring(r.minuto1), tostring(r.pack), tostring(r.pendiente), tostring(r.caducada), tostring(r.cuenta), tostring(r.ahoraNo),
 		tostring(r.porSesion), tostring(r.trasAhoraNo), tostring(r.segunda), tostring(r.cerrada), r.intentos or 0, tostring(r.vacia),
 		tostring(r.trasCompra), tostring(r.bolsaXL), tostring(r.descartada), tostring(r.turbo), tostring(r.turboUnBoton),
-		tostring(r.turboSoloPrimero), tostring(r.turboComprado)))
+		tostring(r.turboSoloPrimero), tostring(r.turboComprado), tostring(r.revalida), tostring(r.cancelaCompra), tostring(r.cerradaSinRechazo)))
 	local bien = #malos == 0
 	return table.concat(partes, " | ") .. (if bien then "" else " | MAL: " .. table.concat(malos, "; ")) .. " => " .. ok(bien)
 end

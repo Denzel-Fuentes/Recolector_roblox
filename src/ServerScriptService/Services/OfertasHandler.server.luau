@@ -8,17 +8,20 @@
 	  tras un deposito       Bolsa.alDepositar (a mano o una lanzada que
 	                         entra; lo que se recicla solo no es un momento)
 	  al renacer             Rebirths.alRenacer (jugador, rebirths)
+	  tras cobrar el         Recompensas.alReclamar (jugador, "calendario"):
+	  calendario             el momento del Pack de inicio (con el panel aun
+	                         abierto: el cliente espera a que se cierre)
 	  fin de un Turbo        Turbo.alAcabar (jugador, ganado)
 	  compra completada      Monetizacion.alComprarPase / alComprarProducto
 	  OfertaRespuestaEvent   (accion, token, opcion): "mostrada",
-	                         "descartada", "ahoraNo", "comprar" y
+	                         "descartada", "ahoraNo", "cerrada", "comprar" y
 	                         "bolsaLlena". Solo se pasan esos tres argumentos;
 	                         los mira Ofertas.responder (la prueba
 	                         ofertaReglas le manda basura)
 
-	"Tras cobrar el calendario" (el Pack de inicio, momento "calendario") se
-	cablea aqui cuando las recompensas avisen de ello; mientras, el Pack sale
-	en el primer deposito de la sesion en que ya se puede.
+	El calendario se suele cobrar nada mas entrar, y en los 3 primeros
+	minutos de una sesion no sale ninguna oferta: entonces el Pack espera al
+	primer deposito en que ya se puede.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,6 +35,7 @@ local Bolsa = require(Servicios:WaitForChild("Bolsa"))
 local Rebirths = require(Servicios:WaitForChild("Rebirths"))
 local Turbo = require(Servicios:WaitForChild("Turbo"))
 local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
+local Recompensas = require(Servicios:WaitForChild("Recompensas"))
 local Ofertas = require(Servicios:WaitForChild("Ofertas"))
 
 Perfiles.alCargar:Connect(function(jugador)
@@ -45,11 +49,19 @@ Perfiles.alSalir:Connect(function(jugador)
 	Ofertas.salir(jugador)
 end)
 
+-- Diferido: Bolsa avisa del deposito (alDepositar) antes de su resumen
+-- (alResumen), con el que se cobran los pedidos; si ese deposito cumple los
+-- tres del dia y trae Turbo, la oferta tiene que verlo ya
 Bolsa.alDepositar:Connect(function(jugador)
-	Ofertas.momento(jugador, "deposito")
+	task.defer(Ofertas.momento, jugador, "deposito")
 end)
 Rebirths.alRenacer:Connect(function(jugador, rebirths)
 	Ofertas.momento(jugador, "rebirth", rebirths)
+end)
+Recompensas.alReclamar:Connect(function(jugador, tipo)
+	if tipo == "calendario" then
+		Ofertas.momento(jugador, "calendario")
+	end
 end)
 Turbo.alAcabar:Connect(Ofertas.turboAcabado)
 Monetizacion.alComprarPase:Connect(Ofertas.compra)

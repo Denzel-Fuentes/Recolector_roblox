@@ -37,8 +37,8 @@
 
 	=== Cada disparador (LISTA, en orden de prioridad) ===
 	  momento   "inicioSesion" el primer momento tranquilo de la sesion en que
-	            ya se pueden ensenar (tras un deposito o al cobrar el
-	            calendario, momento "calendario", si se cablea); "deposito";
+	            ya se pueden ensenar (al cobrar el calendario, momento
+	            "calendario", o tras un deposito); "deposito";
 	            "rebirth" (con rebirths = los que la disparan); y
 	            "finTurboGanado" (el primer deposito despues de acabarse un
 	            Turbo ganado, no comprado: lo avisa Services/Turbo)
@@ -234,10 +234,14 @@ end
 --   momento, loTiene, conTurbo, sinIds, tutorial, sesion, minutos,
 --   trasCompra, porSesion, porSemana, rechazada, ahoraNo, total,
 --   semanaOferta, cadaDias, rebirths, bolsaLlena, nivelBolsa
-function DefinicionesOfertas.debeOfrecer(def: Definicion, ctx: Contexto): (boolean, string)
+-- sinMomento: no mira el momento (ni lo que lo dispara: la bolsa llena, el
+-- Turbo acabado), para volver a pasar las reglas a una ya enviada justo
+-- antes de ensenarla (Services/Ofertas, "mostrada"): una compra o un Turbo
+-- que llegan mientras espera su momento la anulan
+function DefinicionesOfertas.debeOfrecer(def: Definicion, ctx: Contexto, sinMomento: boolean?): (boolean, string)
 	local G = DefinicionesOfertas.GLOBAL
 	local DIA = DefinicionesOfertas.DIA
-	if not momentoValido(def, ctx) then
+	if not sinMomento and not momentoValido(def, ctx) then
 		return false, "momento"
 	end
 	-- 2: lo que ya tiene, el Turbo con Turbo, lo que no tiene id
@@ -303,7 +307,7 @@ function DefinicionesOfertas.debeOfrecer(def: Definicion, ctx: Contexto): (boole
 	if def.rebirthsMax and ctx.rebirths > def.rebirthsMax then
 		return false, "rebirths"
 	end
-	if def.intentosBolsaLlena and ctx.intentosBolsaLlena < def.intentosBolsaLlena then
+	if not sinMomento and def.intentosBolsaLlena and ctx.intentosBolsaLlena < def.intentosBolsaLlena then
 		return false, "bolsaLlena"
 	end
 	if def.nivelBolsa and ctx.nivelBolsa < def.nivelBolsa then

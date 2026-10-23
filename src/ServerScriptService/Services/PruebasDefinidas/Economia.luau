@@ -283,9 +283,10 @@ end
 -- ===========================================================================
 
 -- Lo que tocan las dos pruebas de abajo, para dejarlo como estaba. Por
--- lista y no recorriendo la copia: un campo que era nil (turboHasta en un
--- perfil v5) no estaria en ella y se quedaria con lo de la prueba
-local CAMPOS_PERFIL = { "dinero", "rebirths", "tutorial", "pedidos", "pasesCache", "estadisticas", "logros", "turboHasta", "turboRestante" }
+-- lista y no recorriendo la copia: un campo que era nil no estaria en ella
+-- y se quedaria con lo de la prueba. (El Turbo es turboRestante desde la
+-- v5 del perfil: turboHasta ya no existe, K1)
+local CAMPOS_PERFIL = { "dinero", "rebirths", "tutorial", "pedidos", "pasesCache", "estadisticas", "logros", "turboRestante" }
 local CLONAR = { pasesCache = true, estadisticas = true, logros = true }
 local function guardarPerfil(p)
 	local copia = {}

@@ -8,24 +8,33 @@
 	compra la confirma siempre la de Roblox: aqui no se vende nada.
 
 	=== El viaje de una oferta ===
-	  1 Un disparador (momento): tras un deposito (Bolsa.alDepositar) o al
-	    renacer (Rebirths.alRenacer); lo cablea OfertasHandler. Se arma el
+	  1 Un disparador (momento): tras un deposito (Bolsa.alDepositar), al
+	    renacer (Rebirths.alRenacer) o al cobrar el calendario
+	    (Recompensas.alReclamar); lo cablea OfertasHandler. Se arma el
 	    contexto (perfil, sesion, pases) y DefinicionesOfertas.elegir dice
 	    cual, por prioridad. Si hay, va al cliente por OfertaEvent con un
 	    token: { id, token, momento, espera, titulo, texto, icono, opciones }
 	    (titulo y texto son Idioma.mensaje: el servidor no monta texto).
 	  2 El cliente busca un momento tranquilo (sin panel, sin celebracion,
-	    sin cargar un lanzamiento) durante `espera` s. Si lo encuentra, abre
-	    la ventana y responde "mostrada": SOLO entonces cuenta (vistas,
-	    ultima, historial, la de la sesion). Si no, "descartada" (o nada: a
-	    los `espera` s mas un margen caduca) y no cuenta.
-	  3 Luego "ahoraNo" (el boton, la X o Esc: suma un rechazo) o "comprar"
-	    (lanza el prompt de Roblox en el cliente). Si la compra se completa,
-	    Monetizacion lo avisa (compra) y se cierra; si el jugador cancela la
-	    ventana de Roblox, la oferta sigue abierta y aun puede decir "Ahora no".
-	Una oferta a la vez por jugador. Lo que manda el cliente solo cuenta con
-	el token de la que tiene: un cliente que mintiera solo cambia sus
-	propias ofertas (y no puede sumar vistas ni rechazos dos veces).
+	    sin cargar un lanzamiento, sin bolsa en el aire) durante `espera` s.
+	    Si lo encuentra, abre la ventana y responde "mostrada": SOLO entonces
+	    cuenta (vistas, ultima, historial, la de la sesion), y antes se
+	    vuelven a pasar las reglas (debeOfrecer sin el momento): si mientras
+	    esperaba compro algo o le llego Turbo, ya no vale, no cuenta y el
+	    cliente la cierra ({ cancelar = token } por OfertaEvent). Si no hay
+	    momento, "descartada" (o nada: a los `espera` s mas MARGEN_ESPERA
+	    caduca) y no cuenta.
+	  3 Luego "ahoraNo" (el boton, la X o Esc: suma un rechazo), "cerrada"
+	    (abrio otro panel encima, un atajo o el prompt de la tienda: no es un
+	    "Ahora no" y no suma rechazo) o "comprar" (lanza el prompt de Roblox
+	    en el cliente). Si la compra se completa, Monetizacion lo avisa
+	    (compra) y se cierra; si el jugador cancela la ventana de Roblox, la
+	    oferta sigue abierta y aun puede decir "Ahora no".
+	Una compra con la oferta aun esperando su momento la cancela, sea de lo
+	que sea (24 h sin ofertas tras una compra, §5.6). Una oferta a la vez
+	por jugador. Lo que manda el cliente solo cuenta con el token de la que
+	tiene: un cliente que mintiera solo cambia sus propias ofertas (y no
+	puede sumar vistas ni rechazos dos veces).
 
 	=== Por que el cliente avisa de los intentos con la bolsa llena ===
 	El disparador de Bolsa XL cuenta los intentos de recoger con la bolsa
@@ -40,13 +49,24 @@
 	minutos, la espera del momento). Los dos y enviarCliente se sustituyen
 	en la prueba ofertaReglas.
 
+	=== En Studio no salen solas ===
+	Con los ids reales (F1b, 23 oct) cualquier prueba que deposite o
+	renazca podria mandar una oferta de verdad: una ventana de compra a
+	mitad de una bateria de pruebas estorba, y se contaria en el perfil de
+	Studio. En Studio solo salen con el atributo OfertasEnStudio = true en
+	ServerStorage (se puede poner en Play). La prueba ofertaReglas sustituye
+	Ofertas.esStudio. Fuera de Studio siempre estan.
+
 	alMostrar(jugador, id) y alResponder(jugador, id, respuesta, opcion?)
-	("ahoraNo", "comprar", "aceptada") quedan para la analitica (§7.2).
+	("ahoraNo", "cerrada", "comprar", "aceptada") quedan para la analitica
+	(§7.2).
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
+local ServerStorage = game:GetService("ServerStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
@@ -109,25 +129,38 @@ local Ofertas = {}
 
 Ofertas.ahora = os.time
 Ofertas.reloj = os.clock
--- Por donde sale una oferta al cliente (la prueba la captura)
-Ofertas.enviarCliente = function(jugador: Player, datos: Datos)
+-- Sustituible en la prueba ofertaReglas (ver cabecera)
+Ofertas.esStudio = function(): boolean
+	return RunService:IsStudio()
+end
+
+-- Si se mandan ofertas: siempre fuera de Studio; en Studio, solo con el
+-- atributo OfertasEnStudio en ServerStorage (ver cabecera)
+function Ofertas.activas(): boolean
+	return not Ofertas.esStudio() or ServerStorage:GetAttribute("OfertasEnStudio") == true
+end
+-- Por donde sale al cliente una oferta (Datos) o su cancelacion
+-- ({ cancelar = token }); la prueba lo captura
+Ofertas.enviarCliente = function(jugador: Player, datos: any)
 	OfertaEvent:FireClient(jugador, datos)
 end
 
 -- (jugador, id de la oferta) al ensenarse
 Ofertas.alMostrar = Senal.nueva() :: Senal.Senal<Player, string>
--- (jugador, id de la oferta, "ahoraNo" | "comprar" | "aceptada", opcion?)
+-- (jugador, id de la oferta, "ahoraNo" | "cerrada" | "comprar" | "aceptada", opcion?)
 Ofertas.alResponder = Senal.nueva() :: Senal.Senal<Player, string, string, string?>
 
--- s de mas para el "mostrada" de una oferta que se abrio al final de su espera
-local MARGEN_ESPERA = 5
+-- s de mas para el "mostrada" de una oferta que se abrio al final de su
+-- espera: el cliente cuenta sus `espera` s desde que la recibe, y luego la
+-- respuesta tarda en volver (un movil con mala conexion)
+local MARGEN_ESPERA = 15
 -- Una ensenada sin respuesta (se fue a mitad, un cliente roto) se olvida a los
 local VIDA_MOSTRADA = 600
 -- Envios por sesion como mucho: un cliente que nunca dice "mostrada" no
 -- recibe una oferta en cada deposito
 local MAX_ENVIADAS = 4
 
-local ACCIONES = { mostrada = true, descartada = true, ahoraNo = true, comprar = true, bolsaLlena = true }
+local ACCIONES = { mostrada = true, descartada = true, ahoraNo = true, cerrada = true, comprar = true, bolsaLlena = true }
 
 local sesiones: { [Player]: Sesion } = {}
 
@@ -169,6 +202,12 @@ function Ofertas.reiniciarSesion(jugador: Player): Sesion
 	local s = nuevaSesion()
 	sesiones[jugador] = s
 	return s
+end
+
+-- Vuelve a poner una sesion guardada con Ofertas.sesion (pruebas: la de
+-- verdad, al acabar)
+function Ofertas.fijarSesion(jugador: Player, sesion: Sesion?)
+	sesiones[jugador] = sesion
 end
 
 -- El id de Roblox de un pase o un producto de Config/Productos (0 = sin crear)
@@ -261,6 +300,8 @@ function Ofertas.momento(jugador: Player, momento: string, rebirthHecho: number?
 	local s = sesiones[jugador]
 	if not s then
 		return nil, "sinSesion"
+	elseif not Ofertas.activas() then
+		return nil, "studio"
 	end
 	caducar(s)
 	local ctx = Ofertas.contexto(jugador, momento, rebirthHecho)
@@ -365,6 +406,15 @@ function Ofertas.responder(jugador: Player, accion: any, token: any, opcion: any
 		if actual.mostrada then
 			return false
 		end
+		-- Mientras esperaba su momento pudo dejar de valer (ver cabecera)
+		local def = DefinicionesOfertas.POR_ID[actual.id]
+		local ctx = Ofertas.contexto(jugador, "mostrada", nil)
+		local vale = def ~= nil and ctx ~= nil and DefinicionesOfertas.debeOfrecer(def, ctx, true)
+		if not vale then
+			s.actual = nil
+			Ofertas.enviarCliente(jugador, { cancelar = actual.token })
+			return false
+		end
 		actual.mostrada = true
 		actual.hasta = t + VIDA_MOSTRADA
 		contarVista(jugador, s, actual.id)
@@ -377,7 +427,7 @@ function Ofertas.responder(jugador: Player, accion: any, token: any, opcion: any
 		s.actual = nil
 		return true
 	end
-	-- "ahoraNo" y "comprar" solo de una ensenada
+	-- "ahoraNo", "cerrada" y "comprar" solo de una ensenada
 	if not actual.mostrada then
 		return false
 	end
@@ -385,6 +435,11 @@ function Ofertas.responder(jugador: Player, accion: any, token: any, opcion: any
 		s.actual = nil
 		contarRechazo(jugador, actual.id)
 		Ofertas.alResponder:Fire(jugador, actual.id, "ahoraNo", nil)
+		return true
+	elseif accion == "cerrada" then
+		-- Otro panel encima: se cierra sin rechazo (la vista ya conto)
+		s.actual = nil
+		Ofertas.alResponder:Fire(jugador, actual.id, "cerrada", nil)
 		return true
 	elseif accion == "comprar" then
 		if typeof(opcion) ~= "string" or not tieneOpcion(actual, opcion) then
@@ -396,19 +451,27 @@ function Ofertas.responder(jugador: Player, accion: any, token: any, opcion: any
 	return false
 end
 
--- Una compra completada (Monetizacion.alComprarPase / alComprarProducto):
--- si era de la oferta que tiene, se cierra (y si estaba sin ensenar, ya no
--- hace falta)
+-- Una compra completada (Monetizacion.alComprarPase / alComprarProducto).
+-- Con la oferta ensenada, si es una de sus opciones, aceptada y cerrada
+-- (con la ventana abierta no se puede comprar otra cosa: es modal). Con la
+-- oferta aun esperando su momento, la cancela sea lo que sea lo comprado:
+-- en las 24 h siguientes a una compra no sale ninguna, y si es lo ofrecido
+-- ya no tiene sentido. El cliente deja de esperarla
 function Ofertas.compra(jugador: Player, idCompra: string)
 	local s = sesiones[jugador]
 	local actual = s and s.actual
-	if not s or not actual or not tieneOpcion(actual, idCompra) then
+	if not s or not actual then
+		return
+	end
+	if actual.mostrada then
+		if tieneOpcion(actual, idCompra) then
+			s.actual = nil
+			Ofertas.alResponder:Fire(jugador, actual.id, "aceptada", idCompra)
+		end
 		return
 	end
 	s.actual = nil
-	if actual.mostrada then
-		Ofertas.alResponder:Fire(jugador, actual.id, "aceptada", idCompra)
-	end
+	Ofertas.enviarCliente(jugador, { cancelar = actual.token })
 end
 
 -- Se acabo un Turbo corriendo (Turbo.alAcabar): si era ganado, la oferta de

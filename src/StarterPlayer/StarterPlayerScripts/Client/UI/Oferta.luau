@@ -12,23 +12,34 @@
 	verdad (Client/PreciosRobux).
 
 	=== El momento tranquilo ===
-	La oferta llega tras un deposito o al renacer, y se ensena cuando no hay
-	panel abierto (el de Rebirth incluido: "al cerrar la celebracion del
-	rebirth"), ni celebracion (UI/Celebraciones) ni tarjeta de insignia
-	(UI/Notificaciones), ni lanzamiento cargando, durante TRANQUILO_DURANTE s
-	seguidos. Se espera PAUSA_INICIAL s antes de mirar: el servidor avisa de
-	la oferta antes de mandar la celebracion del mismo deposito. Si en
-	`espera` s (60) no hay momento, se descarta ("descartada") y no cuenta.
+	La oferta llega tras un deposito, al renacer o al cobrar el calendario,
+	y se ensena cuando no hay panel abierto (el de Rebirth incluido: "al
+	cerrar la celebracion del rebirth"), ni celebracion (UI/Celebraciones)
+	ni tarjeta de insignia (UI/Notificaciones), ni lanzamiento cargando, ni
+	una bolsa suya en el aire (en workspace.Objetos con LanzadaPor y aun sin
+	LibreEn: Lanzamiento), durante TRANQUILO_DURANTE s seguidos. Se espera
+	PAUSA_INICIAL s antes de mirar: el servidor avisa de la oferta antes de
+	mandar la celebracion del mismo deposito. Si en `espera` s (60) no hay
+	momento, se descarta ("descartada") y no cuenta.
+
+	Justo antes de abrirla se mira que siga teniendo sentido: si desde que
+	llego compro algo (perfil.compras.ultimaRobux cambio: 24 h sin ofertas),
+	ya tiene el pase, o le llego Turbo, se descarta. Las opciones que Roblox
+	dice que no estan a la venta (PreciosRobux) no salen; sin ninguna, se
+	descarta. El servidor lo vuelve a mirar al recibir "mostrada" y, si ya
+	no vale, la cancela ({ cancelar = token } por OfertaEvent): esperando, se
+	olvida; abierta, se cierra sin responder.
 
 	=== Respuestas (OfertaRespuestaEvent, con el token de la oferta) ===
 	  "mostrada"    al abrirse: solo entonces cuenta
-	  "ahoraNo"     el boton, la X o Esc (Menu.cerrarTodo -> cerrar), o abrir
-	                otro panel encima
+	  "ahoraNo"     el boton, la X o Esc (Menu.cerrarTodo -> cerrar)
+	  "cerrada"     se abrio otro panel encima (un atajo, el prompt de la
+	                tienda): se cierra sin contar un "Ahora no"
 	  "comprar"     y el prompt de Roblox se lanza aqui (PromptGamePassPurchase
 	                / PromptProductPurchase): la ventana de Roblox confirma.
 	                La oferta sigue abierta: comprado, dice "¡Gracias! Ya es
 	                tuyo" y se cierra; cancelado, aun se puede decir "Ahora no"
-	  "descartada"  sin momento tranquilo a tiempo
+	  "descartada"  sin momento tranquilo a tiempo, o ya sin sentido
 	  "bolsaLlena"  cada intento de recoger con la bolsa llena (senales de
 	                EstadoCliente separadas SEPARACION_INTENTO s): el
 	                disparador de Bolsa XL (el servidor comprueba que de verdad
@@ -107,6 +118,7 @@ export type Datos = {
 	texto: any,
 	icono: string,
 	opciones: { Opcion },
+	compraAlRecibir: number, -- perfil.compras.ultimaRobux cuando llego
 }
 
 local scope = Fusion.scoped(Fusion, Kit)
@@ -134,6 +146,14 @@ end
 -- Datos
 -- ===========================================================================
 
+-- La hora de su ultima compra con Robux, segun el perfil publicado
+local function ultimaCompra(): number
+	local p = EstadoCliente.perfil
+	local compras = p and p.compras
+	local t = compras and compras.ultimaRobux
+	return if typeof(t) == "number" then t else 0
+end
+
 -- Lo que manda el servidor, mirado (o nil)
 local function validar(d: any): Datos?
 	if typeof(d) ~= "table" or typeof(d.id) ~= "string" or typeof(d.token) ~= "number" or typeof(d.opciones) ~= "table" then
@@ -159,7 +179,37 @@ local function validar(d: any): Datos?
 		texto = d.texto,
 		icono = if typeof(d.icono) == "string" then d.icono else "estrella",
 		opciones = opciones,
+		compraAlRecibir = if typeof(d.compraAlRecibir) == "number" then d.compraAlRecibir else ultimaCompra(),
 	}
+end
+
+-- La oferta tal y como se puede abrir ahora, o nil si ya no tiene sentido
+-- (ver cabecera): sin las opciones que Roblox dice que no estan a la venta
+local function paraAbrir(d: Datos): Datos?
+	local p = EstadoCliente.perfil
+	if not p or ultimaCompra() ~= d.compraAlRecibir then
+		return nil
+	end
+	local turbo = if typeof(p.turboRestante) == "number" then p.turboRestante else 0
+	local opciones: { Opcion } = {}
+	for _, o in d.opciones do
+		if o.tipo == "pase" and EstadoCliente.tienePase(o.id) then
+			return nil
+		elseif o.tipo == "producto" and turbo > 0 then
+			-- La oferta de Turbo es para quien se quedo sin el
+			return nil
+		end
+		local info = PreciosRobux.info(o.tipo, o.id)
+		if info.estado == "cargando" or info.aLaVenta then
+			table.insert(opciones, o)
+		end
+	end
+	if #opciones == 0 then
+		return nil
+	end
+	local copia = table.clone(d)
+	copia.opciones = opciones
+	return copia
 end
 
 local function nombreDe(opcion: Opcion): string
@@ -193,13 +243,29 @@ local function comprar(opcion: Opcion)
 	end
 end
 
--- "Ahora no" (boton, X, Esc u otro panel encima): una vez por oferta
+-- "Ahora no" (el boton): una vez por oferta
 local function ahoraNo()
 	local d = peek(datosR)
 	if d and not respondida then
 		respondida = true
 		responder("ahoraNo", d.token)
 	end
+end
+
+-- Se cierra sin pulsar "Ahora no" (Menu llama a `cerrar`): la X y Esc
+-- (Menu.cerrarTodo) valen "Ahora no"; abrir otro panel encima (un atajo, el
+-- prompt de la tienda) es "cerrada", sin rechazo. Las dos llegan con
+-- Menu.abierto() a nil: se distinguen despues, cuando Menu.abrir ya puso
+-- el otro panel
+local function alCerrarse()
+	local d = peek(datosR)
+	if not d or respondida then
+		return
+	end
+	respondida = true
+	task.defer(function()
+		responder(if Menu.abierto() ~= nil then "cerrada" else "ahoraNo", d.token)
+	end)
 end
 
 -- ===========================================================================
@@ -360,10 +426,8 @@ Menu.registrar(NOMBRE, {
 		respondida = false
 		responder("mostrada", d.token)
 	end,
-	-- Cerrar sin haber respondido vale "Ahora no" (X, Esc, otro panel)
-	cerrar = function()
-		ahoraNo()
-	end,
+	-- Cerrar sin haber respondido: "Ahora no" o "cerrada" (ver alCerrarse)
+	cerrar = alCerrarse,
 	primerSeleccionable = botonAhoraNo,
 })
 
@@ -378,8 +442,23 @@ local function celebrando(): boolean
 		or (notificaciones ~= nil and notificaciones:FindFirstChild("Logro") ~= nil)
 end
 
+-- Una bolsa suya volando: Lanzamiento la pone en workspace.Objetos con
+-- LanzadaPor y le pone LibreEn al posarse (si entra, desaparece)
+local function bolsaEnElAire(): boolean
+	local carpeta = workspace:FindFirstChild("Objetos")
+	if not carpeta then
+		return false
+	end
+	for _, objeto in carpeta:GetChildren() do
+		if objeto:GetAttribute("LanzadaPor") == jugador.UserId and objeto:GetAttribute("LibreEn") == nil then
+			return true
+		end
+	end
+	return false
+end
+
 local function tranquilo(): boolean
-	return Menu.abierto() == nil and EstadoCliente.cargaLanzamiento <= 0 and not celebrando()
+	return Menu.abierto() == nil and EstadoCliente.cargaLanzamiento <= 0 and not celebrando() and not bolsaEnElAire()
 end
 
 local function esperarMomento(d: Datos)
@@ -391,7 +470,13 @@ local function esperarMomento(d: Datos)
 			desde = desde or os.clock()
 			if os.clock() - (desde :: number) >= TRANQUILO_DURANTE then
 				pendiente = nil
-				Menu.abrir(NOMBRE, d)
+				-- Justo antes de abrir, si aun tiene sentido (ver cabecera)
+				local lista = paraAbrir(d)
+				if lista then
+					Menu.abrir(NOMBRE, lista)
+				else
+					responder("descartada", d.token)
+				end
 				return
 			end
 		else
@@ -405,7 +490,24 @@ local function esperarMomento(d: Datos)
 	end
 end
 
+-- El servidor la cancela (una compra mientras esperaba, o al ensenarse ya
+-- no valia): esperando, se olvida; abierta, se cierra sin responder
+local function cancelar(token: number)
+	if pendiente and pendiente.token == token then
+		pendiente = nil
+	end
+	local abierta = peek(datosR)
+	if abierta and abierta.token == token and Menu.abierto() == NOMBRE then
+		respondida = true
+		Menu.cerrarTodo()
+	end
+end
+
 OfertaEvent.OnClientEvent:Connect(function(datos)
+	if typeof(datos) == "table" and typeof(datos.cancelar) == "number" then
+		cancelar(datos.cancelar)
+		return
+	end
 	local d = validar(datos)
 	-- Una a la vez: con una abierta o esperando, la nueva no entra
 	if not d or pendiente ~= nil or Menu.abierto() == NOMBRE then
@@ -490,7 +592,7 @@ local function ejemplo(id: string): Datos?
 	if not def then
 		return nil
 	end
-	local valores = nil
+	local valores: { [string]: any }? = nil
 	if def.valores == "multiplicador" then
 		local m = DefinicionesRebirths.multiplicador(1)
 		valores = { mult = Idioma.multiplicador(m), mult2 = Idioma.multiplicador(m * 2) }
@@ -511,6 +613,7 @@ local function ejemplo(id: string): Datos?
 		texto = Idioma.mensaje(def.texto, valores),
 		icono = def.icono,
 		opciones = opciones,
+		compraAlRecibir = ultimaCompra(),
 	}
 end
 

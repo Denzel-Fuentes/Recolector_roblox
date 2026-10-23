@@ -7,7 +7,8 @@
 	cosmeticos nuevos, ofertas) estan en Catalogo.
 
 	Usan el modo dev de pases (Monetizacion.fijarModoDev) y lo dejan como
-	estaba.
+	estaba. Desde E1, Pedidos mete el Pedido VIP al ver el pase (y el modo
+	dev se lo da a todos): conPases quita al acabar los VIP que aparecieron.
 ]]
 
 local Servicios = script.Parent.Parent
@@ -27,11 +28,39 @@ local function ok(cond: boolean): string
 	return if cond then "OK" else "FALLO"
 end
 
+-- Los pedidos de cada perfil antes de cambiar el modo dev, para quitar
+-- despues los Pedidos VIP que meta Pedidos al ver el pase (ver cabecera)
+local function pedidosDeTodos(): { [any]: { [any]: boolean } }
+	local antes = {}
+	for quien, perfil in Perfiles.todos() do
+		local vistos = {}
+		for _, pedido in perfil.pedidos.lista do
+			vistos[pedido] = true
+		end
+		antes[quien] = vistos
+	end
+	return antes
+end
+local function quitarVipNuevos(antes)
+	for quien, perfil in Perfiles.todos() do
+		local vistos = antes[quien] or {}
+		local lista = perfil.pedidos.lista
+		for i = #lista, 1, -1 do
+			if lista[i].vip and not vistos[lista[i]] then
+				table.remove(lista, i)
+				Perfiles.marcarSucio(quien)
+			end
+		end
+	end
+end
+
 local function conPases(activo: boolean, fn: () -> any): any
 	local antes = Monetizacion.modoDev()
+	local pedidos = pedidosDeTodos()
 	Monetizacion.fijarModoDev(activo)
 	local bien, resultado = pcall(fn)
 	Monetizacion.fijarModoDev(antes)
+	quitarVipNuevos(pedidos)
 	if not bien then
 		error(resultado, 0)
 	end

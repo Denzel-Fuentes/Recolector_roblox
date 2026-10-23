@@ -16,7 +16,8 @@
 	          REPETICIONES_TURBO veces y vuelve la del patio aunque el Turbo
 	          siga (dura 10-15 min: entera cansaria, §5.2). Si se acaba o se
 	          pausa (2 min sin hacer nada), vuelve el patio con fundido; al
-	          reanudarse vuelve a sonar la del Turbo.
+	          reanudarse vuelve la del Turbo si aun no ha sonado esas veces:
+	          se cuentan por Turbo (de 0 a algo), no por cada pausa.
 	  Baja    a lo que diga Sonido.atenuacion() (las celebraciones, el
 	          rebirth y las insignias la ponen a la mitad mientras suenan),
 	          con una transicion corta.
@@ -100,15 +101,20 @@ local function sonables(lista: { string }): { string }
 	return claves
 end
 
--- El Turbo corre: le quedan segundos (el servidor los publica en el perfil
--- y lo pone a 0 al acabarse) y no esta en pausa
-local function turboActivo(): boolean
+-- Le quedan segundos de Turbo (el servidor los publica en el perfil y lo
+-- pone a 0 al acabarse), en pausa o no
+local function hayTurbo(): boolean
 	local p = EstadoCliente.perfil
-	return p ~= nil
-		and typeof(p.turboRestante) == "number"
-		and p.turboRestante > 0
-		and jugador:GetAttribute("TurboPausado") ~= true
+	return p ~= nil and typeof(p.turboRestante) == "number" and p.turboRestante > 0
 end
+
+-- El Turbo corre: le queda y no esta en pausa
+local function turboActivo(): boolean
+	return hayTurbo() and jugador:GetAttribute("TurboPausado") ~= true
+end
+-- Si en el ultimo Heartbeat quedaba Turbo: las veces de la pista del Turbo
+-- se cuentan por Turbo, no por cada vez que se reanuda tras una pausa
+local habiaTurbo = false
 
 local function yaCargo(clave: string): boolean
 	local b = bucles[clave]
@@ -245,11 +251,17 @@ end
 RunService.Heartbeat:Connect(function(dt)
 	local suena = Sonido.activado("Musica")
 
-	-- El Turbo empieza o acaba: se cambia de lista ya, con fundido
+	-- Un Turbo nuevo: su pista vuelve a poder sonar REPETICIONES_TURBO veces.
+	-- Una pausa y su vuelta no la reinician
+	local hay = hayTurbo()
+	if hay and not habiaTurbo then
+		vecesTurbo = 0
+	end
+	habiaTurbo = hay
+	-- El Turbo empieza, se pausa, sigue o acaba: se cambia de lista ya, con fundido
 	local turbo = turboActivo()
 	if turbo ~= enTurbo then
 		enTurbo = turbo
-		vecesTurbo = 0
 		if suena then
 			local clave, esTurbo = elegir()
 			local esta = actual
