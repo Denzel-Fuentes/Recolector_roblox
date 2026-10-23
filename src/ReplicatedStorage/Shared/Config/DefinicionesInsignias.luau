@@ -2,7 +2,10 @@
 --[[
 	DefinicionesInsignias
 	Las 16 insignias del diseno v2 (lote 7): hitos de reciclar, de punteria,
-	de separar, de dinero, de mejoras y de rebirths. Son Badges de Roblox y
+	de separar, de dinero, de mejoras y de rebirths; y 4 de la economia v4
+	(22 oct, al final de la lista): los rebirths 5 y 10, el calendario
+	completo (estadistica diasCalendario, las casillas cobradas; la suma
+	Services/Recompensas) y 30 pedidos. Son Badges de Roblox y
 	ademas se guardan en el perfil (perfil.logros), para ensenarlas en el
 	panel aunque el badge aun no exista. Solo datos y la cuenta de si un
 	perfil cumple una (servidor y panel la comparten).
@@ -49,6 +52,12 @@ DefinicionesInsignias.LISTA = {
 	{ id = "todasMax", nombre = "Equipo completo", descripcion = "Las 4 mejoras al máximo", icono = "bota", badgeId = 0, mejorasAlMaximo = 4 },
 	{ id = "rebirth1", nombre = "Renacido", descripcion = "Haz tu primer Rebirth", icono = "estrella", badgeId = 0, estadistica = "rebirthMaximo", meta = 1 },
 	{ id = "rebirth3", nombre = "Veterano", descripcion = "Llega al Rebirth 3", icono = "estrella", badgeId = 0, estadistica = "rebirthMaximo", meta = 3 },
+	-- Economia v4 (22 oct). semanaCompleta regala la Bolsa de carton
+	-- (DefinicionesCosmeticos, forma insignia)
+	{ id = "rebirth5", nombre = "Reciclador de élite", descripcion = "Llega al Rebirth 5", icono = "estrella", badgeId = 0, estadistica = "rebirthMaximo", meta = 5 },
+	{ id = "rebirth10", nombre = "Leyenda del reciclaje", descripcion = "Llega al Rebirth 10", icono = "trofeo", badgeId = 0, estadistica = "rebirthMaximo", meta = 10 },
+	{ id = "semanaCompleta", nombre = "Constante", descripcion = "Cobra las 7 casillas del calendario", icono = "check", badgeId = 0, estadistica = "diasCalendario", meta = 7 },
+	{ id = "pedidos30", nombre = "Cumplidor", descripcion = "Cumple 30 pedidos", icono = "libreta", badgeId = 0, estadistica = "pedidosCompletados", meta = 30 },
 } :: { Insignia }
 
 DefinicionesInsignias.POR_ID = {} :: { [string]: Insignia }

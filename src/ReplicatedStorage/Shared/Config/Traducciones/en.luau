@@ -8,7 +8,7 @@
 	Glosario (para que todo diga lo mismo): bolsa = bag, contenedor = bin,
 	monton = pile, patio = junkyard, pedido = order, mejora = upgrade,
 	insignia = badge, racha = streak, tesoro = treasure, encestar = score.
-	"Rebirth" y "Turbo" no se traducen (asi los llaman en Roblox).
+	"Rebirth", "Turbo" y "VIP" no se traducen (asi los llaman en Roblox).
 ]]
 
 return {
@@ -28,6 +28,8 @@ return {
 		fuerza = "Power",
 		bonusAqui = "+{pct} %",
 		bolsaLlenaBarra = "FULL!",
+		-- C3, 22 oct
+		recompensas = "Rewards",
 	},
 
 	MUNDO = {
@@ -39,6 +41,8 @@ return {
 		tendero = "Recycler",
 		patio = "Junkyard ↑",
 		barrera = "Rebirth {n} · {zona}",
+		-- C3, 22 oct
+		vip = "VIP",
 	},
 
 	ZONAS = {
@@ -146,7 +150,11 @@ return {
 			metal = "Unlocks metal trash",
 			organico = "Unlocks organic trash",
 			bolsaPlateada = "Gives you the Silver bag",
-			insignia = "Multiplier and badge only",
+			-- C3, 22 oct
+			bolsaHielo = "Gives you the Ice bag",
+			estelaFuego = "Gives you the Fire trail and a badge",
+			multiplicador = "Raises your money multiplier",
+			leyenda = "Gives you the Recycling legend badge",
 		},
 		reinicia = "Your money and upgrades reset",
 		conserva = "You keep unlocked zones, records, badges and passes",
@@ -172,6 +180,13 @@ return {
 		robux = "{precio} Robux",
 		sinIds = "Product not available yet",
 		mejoraComprada = "{nombre} → level {nivel}",
+		-- C3, 22 oct
+		conInsignia = "With the {nombre} badge",
+		dePack = "From the Starter pack",
+		deVip = "VIP exclusive",
+		compraUnica = "One-time purchase",
+		turboTope = "You already have over {horas} h of Turbo saved",
+		cargandoPrecio = "Loading price…",
 	},
 
 	LOGROS = {
@@ -196,6 +211,8 @@ return {
 		cerrados = "Orders open when you buy your first upgrade",
 		nuevos = "New orders every day",
 		insigniasConseguidas = "{n}/{total} earned",
+		-- C3, 22 oct
+		vip = "VIP order",
 	},
 
 	PEDIDOS_HUD = {
@@ -217,6 +234,9 @@ return {
 
 	TURBO = {
 		activo = "x2 {tiempo}",
+		-- C3, 22 oct
+		pausado = "x2 paused",
+		soloJugando = "Turbo only runs while you play",
 	},
 
 	NOTIFICACIONES = {
@@ -229,6 +249,8 @@ return {
 		-- C2, 22 oct
 		versionNueva = "There's a new version of the game: rejoin to keep playing.",
 		progresoRecuperado = "Your saved progress is back. What you played while it couldn't be saved isn't kept.",
+		-- C3, 22 oct
+		packTurbo = "Starter pack: +{minutos} min of Turbo",
 	},
 
 	MATERIALES = {
@@ -272,6 +294,52 @@ return {
 		consejo5 = "Rebirths unlock new types of trash.",
 	},
 
+	-- C3, 22 oct
+	RECOMPENSAS = {
+		titulo = "Rewards",
+		calendario = "Calendar",
+		dia = "Day {n}",
+		semana = "Week {n}",
+		reclamar = "Claim",
+		reclamado = "Claimed",
+		vuelveManana = "Come back tomorrow for day {n}",
+		listo = "Your daily reward is ready!",
+		cobrado = "Day {n}: {premio}",
+		sinPrisa = "Miss a day and you lose nothing: the calendar waits for you",
+		regalos = "Playtime gifts",
+		minutosHoy = "You've played {n} min today",
+		siguiente = "Next gift at {n} min",
+		todos = "You got all of today's gifts! More tomorrow",
+		soloActivo = "Only minutes where you pick up, throw or dig count",
+		regalo = "Gift for playing {n} min! {premio}",
+		tramo = "{n} min",
+		regresoTitulo = "Great to see you again!",
+		regresoTexto = "For coming back, you get {premio}",
+		genial = "Awesome!",
+		cerradas = "Rewards open when you buy your first upgrade",
+		abiertas = "New rewards! Check them on the Rewards button",
+		premioTurbo = "Turbo {minutos} min",
+		premioY = "{a} and {b}",
+	},
+
+	-- C3, 22 oct
+	OFERTAS = {
+		comprar = "Buy · {precio} Robux",
+		ahoraNo = "Not now",
+		packTitulo = "Starter pack",
+		packTexto = "30 min of Turbo and the Recycler bag, which only comes in this pack. One-time purchase.",
+		bolsaXLTitulo = "Is your bag always full?",
+		bolsaXLTexto = "XL Bag: 10 more slots forever. Fewer trips to the bin.",
+		turboTitulo = "Your Turbo ran out",
+		turboTexto = "Turbo pays double while you play, and it only runs while you're in the game.",
+		turboOpcion = "{minutos} min · {precio} Robux",
+		dineroTitulo = "Your money is now worth {mult}",
+		dineroTexto = "With x2 Money it would be worth {mult2}, forever.",
+		vipTitulo = "VIP",
+		vipTexto = "A VIP crown over your head, the VIP trail and one more order every day.",
+		gracias = "Thanks! It's yours: {nombre}",
+	},
+
 	DEF = {
 		Mejoras = {
 			Bolsa = { nombre = "Bag", descripcion = "Fits more trash in your bag" },
@@ -284,16 +352,28 @@ return {
 			BolsaXL = { nombre = "XL Bag", descripcion = "10 more slots in your bag, forever" },
 			EstelaArcoiris = { nombre = "Rainbow trail", descripcion = "Your bag leaves a rainbow when you throw it" },
 			BolsaDorada = { nombre = "Golden bag", descripcion = "A bag made of gold to show off" },
+			-- C3, 22 oct
+			PackInicio = { nombre = "Starter pack", descripcion = "30 min of Turbo (once) and the Recycler bag, which only comes in this pack" },
+			VIP = { nombre = "VIP", descripcion = "A VIP crown over your head, the VIP trail and one more order every day" },
 		},
 		Productos = {
-			Turbo15 = { nombre = "Turbo 15 min", descripcion = "x2 money for 15 minutes (adds to any you have left)" },
+			Turbo15 = { nombre = "Turbo 15 min", descripcion = "x2 money for 15 minutes of play (adds to any you have left)" },
+			-- C3, 22 oct
+			Turbo60 = { nombre = "Turbo 60 min", descripcion = "x2 money for 60 minutes of play (adds to any you have left)" },
 		},
 		Bolsas = {
 			Plateada = { nombre = "Silver bag" },
 			Dorada = { nombre = "Golden bag" },
+			-- C3, 22 oct
+			Carton = { nombre = "Cardboard bag" },
+			Hielo = { nombre = "Ice bag" },
+			Reciclador = { nombre = "Recycler bag" },
 		},
 		Estelas = {
 			Arcoiris = { nombre = "Rainbow trail" },
+			-- C3, 22 oct
+			Fuego = { nombre = "Fire trail" },
+			VIP = { nombre = "VIP trail" },
 		},
 		Insignias = {
 			primerReciclaje = { nombre = "First recycle", descripcion = "Recycle your first bag" },
@@ -312,6 +392,11 @@ return {
 			todasMax = { nombre = "Fully geared", descripcion = "All 4 upgrades maxed" },
 			rebirth1 = { nombre = "Reborn", descripcion = "Do your first Rebirth" },
 			rebirth3 = { nombre = "Veteran", descripcion = "Reach Rebirth 3" },
+			-- C3, 22 oct
+			rebirth5 = { nombre = "Elite recycler", descripcion = "Reach Rebirth 5" },
+			rebirth10 = { nombre = "Recycling legend", descripcion = "Reach Rebirth 10" },
+			semanaCompleta = { nombre = "Dedicated", descripcion = "Claim all 7 calendar rewards" },
+			pedidos30 = { nombre = "Reliable", descripcion = "Complete 30 orders" },
 		},
 	},
 }

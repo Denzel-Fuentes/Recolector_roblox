@@ -19,9 +19,10 @@ GameConfig.NOMBRE_JUEGO = "Recíclatas"
 -- (decision del usuario: el de la v3 se abandona, no se borra). En Studio,
 -- Guardado le anade "_Studio" (como los rankings): las pruebas tocan el
 -- perfil y no deben acabar en el del juego publicado. Las versiones del
--- perfil se migran una a una (Perfiles.MIGRACIONES).
+-- perfil se migran una a una (Perfiles.MIGRACIONES): la 5 (economia v4,
+-- 22 oct) vive en el mismo store.
 GameConfig.NOMBRE_DATASTORE = "ReciclatasPerfiles_v4"
-GameConfig.VERSION_PERFIL = 4
+GameConfig.VERSION_PERFIL = 5
 GameConfig.INTERVALO_AUTOGUARDADO = 120
 GameConfig.REINTENTOS_DATASTORE = 3
 -- Bloqueo de sesion: cada autoguardado renueva el latido de la sesion. Una
