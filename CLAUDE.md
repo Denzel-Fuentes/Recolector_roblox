@@ -269,7 +269,9 @@ un módulo de solo tipos.
      `ENVIAR_EN_STUDIO` apagado, y `analiticaEmbudo` lo enciende y escribe
      las líneas "event fired"): `analiticaEmbudo`, `analiticaEconomia`,
      `analiticaProgresion`, `analiticaEventoMalo`, `analiticaSinServicio`,
-     `analiticaLanzamiento`, `analiticaSospecha`.
+     `analiticaLanzamiento`, `analiticaSospecha`; y N1b,
+     `analiticaRecompensas` (el dinero de las recompensas como fuente
+     TimedReward, el evento Calendario y el de las ofertas).
    - Ajustes y Actividad: `ajustesValidos`, `actividad`.
    - Economia (E1): `ritmoR1` (el modelo del documento: R1 en 45–60 min),
      `costeSiguiente`, `rebirthsAbren`, `pedidoVip`, `premioAlCobrar`.

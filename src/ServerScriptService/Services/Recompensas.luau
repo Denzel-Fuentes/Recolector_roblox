@@ -77,6 +77,7 @@ export type Reclamo = {
 	turbo: number, -- minutos de Turbo dados
 	casilla: number?, -- calendario: la casilla cobrada (1..7)
 	vuelta: number?, -- calendario: la vuelta (1 = la primera semana)
+	diasDesde: number?, -- calendario: dias desde la casilla anterior (nil en la primera)
 	minutos: number?, -- regalo: el tramo (5, 10, 20...)
 	dias: number?, -- regreso: dias sin jugar
 	tramo: number?, -- regreso: el tramo que se cumplio (3 o 14)
@@ -190,6 +191,7 @@ function Recompensas.reclamarDiaria(jugador: Player): (boolean, string?)
 	local casilla = DefinicionesRecompensas.casillaActual(calendario)
 	local vueltas = math.max(0, math.floor(tonumber(calendario.vueltas) or 0))
 	local premio = DefinicionesRecompensas.premioCasilla(casilla, vueltas, perfil.rebirths)
+	local anterior = math.floor(tonumber(calendario.ultimoDia) or 0) -- (la analitica: dias desde la anterior)
 	-- Primero el estado (ver cabecera)
 	calendario.ultimoDia = hoy
 	if casilla >= #DefinicionesRecompensas.CALENDARIO then
@@ -207,7 +209,13 @@ function Recompensas.reclamarDiaria(jugador: Player): (boolean, string?)
 	Recompensas.notificar(jugador, Idioma.mensaje("RECOMPENSAS.cobrado", { n = casilla, premio = Recompensas.mensajePremio(premio) }),
 		if premio.dinero > 0 then "dinero" else "exito")
 	Recompensas.alCliente(jugador, "premio", "calendario")
-	Recompensas.alReclamar:Fire(jugador, "calendario", { dinero = premio.dinero, turbo = premio.turbo, casilla = casilla, vuelta = vueltas + 1 })
+	Recompensas.alReclamar:Fire(jugador, "calendario", {
+		dinero = premio.dinero,
+		turbo = premio.turbo,
+		casilla = casilla,
+		vuelta = vueltas + 1,
+		diasDesde = if anterior > 0 then hoy - anterior else nil,
+	})
 	return true, nil
 end
 

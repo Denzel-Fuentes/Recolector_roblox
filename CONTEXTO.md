@@ -101,7 +101,7 @@ mundo vestido; pendientes los paneles (lotes 12–13 de la UI), la prueba con
 | Admin por chat **solo en Studio** (22 oct; sin autocompletar y todos los de la sesión son admin): `/dar dinero n` (acotado; no cuenta como dinero ganado), `/maxmejoras`, `/pases on` u `off`, `/rebirths n`, `/tutorial n`, `/repoblar`, `/reset`. En el juego publicado no hay comandos ni admins, tampoco el creador | `Services/Admin.luau`, `AdminHandler.server` | verificado (`adminOculto`, `modoDevSoloStudio`) |
 | **Audio** (22 oct, A1; decisión del usuario: los recomendados de `docs/Audio-propuesta.md`, de la biblioteca con licencia de Roblox): `Config/Sonidos` (un id por clave; id 0 la calla), efectos 2D y 3D con voces reutilizadas, música del patio en orden aleatorio con fundido cruzado (y la del Turbo, como mucho dos veces) que baja en celebraciones, rebirths e insignias; botón **Sonido (M)** con Música y Efectos, que valida y guarda el servidor (`AjustesEvent`, `perfil.ajustes`) | `Config/Sonidos`, `Client/Sonido.luau`, `Musica.client`, `SonidosMundo.client`, `UI/Ajustes.luau`, `Services/Ajustes` + `AjustesHandler` | verificado (`ajustesValidos`, `("modulo","Sonido","listar")`); el usuario los escucha jugando y cambia los que no le gusten |
 | **Pantalla de carga** (22 oct, L1): desde el primer fotograma del cliente hasta que el perfil responde (`PerfilListo`) o hay personaje, con red de seguridad a los 60 s; los cinco contenedores saltando por turnos, título y consejos traducidos ("Cargando tu progreso…" a los 8 s); precarga iconos y sonidos sin retener a nadie | `src/ReplicatedFirst/Carga.luau` + `PantallaCarga.client` | verificado (23/23 precargas, carga lenta simulada, es/en; `("modulo","Carga",...)`) |
-| **Analítica** (22 oct, N1): embudo de inicio de 9 pasos (entrar y los 8 del tutorial), fuentes y sumideros del Dinero con el saldo final, progresión por rebirth y eventos propios (Acierto, Fallo, Rebirth, Insignia, CompraPase, CompraProducto, Sesion, PerfilNoCargado, Sospecha), todo en pcall y en tramos; la plataforma la manda el cliente una vez. En Studio no se envía (`Analitica.registro`) | `Services/Analitica` + `AnaliticaHandler`, `Client/Telemetria.client`, `AnaliticaEvent` | verificado (las 7 de `Analitica`); los datos reales, tras publicar (24–48 h) |
+| **Analítica** (22 oct, N1; N1b el 23): embudo de inicio de 9 pasos (entrar y los 8 del tutorial), fuentes y sumideros del Dinero con el saldo final (desde N1b también el calendario, los regalos y el regreso, como `TimedReward`: `Calendario_3`, `Regalo_20`, `Regreso_14`), progresión por rebirth y eventos propios (Acierto, Fallo, Rebirth, Insignia, CompraPase, CompraProducto, Sesion, PerfilNoCargado, Sospecha y, con N1b, Calendario y Oferta), todo en pcall y en tramos; la plataforma la manda el cliente una vez. En Studio no se envía (`Analitica.registro`) | `Services/Analitica` + `AnaliticaHandler`, `Client/Telemetria.client`, `AnaliticaEvent` | verificado (las 7 de `Analitica`); `analiticaRecompensas`, en Lune: falta Studio; los datos reales, tras publicar (24–48 h) |
 | **Idiomas** (7 oct): español (original y respaldo), inglés y portugués con módulos Luau, sin LocalizationTable ni traducción automática de Roblox; el servidor manda mensajes y no texto (salvo el `Kick`) | `Config/Traducciones/{en,pt}`, `Utilidades/Idioma`, `TraducirMundo.client` | verificado (`idioma`, `("idioma")`) |
 
 ## 2. Cómo se trabaja
@@ -1543,10 +1543,15 @@ a origin/master). Lo que falta, en orden:
    no" suma `perfil.ofertas.porId.PackInicio.rechazos`. Una compra de prueba
    de Turbo15 suma 900 s y pone `ultimaRobux`. Con 2 jugadores, la corona se
    ve desde el otro cliente (Q1).
-3. **N1b**: la analítica de las recompensas (`Recompensas.alReclamar`: su
-   dinero hoy sale al salir como `Reciclaje_SinBonus`) y de las ofertas
-   (`Ofertas.alMostrar` y `alResponder`, ya publicadas por K1), con la prueba
-   `analiticaRecompensas`.
+3. **N1b**: hecho el 23 oct y verificado en Lune; falta pasar
+   `analiticaRecompensas` en Studio. El dinero de las recompensas ya no sale
+   al salir como `Reciclaje_SinBonus`: es una fuente `TimedReward` con su sku.
+   El calendario manda su evento con la vuelta y los días desde la casilla
+   anterior (`diasDesde` en el aviso de `Recompensas`), y cada oferta el suyo
+   al enseñarse y al contestar. De la tabla §7.2 de `docs/Economia-v4.md`
+   quedan sin hacer la moneda `TurboMin` (el Turbo que entra y se consume) y
+   el evento "Bolsa" (1 de cada 3 depósitos); N1 midió el acierto con
+   Acierto/Fallo. Son para después si hacen falta.
 4. Pulido: la píldora del tutorial en táctil cae dentro de la zona del
    joystick (hay que medirlo en Studio). Hecho el 23 oct: la cabecera del
    panel Recompensas en rosa (`Paleta.CABECERA_PANEL`). Los avisos de

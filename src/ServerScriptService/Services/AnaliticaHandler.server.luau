@@ -33,6 +33,8 @@ local Lanzamiento = require(Servicios:WaitForChild("Lanzamiento"))
 local Insignias = require(Servicios:WaitForChild("Insignias"))
 local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
 local Movimiento = require(Servicios:WaitForChild("Movimiento"))
+local Recompensas = require(Servicios:WaitForChild("Recompensas"))
+local Ofertas = require(Servicios:WaitForChild("Ofertas"))
 
 -- Sesion
 Players.PlayerAdded:Connect(Analitica.entrada)
@@ -54,6 +56,7 @@ Tutorial.alCompletar:Connect(Analitica.pasoTutorial)
 -- Economia
 Bolsa.alResumen:Connect(Analitica.deposito)
 Pedidos.alCumplir:Connect(Analitica.pedido)
+Recompensas.alReclamar:Connect(Analitica.recompensa) -- (y el evento Calendario)
 Mejoras.alComprar:Connect(Analitica.mejora)
 
 -- Progresion
@@ -68,6 +71,10 @@ Lanzamiento.alFallar:Connect(Analitica.fallo)
 Insignias.alConseguir:Connect(Analitica.insignia)
 Monetizacion.alComprarPase:Connect(Analitica.compraPase)
 Monetizacion.alComprarProducto:Connect(Analitica.compraProducto)
+
+-- Ofertas: la que se ensena y lo que contesta
+Ofertas.alMostrar:Connect(Analitica.ofertaMostrada)
+Ofertas.alResponder:Connect(Analitica.ofertaRespuesta)
 
 -- Anti-trampas: moverse mas de lo que se puede andando
 Movimiento.alSospechar:Connect(Analitica.sospecha)

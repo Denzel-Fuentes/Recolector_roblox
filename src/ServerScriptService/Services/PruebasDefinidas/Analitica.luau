@@ -38,6 +38,8 @@ local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
 local Botin = require(Servicios:WaitForChild("Botin"))
 local Mundo = require(Servicios:WaitForChild("Mundo"))
 local Movimiento = require(Servicios:WaitForChild("Movimiento"))
+local Recompensas = require(Servicios:WaitForChild("Recompensas"))
+local Ofertas = require(Servicios:WaitForChild("Ofertas"))
 
 local Comunes = require(script.Parent:WaitForChild("Comunes"))
 local jugador, teletransportar = Comunes.jugador, Comunes.teletransportar
@@ -575,6 +577,97 @@ function Pruebas.analiticaSospecha()
 	local segundaOk = lista[2] ~= nil and lista[2].valor == 12 and lista[2].campos[1] == "Exceso - 2-5x" and lista[2].campos[2] == "EnPatio - no"
 	return string.format("%d eventos de 3 avisos: %s | %s => %s", #lista, describir(lista[1]), describir(lista[2]),
 		ok(#lista == 2 and primeraOk and segundaOk))
+end
+
+-- N1b, por las senales de verdad: el dinero del calendario, de un regalo y
+-- del regreso sale como fuente TimedReward con su sku (Calendario_3,
+-- Regalo_20, Regreso_14; un tramo que no existe, Regalo_otro) y cuenta para
+-- el cuadre de la salida (no vuelve a salir como Reciclaje_SinBonus); un
+-- premio solo de Turbo no deja evento de Dinero; el calendario deja su
+-- evento propio (casilla; vuelta, dias desde la anterior, plataforma); y una
+-- oferta, el suyo al ensenarse y al contestar (oferta, resultado con la
+-- opcion, sesion), con "otro" para lo que no existe. Recompensas.alReclamar
+-- tambien lo oye OfertasHandler: OfertasEnStudio se quita mientras dura
+function Pruebas.analiticaRecompensas()
+	local j = jugador()
+	local p = Perfiles.obtener(j)
+	if not p then
+		return "sin perfil => FALLO"
+	end
+	local ServerStorage = game:GetService("ServerStorage")
+	local ofertasPrevio = ServerStorage:GetAttribute("OfertasEnStudio")
+	ServerStorage:SetAttribute("OfertasEnStudio", nil)
+	Analitica.reiniciarLimites()
+	local copia = { dinero = p.dinero, plataforma = Analitica.plataformaDe(j) }
+	local restaurarPedidos = sinPedidos(p)
+	Analitica.fijarPlataforma(j, "teclado")
+	Analitica.cuadrar(j, p) -- la cuenta del cuadre empieza de cero
+	local desde = Analitica.contador()
+	local mal = {}
+	local function comprobar(sku: string, cantidad: number)
+		local lista = eventos(desde, "economia", sku)
+		local e = lista[#lista]
+		if not e then
+			table.insert(mal, sku .. " no salio")
+		elseif e.flujo ~= "fuente" or e.valor ~= cantidad or e.saldo ~= p.dinero or e.transaccion ~= "TimedReward" or not e.ok then
+			table.insert(mal, string.format("%s: %s $%s saldo %s (esperado %s) %s ok=%s", sku, tostring(e.flujo), tostring(e.valor),
+				tostring(e.saldo), tostring(p.dinero), tostring(e.transaccion), tostring(e.ok)))
+		end
+	end
+
+	-- Recompensas paga y despues avisa (como Pedidos)
+	Economia.ganar(j, 1000)
+	Recompensas.alReclamar:Fire(j, "calendario", { dinero = 1000, turbo = 0, casilla = 3, vuelta = 1, diasDesde = 2 })
+	comprobar("Calendario_3", 1000)
+	Economia.ganar(j, 250)
+	Recompensas.alReclamar:Fire(j, "regalo", { dinero = 250, turbo = 0, minutos = 20 })
+	comprobar("Regalo_20", 250)
+	Economia.ganar(j, 4000)
+	Recompensas.alReclamar:Fire(j, "regreso", { dinero = 4000, turbo = 30, dias = 20, tramo = 14 })
+	comprobar("Regreso_14", 4000)
+	Economia.ganar(j, 10)
+	Recompensas.alReclamar:Fire(j, "regalo", { dinero = 10, turbo = 0, minutos = 7 })
+	comprobar("Regalo_otro", 10)
+	-- Solo Turbo: ningun evento de Dinero
+	local antes = #eventos(desde, "economia")
+	Recompensas.alReclamar:Fire(j, "regalo", { dinero = 0, turbo = 5, minutos = 30 })
+	local soloTurbo = #eventos(desde, "economia") == antes
+	-- El evento Calendario (solo del calendario)
+	local cal = eventos(desde, "personalizado", "Calendario")
+	local calOk = #cal == 1 and cal[1].valor == 3 and cal[1].ok and cal[1].campos[1] == "Vuelta - 1"
+		and cal[1].campos[2] == "Dias - 2" and cal[1].campos[3] == "Plataforma - teclado"
+	-- El cuadre: todo estaba contado, no queda nada suelto
+	Analitica.cuadrar(j, p)
+	local sueltos = #eventos(desde, "economia", "Reciclaje_SinBonus")
+
+	-- Ofertas
+	Ofertas.alMostrar:Fire(j, "PackInicio")
+	Ofertas.alResponder:Fire(j, "PackInicio", "ahoraNo", nil)
+	Ofertas.alResponder:Fire(j, "Turbo", "aceptada", "Turbo60")
+	Ofertas.alResponder:Fire(j, "Inventada", "loQueSea", "nada")
+	local sesion = "Sesion - " .. Analitica.tramoSesion(p.estadisticas.sesiones or 0)
+	local esperado = {
+		{ "Oferta - PackInicio", "Resultado - mostrada", sesion },
+		{ "Oferta - PackInicio", "Resultado - ahoraNo", sesion },
+		{ "Oferta - Turbo", "Resultado - aceptada Turbo60", sesion },
+		{ "Oferta - otro", "Resultado - otro", sesion },
+	}
+	local ofertas = eventos(desde, "personalizado", "Oferta")
+	local ofertasOk = #ofertas == #esperado
+	for i, campos in esperado do
+		local e = ofertas[i]
+		ofertasOk = ofertasOk and e ~= nil and e.valor == 1 and e.ok and table.concat(e.campos, "|") == table.concat(campos, "|")
+	end
+
+	p.dinero = copia.dinero
+	restaurarPedidos()
+	Analitica.cuadrar(j, p)
+	Analitica.fijarPlataforma(j, copia.plataforma)
+	ServerStorage:SetAttribute("OfertasEnStudio", ofertasPrevio)
+	Perfiles.marcarSucio(j)
+	return string.format("dinero: mal [%s] | solo Turbo sin evento=%s | calendario %s | sueltos al cuadrar %d | ofertas %d: %s / %s => %s",
+		table.concat(mal, "; "), tostring(soloTurbo), describir(cal[1]), sueltos, #ofertas, describir(ofertas[1]), describir(ofertas[3]),
+		ok(#mal == 0 and soloTurbo and calOk and sueltos == 0 and ofertasOk))
 end
 
 return Pruebas

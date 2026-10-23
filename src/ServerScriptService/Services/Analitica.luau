@@ -22,6 +22,9 @@
 	                     Pedido VIP, dificil)
 	  fuente   Gameplay  Reciclaje_SinBonus (al salir: lo que entro sin
 	                     senal en la sesion, ver "Decisiones")
+	  fuente   TimedReward  Calendario_<casilla>, Regalo_<minutos>,
+	                     Regreso_<dias del tramo> (N1b, Recompensas.alReclamar;
+	                     un premio solo de Turbo no deja evento de Dinero)
 	  sumidero Shop      Mejora_<id>_<nivel>
 	  sumidero Gameplay  Rebirth_<n> (todo el dinero que se pierde)
 	Progresion (LogProgressionCompleteEvent): ruta "Rebirth", nivel n;
@@ -35,6 +38,10 @@
 	  CompraProducto  alComprarProducto  minutos jugados  producto, plataforma, rebirths
 	  Sesion          alSalir            minutos sesion   plataforma, rebirths, tutorial
 	  PerfilNoCargado alCargar sin cargar 1               motivo, plataforma
+	  Calendario      Recompensas.alReclamar  casilla     vuelta, dias desde la anterior, plataforma
+	  Oferta          Ofertas.alMostrar / alResponder  1  oferta, resultado (mostrada, ahoraNo,
+	                                                      cerrada, comprar o aceptada, con la
+	                                                      opcion), sesion (tramo); N1b
 	  Sospecha        Movimiento.alSospechar (1 cada SOSPECHA_CADA s por jugador)
 	                                     studs de exceso  velocidad / limite (tramo), en el patio, plataforma
 
@@ -68,12 +75,13 @@
 	  experiencia: nada de numeros sueltos, todo en tramos (distancia por los
 	  tramos del bonus, minutos de 10 en 10 las tres primeras horas, rebirths
 	  hasta 10 y "11+", nivel medio 0..10). Entre todos los eventos de aqui
-	  salen ~2.500 combinaciones como mucho en teoria (economia ~530,
-	  sesion ~520, lanzamientos ~450, progresion ~320, compras ~480...); las
-	  que se vean de verdad, muchas menos.
+	  salen ~2.800 combinaciones como mucho en teoria (economia ~530,
+	  sesion ~520, lanzamientos ~450, progresion ~320, compras ~480,
+	  ofertas ~210, calendario ~100...); las que se vean de verdad, muchas
+	  menos.
 	- 100 nombres de evento propio, 100 sku, 20 tipos de transaccion y 5-10
 	  monedas: todo sale de Config (un id desconocido va a "otro") y queda
-	  acotado (~70 sku, 9 eventos, 2 tipos, 1 moneda).
+	  acotado (~90 sku, 11 eventos, 3 tipos, 1 moneda).
 
 	=== Decisiones no obvias ===
 	- Roblox desglosa un embudo con los campos de su PRIMER paso: el paso 1
@@ -127,9 +135,11 @@ local Config = Shared:WaitForChild("Config")
 local GameConfig = require(Config:WaitForChild("GameConfig"))
 local DefinicionesInsignias = require(Config:WaitForChild("DefinicionesInsignias"))
 local DefinicionesMejoras = require(Config:WaitForChild("DefinicionesMejoras"))
+local DefinicionesOfertas = require(Config:WaitForChild("DefinicionesOfertas"))
 local DefinicionesPedidos = require(Config:WaitForChild("DefinicionesPedidos"))
 local DefinicionesPunteria = require(Config:WaitForChild("DefinicionesPunteria"))
 local DefinicionesRebirths = require(Config:WaitForChild("DefinicionesRebirths"))
+local DefinicionesRecompensas = require(Config:WaitForChild("DefinicionesRecompensas"))
 local DefinicionesTutorial = require(Config:WaitForChild("DefinicionesTutorial"))
 local Productos = require(Config:WaitForChild("Productos"))
 local Contenedores = require(Shared:WaitForChild("Utilidades"):WaitForChild("Contenedores"))
@@ -212,6 +222,8 @@ local CLAVES_CAMPO = {
 }
 local TRANSACCION_JUEGO = nombreEnum("AnalyticsEconomyTransactionType", "Gameplay")
 local TRANSACCION_TIENDA = nombreEnum("AnalyticsEconomyTransactionType", "Shop")
+-- Calendario, regalos y regreso (docs/Economia-v4.md §7.2)
+local TRANSACCION_PREMIO = nombreEnum("AnalyticsEconomyTransactionType", "TimedReward")
 
 local function flujoEnum(flujo: Flujo): any
 	local ok, item = pcall(function()
@@ -358,6 +370,28 @@ end
 function Analitica.tramoRebirths(n: number): string
 	local r = math.max(0, math.floor(tonumber(n) or 0))
 	return if r > 10 then "11+" else tostring(r)
+end
+
+-- El numero de sesion del perfil: 1..4, "5-9", "10-19" y "20+"
+function Analitica.tramoSesion(n: number): string
+	local s = math.max(0, math.floor(tonumber(n) or 0))
+	return if s >= 20 then "20+" elseif s >= 10 then "10-19" elseif s >= 5 then "5-9" else tostring(s)
+end
+
+-- La vuelta del calendario: 1..3 y "4+"
+function Analitica.tramoVuelta(n: any): string
+	local v = math.max(0, math.floor(tonumber(n) or 0))
+	return if v >= 4 then "4+" else tostring(v)
+end
+
+-- Dias desde la casilla anterior: "primera" (nil), 1, 2, "3-6" y "7+"
+function Analitica.tramoDias(n: any): string
+	local d = tonumber(n)
+	if d == nil then
+		return "primera"
+	end
+	d = math.max(0, math.floor(d))
+	return if d >= 7 then "7+" elseif d >= 3 then "3-6" else tostring(d)
 end
 
 function Analitica.plataforma(jugador: Player): string
@@ -825,6 +859,98 @@ Analitica.compraProducto = protegido("compraProducto", function(jugador: Player,
 	end
 	local nombre = if typeof(id) == "string" and Productos.PRODUCTO_POR_ID[id] then id else "otro"
 	Analitica.personalizado(jugador, "CompraProducto", minutosJugados(perfil), { "Producto - " .. nombre, campoPlataforma(jugador), campoRebirths(perfil) })
+end)
+
+-- El sku del dinero de una recompensa: Calendario_<1..7>, Regalo_<minutos>
+-- o Regreso_<dias del tramo>; lo que no este en DefinicionesRecompensas va a
+-- "otro" (cardinalidad fija)
+local function skuRecompensa(tipo: any, reclamo: any): string
+	if tipo == "calendario" then
+		local casilla = tonumber(reclamo.casilla)
+		local existe = casilla ~= nil and casilla == math.floor(casilla) and DefinicionesRecompensas.CALENDARIO[casilla] ~= nil
+		return "Calendario_" .. (if existe then tostring(casilla) else "otro")
+	elseif tipo == "regalo" then
+		for _, tramo in DefinicionesRecompensas.REGALOS do
+			if tramo.minutos == reclamo.minutos then
+				return "Regalo_" .. tostring(tramo.minutos)
+			end
+		end
+		return "Regalo_otro"
+	elseif tipo == "regreso" then
+		for _, bono in DefinicionesRecompensas.REGRESO do
+			if bono.dias == reclamo.tramo then
+				return "Regreso_" .. tostring(bono.dias)
+			end
+		end
+		return "Regreso_otro"
+	end
+	return "Recompensa_otro"
+end
+
+-- Recompensas.alReclamar(jugador, tipo, reclamo): el premio ya esta pagado
+-- (Economia.ganar y Turbo.anadir). Su dinero es una fuente TimedReward y
+-- cuenta para el cuadre de la salida (si no, saldria otra vez como
+-- Reciclaje_SinBonus); el Turbo no es Dinero. El calendario deja ademas su
+-- evento propio (§7.2: uso y vuelta)
+Analitica.recompensa = protegido("recompensa", function(jugador: Player, tipo: string, reclamo: any)
+	if not esJugador(jugador) or typeof(reclamo) ~= "table" then
+		return
+	end
+	local perfil = Perfiles.obtener(jugador)
+	if not perfil then
+		return
+	end
+	local cantidad = tonumber(reclamo.dinero) or 0
+	if cantidad > 0 then
+		Analitica.economia(jugador, "fuente", cantidad, perfil.dinero, TRANSACCION_PREMIO, skuRecompensa(tipo, reclamo), perfil)
+		contado[jugador] = (contado[jugador] or 0) + cantidad
+	end
+	saldos[jugador] = perfil.dinero
+	if tipo == "calendario" then
+		local casilla = math.clamp(math.floor(tonumber(reclamo.casilla) or 0), 0, #DefinicionesRecompensas.CALENDARIO)
+		Analitica.personalizado(jugador, "Calendario", casilla, {
+			"Vuelta - " .. Analitica.tramoVuelta(reclamo.vuelta),
+			"Dias - " .. Analitica.tramoDias(reclamo.diasDesde),
+			campoPlataforma(jugador),
+		})
+	end
+end)
+
+local RESULTADOS_OFERTA: { [string]: boolean } = { ahoraNo = true, cerrada = true, comprar = true, aceptada = true }
+
+local function campoOferta(id: any): string
+	return "Oferta - " .. (if typeof(id) == "string" and DefinicionesOfertas.POR_ID[id] then id else "otro")
+end
+
+local function campoSesion(perfil: Perfil): string
+	return "Sesion - " .. Analitica.tramoSesion(perfil.estadisticas.sesiones or 0)
+end
+
+-- Ofertas.alMostrar(jugador, id): la oferta que llego a verse (las que se
+-- descartan sin encontrar su momento no cuentan, Services/Ofertas)
+Analitica.ofertaMostrada = protegido("ofertaMostrada", function(jugador: Player, id: string)
+	local perfil = if esJugador(jugador) then Perfiles.obtener(jugador) else nil
+	if not perfil then
+		return
+	end
+	Analitica.personalizado(jugador, "Oferta", 1, { campoOferta(id), "Resultado - mostrada", campoSesion(perfil) })
+end)
+
+-- Ofertas.alResponder(jugador, id, respuesta, opcion?): "ahoraNo", "cerrada"
+-- (otro panel encima: no es un rechazo), "comprar" (pulso Comprar: el prompt
+-- de Roblox) o "aceptada" (la compra se completo); comprar y aceptada llevan
+-- la opcion (el Turbo tiene dos)
+Analitica.ofertaRespuesta = protegido("ofertaRespuesta", function(jugador: Player, id: string, respuesta: string, opcion: string?)
+	local perfil = if esJugador(jugador) then Perfiles.obtener(jugador) else nil
+	if not perfil then
+		return
+	end
+	local resultado = if typeof(respuesta) == "string" and RESULTADOS_OFERTA[respuesta] then respuesta else "otro"
+	if (resultado == "comprar" or resultado == "aceptada") and typeof(opcion) == "string"
+		and (Productos.PASE_POR_ID[opcion] ~= nil or Productos.PRODUCTO_POR_ID[opcion] ~= nil) then
+		resultado ..= " " .. opcion
+	end
+	Analitica.personalizado(jugador, "Oferta", 1, { campoOferta(id), "Resultado - " .. resultado, campoSesion(perfil) })
 end)
 
 -- Lo que subio dineroGanadoTotal desde la carga (o el ultimo cuadre) sin
