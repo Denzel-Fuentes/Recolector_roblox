@@ -27,6 +27,12 @@
 	Cada aviso vive en su propio scope de Fusion: su aparicion y su fundido
 	son Tweens de un Value de transparencia, y al acabar se limpia entero.
 	Se conecta a NotificacionEvent y FeedEvent al cargarse.
+
+	Sonido (Client/Sonido): lo que el servidor avisa por NotificacionEvent
+	suena segun la CLAVE de su mensaje (SONIDO_AVISO: mejora comprada y
+	compra de Robux, rebirth con su capa de magia, pedido cumplido y premio
+	del dia, y los "no te alcanza"), y la tarjeta de insignia o de record con
+	"insignia". El feed no suena: es lo que les pasa a otros.
 ]]
 
 local Players = game:GetService("Players")
@@ -44,6 +50,7 @@ local Fusion = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("
 local Kit = require(script.Parent:WaitForChild("Kit"))
 local Tema = require(script.Parent:WaitForChild("Kit"):WaitForChild("Tema"))
 local Escala = require(script.Parent:WaitForChild("Kit"):WaitForChild("Escala"))
+local Sonido = require(script.Parent.Parent:WaitForChild("Sonido"))
 
 local Children = Fusion.Children
 
@@ -373,6 +380,29 @@ function Notificaciones.logro(nombre: string, descripcion: string)
 	tarjetaGrande("trofeo", Paleta.UI_PRIMARIO, Textos.LOGROS.desbloqueado, nombre, descripcion)
 end
 
+-- Lo que suena con cada aviso del servidor, por la clave de su mensaje
+-- (Idioma.mensaje). Los que no estan aqui solo se ven.
+local SONIDO_AVISO: { [string]: { string } } = {
+	["TIENDA.mejoraComprada"] = { "mejora" },
+	["NOTIFICACIONES.compraRobux"] = { "mejora" },
+	["REBIRTH.hecho"] = { "rebirth", "rebirthMagia" },
+	["PEDIDOS_AVISOS.cumplido"] = { "regalo" },
+	["PEDIDOS_AVISOS.todos"] = { "regalo" },
+	["PATIO.sinDinero"] = { "denegado" },
+	["REBIRTH.faltanMejoras"] = { "denegado" },
+	["REBIRTH.faltaDinero"] = { "denegado" },
+}
+
+local function sonarAviso(mensaje: any)
+	local clave = if typeof(mensaje) == "table" and typeof(mensaje.k) == "string" then mensaje.k else nil
+	local sonidos = if clave then SONIDO_AVISO[clave] else nil
+	if sonidos then
+		for _, s in sonidos do
+			Sonido.tocar(s)
+		end
+	end
+end
+
 -- El servidor manda Idioma.mensaje (o un string suelto); aqui se escribe en
 -- el idioma del jugador
 Red.evento("NotificacionEvent").OnClientEvent:Connect(function(mensaje, tipo)
@@ -381,6 +411,7 @@ Red.evento("NotificacionEvent").OnClientEvent:Connect(function(mensaje, tipo)
 		local def = if typeof(mensaje) == "string" then DefinicionesInsignias.POR_ID[mensaje] else nil
 		if def then
 			Notificaciones.logro(Idioma.nombre("Insignias", def), Idioma.descripcion("Insignias", def))
+			Sonido.tocar("insignia")
 		end
 		return
 	end
@@ -392,8 +423,10 @@ Red.evento("NotificacionEvent").OnClientEvent:Connect(function(mensaje, tipo)
 		-- "distancia|servidor" o "distancia|personal" (Services/Lanzamiento)
 		local partes = string.split(texto, "|")
 		Notificaciones.record(partes[1], partes[2] == "servidor")
+		Sonido.tocar("insignia")
 	else
 		Notificaciones.mostrar(texto, tipo)
+		sonarAviso(mensaje)
 	end
 end)
 

@@ -683,6 +683,12 @@ function Lanzamiento.lanzarBolsa(jugador: Player, punto: Vector3, fuerza: number
 	if rotulo then
 		rotulo:SetAttribute("Mensaje", Idioma.codificar(Idioma.mensaje("PATIO.bolsaDe", { dueno = jugador.DisplayName })))
 	end
+	-- Para el sonido de cada cliente (SonidosMundo, A1): es una bolsa en vuelo
+	-- (aun sin ObjetoId), de quien y con que fuerza (el whoosh es mas grave
+	-- cuanta mas). Como LibreEn y Dueno al posarse: datos para pintar, nada
+	-- que decida
+	modelo:SetAttribute("LanzadaPor", jugador.UserId)
+	modelo:SetAttribute("Fuerza", fuerza)
 	modelo:PivotTo(CFrame.new(origen))
 	modelo.Parent = ObjetosPatio.carpeta
 	table.insert(excluirVuelo, modelo)

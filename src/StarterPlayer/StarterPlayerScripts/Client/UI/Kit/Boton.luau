@@ -21,6 +21,11 @@
 	del texto de su padre, asi que si el texto fuera del boton los studs lo
 	taparian. Devuelve el envoltorio; el Cuerpo es el GuiButton que encuentra
 	el gamepad (Selectable, contorno amarillo al elegirlo).
+
+	Suena el "clic" del kit al pulsarlo (Client/Sonido) y "denegado" si se
+	pulsa deshabilitado (p. ej. una mejora que no alcanza: el servidor ni se
+	entera, pero el jugador si tiene que oir que no): lo que pase despues de
+	un clic (una compra, un panel) trae su propio sonido.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -31,6 +36,8 @@ local Tema = require(script.Parent:WaitForChild("Tema"))
 local Escala = require(script.Parent:WaitForChild("Escala"))
 local Studs = require(script.Parent:WaitForChild("Studs"))
 local Icono = require(script.Parent:WaitForChild("Icono"))
+-- Kit -> UI -> Client
+local Sonido = require(script.Parent.Parent.Parent:WaitForChild("Sonido"))
 
 local Children = Fusion.Children
 local OnEvent = Fusion.OnEvent
@@ -126,9 +133,10 @@ return function(scope: any, p: Props): Frame
 		Selectable = scope:Computed(function(use)
 			return not use(deshabilitado)
 		end),
-		Active = scope:Computed(function(use)
-			return not use(deshabilitado)
-		end),
+		-- Activo aunque este deshabilitado: asi Activated (el clic de verdad,
+		-- que el motor cancela si el dedo arrastra una lista) llega y suena
+		-- "denegado"; la accion la frena el propio Activated
+		Active = true,
 		SelectionImageObject = Tema.SELECCION_INVISIBLE,
 		ZIndex = 2,
 		[OnEvent("MouseEnter")] = function()
@@ -152,8 +160,10 @@ return function(scope: any, p: Props): Frame
 		end,
 		[OnEvent("Activated")] = function()
 			if peek(deshabilitado) then
+				Sonido.tocar("denegado")
 				return
 			end
+			Sonido.tocar("clic")
 			-- Toque o gamepad: no hay MouseButton1Down, se hunde un momento
 			pulsado:set(true)
 			task.delay(0.08, function()

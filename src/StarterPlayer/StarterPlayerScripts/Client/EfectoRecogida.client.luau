@@ -19,6 +19,10 @@
 	anclada: sale con un rebote de tamano, sube ~2,5 studs y se funde.
 	PruebasCliente lo dispara con ("mas1"); el atributo Vida del script
 	alarga cuanto dura (para capturarlo).
+
+	Cada recogida suena (Client/Sonido, 2D: solo quien recoge): "recoger"
+	la basura y la bolsa caida recuperada (el pop corto que mas se repite,
+	con el tono al azar), "billete" y "tesoro" lo suyo.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,7 +36,15 @@ local Textos = Idioma.textos
 local Red = require(Shared:WaitForChild("Utilidades"):WaitForChild("Red"))
 local Formato = require(Shared:WaitForChild("Utilidades"):WaitForChild("Formato"))
 
+local Sonido = require(script.Parent:WaitForChild("Sonido"))
+
 local RecogidaEvent = Red.evento("RecogidaEvent")
+
+-- El sonido de cada tipo; lo demas (basura, bolsa caida) es "recoger"
+local SONIDO_TIPO: { [string]: string } = {
+	billete = "billete",
+	tesoro = "tesoro",
+}
 
 local FUENTE = Font.new("rbxasset://fonts/families/FredokaOne.json")
 local COLOR_TESORO = Paleta.TESORO -- violeta (7 oct), como el cofre
@@ -184,6 +196,7 @@ RecogidaEvent.OnClientEvent:Connect(function(posicion, tipo, material, n, valor)
 	if t == "tesoro" or t == "billete" then
 		rafaga(posicion, t)
 	end
+	Sonido.tocar(SONIDO_TIPO[t] or "recoger")
 end)
 
 -- Para PruebasCliente: ("mas1")
@@ -194,5 +207,6 @@ prueba.Event:Connect(function(posicion, tipo, material, n, valor)
 	if tipo == "tesoro" or tipo == "billete" then
 		rafaga(posicion, tipo)
 	end
+	Sonido.tocar(SONIDO_TIPO[tipo] or "recoger")
 end)
 prueba.Parent = script

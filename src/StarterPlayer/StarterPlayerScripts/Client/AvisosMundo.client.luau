@@ -18,6 +18,10 @@
 	corta, sube un poco y se funde. Una sola burbuja por sitio: la nueva
 	sustituye a la anterior. Si el aviso trae un modelo para resaltar (tu
 	monton pendiente), late con un Highlight mientras dura.
+
+	Todas son rechazos (monton agotado, contenedor cerrado, demasiado
+	cerca...): cada burbuja suena "denegado" (Client/Sonido; su espera de
+	0,3 s junta los clics seguidos).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -33,6 +37,7 @@ local Idioma = require(Utilidades:WaitForChild("Idioma"))
 local Glifos = require(Utilidades:WaitForChild("Glifos"))
 
 local Tema = require(script.Parent:WaitForChild("UI"):WaitForChild("Kit"):WaitForChild("Tema"))
+local Sonido = require(script.Parent:WaitForChild("Sonido"))
 
 local AvisoMundoEvent = Red.evento("AvisoMundoEvent")
 
@@ -117,6 +122,7 @@ local function resaltar(modelo: Instance)
 end
 
 local function mostrar(objetivo: Vector3, texto: string, claveIcono: string?)
+	Sonido.tocar("denegado")
 	local posicion = puntoLegible(objetivo)
 	local clave = claveSitio(posicion)
 	local vieja = porSitio[clave]

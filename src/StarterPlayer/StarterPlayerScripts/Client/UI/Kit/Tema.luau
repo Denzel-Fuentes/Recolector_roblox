@@ -32,6 +32,25 @@ Tema.SOMBRA = 4 -- px que asoma la sombra dura por debajo de un boton
 Tema.ALTO_CABECERA = 52 -- barra de titulo de las ventanas
 Tema.TEXTO_MINIMO_COMPACTO = 13 -- en telefono nada por debajo de esto (px de diseno)
 
+-- La botonera del HUD (HUD.client): 2 columnas x 3 filas de iconos (A1,
+-- 22 oct: cinco botones y el hueco del de Recompensas). Tambien la mide
+-- Tutorial.client, que en tactil pone su pildora debajo: alli la botonera va
+-- arriba a la izquierda, a ESCALA_TACTIL
+Tema.BOTONERA = {
+	LADO = 88, -- era 76: el usuario los queria un poco mas grandes, 29 sep
+	HUECO = 10,
+	COLUMNAS = 2,
+	FILAS = 3,
+	ESCALA_TACTIL = 0.8,
+	ARRIBA_TACTIL = 16, -- px de diseno desde arriba
+}
+
+-- Lo que mide de alto la botonera en tactil, ya escalada (px de diseno)
+function Tema.altoBotoneraTactil(): number
+	local b = Tema.BOTONERA
+	return (b.LADO * b.FILAS + b.HUECO * (b.FILAS - 1)) * b.ESCALA_TACTIL
+end
+
 -- Textura de studs: id en Config/Iconos (clave "studs"); sin id, no hay studs
 Tema.STUDS_BALDOSA = 32
 Tema.STUDS_VENTANA = 0.86 -- transparencia de la imagen segun donde va

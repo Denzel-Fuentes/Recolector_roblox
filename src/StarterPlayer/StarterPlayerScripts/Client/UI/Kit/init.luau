@@ -33,6 +33,7 @@ return {
 	Insignia = require(script:WaitForChild("Insignia")),
 	Barra = require(script:WaitForChild("Barra")),
 	Segmentos = require(script:WaitForChild("Segmentos")),
+	Interruptor = require(script:WaitForChild("Interruptor")),
 	Scroll = require(script:WaitForChild("Scroll")),
 	Viewport = require(script:WaitForChild("Viewport")),
 	Lista = Maquetas.Lista,
