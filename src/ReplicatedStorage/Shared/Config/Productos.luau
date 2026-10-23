@@ -63,19 +63,19 @@ local Productos = {}
 
 Productos.PASES = {
 	-- Icono estrella y no cofre: un cofre parece una caja de premio al azar
-	{ id = "PackInicio", nombre = "Pack de inicio", descripcion = "30 min de Turbo (una vez) y la Bolsa del reciclador, que solo está en este pack", precioRobux = 99, gamePassId = 0, categoria = "ventaja", icono = "estrella", compraUnica = true, turboMinutos = 30 },
-	{ id = "DineroX2", nombre = "Dinero x2", descripcion = "Todo lo que reciclas paga el doble, para siempre", precioRobux = 199, gamePassId = 0, categoria = "ventaja", icono = "billete" },
-	{ id = "BolsaXL", nombre = "Bolsa XL", descripcion = "10 huecos más en la bolsa, para siempre", precioRobux = 149, gamePassId = 0, categoria = "ventaja", icono = "bolsa" },
-	{ id = "VIP", nombre = "VIP", descripcion = "Corona VIP sobre tu cabeza, la Estela VIP y un pedido más cada día", precioRobux = 249, gamePassId = 0, categoria = "ventaja", icono = "corona" },
-	{ id = "EstelaArcoiris", nombre = "Estela arcoíris", descripcion = "Tu bolsa deja un arcoíris al lanzarla", precioRobux = 99, gamePassId = 0, categoria = "cosmetico", icono = "estrella" },
-	{ id = "BolsaDorada", nombre = "Bolsa dorada", descripcion = "Una bolsa de oro para lucirla", precioRobux = 99, gamePassId = 0, categoria = "cosmetico", icono = "cofre" },
+	{ id = "PackInicio", nombre = "Pack de inicio", descripcion = "30 min de Turbo (una vez) y la Bolsa del reciclador, que solo está en este pack", precioRobux = 99, gamePassId = 2052712857, categoria = "ventaja", icono = "estrella", compraUnica = true, turboMinutos = 30 },
+	{ id = "DineroX2", nombre = "Dinero x2", descripcion = "Todo lo que reciclas paga el doble, para siempre", precioRobux = 199, gamePassId = 2054050833, categoria = "ventaja", icono = "billete" },
+	{ id = "BolsaXL", nombre = "Bolsa XL", descripcion = "10 huecos más en la bolsa, para siempre", precioRobux = 149, gamePassId = 2052700812, categoria = "ventaja", icono = "bolsa" },
+	{ id = "VIP", nombre = "VIP", descripcion = "Corona VIP sobre tu cabeza, la Estela VIP y un pedido más cada día", precioRobux = 249, gamePassId = 2054056851, categoria = "ventaja", icono = "corona" },
+	{ id = "EstelaArcoiris", nombre = "Estela arcoíris", descripcion = "Tu bolsa deja un arcoíris al lanzarla", precioRobux = 99, gamePassId = 2052844870, categoria = "cosmetico", icono = "estrella" },
+	{ id = "BolsaDorada", nombre = "Bolsa dorada", descripcion = "Una bolsa de oro para lucirla", precioRobux = 99, gamePassId = 2053906850, categoria = "cosmetico", icono = "cofre" },
 } :: { Pase }
 
 -- Developer Products (consumibles). Turbo registra solo todo producto con
 -- turboMinutos (Services/Turbo)
 Productos.PRODUCTOS = {
-	{ id = "Turbo15", nombre = "Turbo 15 min", descripcion = "Dinero x2 durante 15 minutos de juego (se suma al que te quede)", precioRobux = 49, productId = 0, icono = "rayo", turboMinutos = 15 },
-	{ id = "Turbo60", nombre = "Turbo 60 min", descripcion = "Dinero x2 durante 60 minutos de juego (se suma al que te quede)", precioRobux = 149, productId = 0, icono = "rayo", turboMinutos = 60 },
+	{ id = "Turbo15", nombre = "Turbo 15 min", descripcion = "Dinero x2 durante 15 minutos de juego (se suma al que te quede)", precioRobux = 49, productId = 3721546571, icono = "rayo", turboMinutos = 15 },
+	{ id = "Turbo60", nombre = "Turbo 60 min", descripcion = "Dinero x2 durante 60 minutos de juego (se suma al que te quede)", precioRobux = 149, productId = 3721546722, icono = "rayo", turboMinutos = 60 },
 } :: { Producto }
 
 Productos.PASE_POR_ID = {} :: { [string]: Pase }
