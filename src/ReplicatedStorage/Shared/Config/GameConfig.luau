@@ -211,4 +211,27 @@ function GameConfig.activa(nombre: string): boolean
 	return (GameConfig.FUNCIONES :: any)[nombre] == true
 end
 
+-- === Turbo y ofertas (economia v4, K1 22 oct; docs/Economia-v4.md §4.6 y §5.6) ===
+-- El Turbo (dinero x2) solo corre mientras se juega: Services/Turbo descuenta
+-- perfil.turboRestante cada TURBO_TIC s si el jugador hizo algo
+-- (Services/Actividad) en los ultimos TURBO_PAUSA_INACTIVO s; si no, o fuera
+-- del juego, queda en pausa (atributo TurboPausado del Player: el HUD dice
+-- "x2 en pausa"). Mientras corre, el perfil se publica cada
+-- TURBO_PUBLICAR_CADA s como poco: el HUD descuenta solo entre dos perfiles
+-- y asi no se desvia.
+GameConfig.TURBO_PAUSA_INACTIVO = 120
+GameConfig.TURBO_TIC = 1
+GameConfig.TURBO_PUBLICAR_CADA = 30
+-- Con tanto Turbo guardado (3 h) no se puede comprar mas: la Tienda y las
+-- ofertas desactivan sus botones de Turbo. Solo impide el prompt: un recibo
+-- que llegue igual se otorga entero (ProcessReceipt nunca rechaza una
+-- compra ya pagada)
+GameConfig.TURBO_TOPE_COMPRA = 3 * 3600
+-- Ofertas: las reglas viven en Config/DefinicionesOfertas; esto es el ritmo
+-- del remote. Respuestas que se atienden por jugador y segundo
+-- (OfertaRespuestaEvent) y segundos minimos entre dos intentos de recoger
+-- con la bolsa llena que se cuentan (el disparador de Bolsa XL)
+GameConfig.OFERTAS_RESPUESTAS_POR_SEGUNDO = 8
+GameConfig.OFERTAS_BOLSA_LLENA_CADA = 1
+
 return GameConfig

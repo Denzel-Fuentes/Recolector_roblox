@@ -362,21 +362,15 @@ local pedidoHud = scope:Computed(function(use)
 end)
 
 -- Turbo (economia v4): perfil.turboRestante son los segundos que le quedan,
--- que el servidor solo descuenta mientras se juega (K1); mientras no corren,
--- el Player lleva el atributo TurboPausado. Entre dos perfiles el HUD
--- descuenta con su reloj de 1 s (salvo en pausa): asi el servidor no tiene
--- que publicar el perfil cada segundo y el numero no da saltos. Respaldo
--- mientras el Turbo sea el antiguo: perfil.turboHasta, la hora de fin (un
--- os.time() del servidor), que la v5 del perfil ya no guarda.
+-- que el servidor solo descuenta mientras se juega (Services/Turbo);
+-- mientras no corren, el Player lleva el atributo TurboPausado. Entre dos
+-- perfiles el HUD descuenta con su reloj de 1 s (salvo en pausa): asi el
+-- servidor no tiene que publicar el perfil cada segundo y el numero no da
+-- saltos.
 local turboDelPerfil = scope:Computed(function(use)
 	local p = use(reactivo.perfil)
 	local r = p and p.turboRestante
 	return if typeof(r) == "number" then r else 0
-end)
-local turboHasta = scope:Computed(function(use)
-	local p = use(reactivo.perfil)
-	local h = p and p.turboHasta
-	return if typeof(h) == "number" then h else 0
 end)
 local turboPausado = scope:Value(jugador:GetAttribute("TurboPausado") == true)
 local turboRestante = scope:Value(0) -- lo que se ensena, en s
@@ -390,14 +384,12 @@ do
 		return math.max(0, base - (os.clock() - desde))
 	end
 	local function pintar()
-		local antiguo = math.max(0, Fusion.peek(turboHasta) - workspace:GetServerTimeNow())
-		turboRestante:set(math.ceil(math.max(queda(), antiguo)))
+		turboRestante:set(math.ceil(queda()))
 	end
 	scope:Observer(turboDelPerfil):onChange(function()
 		base, desde = Fusion.peek(turboDelPerfil), os.clock()
 		pintar()
 	end)
-	scope:Observer(turboHasta):onChange(pintar)
 	-- Al pausarse o reanudarse, lo que quedaba en ese momento es la base: en
 	-- pausa no baja y al volver se descuenta desde ahora
 	jugador:GetAttributeChangedSignal("TurboPausado"):Connect(function()

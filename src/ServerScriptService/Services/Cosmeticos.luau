@@ -9,6 +9,11 @@
 	Si un jugador deja de tener algo puesto (un pase reembolsado, el modo dev
 	de pases apagado), se le quita al consultarlo: nunca se ve un cosmetico
 	que no se tiene.
+
+	Economia v4 (K1, 22 oct): ademas de por pase y por rebirth, uno se gana
+	con una insignia (perfil.logros: la Bolsa de carton de "Constante"); la
+	regla es DefinicionesCosmeticos.loTiene, la misma que pinta la tienda. Los
+	del Pack de inicio y del VIP son de su pase (no se venden sueltos).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -35,8 +40,11 @@ function Cosmeticos.tiene(jugador: Player, tipo: string, id: string): boolean
 	if not def or not perfil then
 		return false
 	end
+	local logros = perfil.logros
 	return DefinicionesCosmeticos.loTiene(def, perfil.rebirths, function(pase)
 		return Monetizacion.tienePase(jugador, pase)
+	end, function(insignia)
+		return logros[insignia] == true
 	end)
 end
 

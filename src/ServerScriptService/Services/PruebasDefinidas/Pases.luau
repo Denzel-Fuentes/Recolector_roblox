@@ -1,11 +1,14 @@
 --!nonstrict
 --[[
 	Pruebas de los pases y cosmeticos (lote 8): Dinero x2 dobla el pago,
-	Bolsa XL suma 10 huecos, el producto Turbo se acumula, y los cosmeticos
-	solo se ponen si se tienen (y se ven en la bolsa lanzada).
+	Bolsa XL suma 10 huecos, el Turbo se acumula, y los cosmeticos solo se
+	ponen si se tienen (y se ven en la bolsa lanzada). Las del catalogo de
+	la economia v4 (Turbo que solo corre jugando, VIP, Pack de inicio,
+	cosmeticos nuevos, ofertas) estan en Catalogo.
 
 	Usan el modo dev de pases (Monetizacion.fijarModoDev) y lo dejan como
-	estaba.
+	estaba. Desde E1, Pedidos mete el Pedido VIP al ver el pase (y el modo
+	dev se lo da a todos): conPases quita al acabar los VIP que aparecieron.
 ]]
 
 local Servicios = script.Parent.Parent
@@ -25,11 +28,39 @@ local function ok(cond: boolean): string
 	return if cond then "OK" else "FALLO"
 end
 
+-- Los pedidos de cada perfil antes de cambiar el modo dev, para quitar
+-- despues los Pedidos VIP que meta Pedidos al ver el pase (ver cabecera)
+local function pedidosDeTodos(): { [any]: { [any]: boolean } }
+	local antes = {}
+	for quien, perfil in Perfiles.todos() do
+		local vistos = {}
+		for _, pedido in perfil.pedidos.lista do
+			vistos[pedido] = true
+		end
+		antes[quien] = vistos
+	end
+	return antes
+end
+local function quitarVipNuevos(antes)
+	for quien, perfil in Perfiles.todos() do
+		local vistos = antes[quien] or {}
+		local lista = perfil.pedidos.lista
+		for i = #lista, 1, -1 do
+			if lista[i].vip and not vistos[lista[i]] then
+				table.remove(lista, i)
+				Perfiles.marcarSucio(quien)
+			end
+		end
+	end
+end
+
 local function conPases(activo: boolean, fn: () -> any): any
 	local antes = Monetizacion.modoDev()
+	local pedidos = pedidosDeTodos()
 	Monetizacion.fijarModoDev(activo)
 	local bien, resultado = pcall(fn)
 	Monetizacion.fijarModoDev(antes)
+	quitarVipNuevos(pedidos)
 	if not bien then
 		error(resultado, 0)
 	end
@@ -44,19 +75,27 @@ local function papel(n: number)
 	return items
 end
 
--- Dinero x2: el mismo deposito paga el doble
+-- Dinero x2: el mismo deposito paga el doble (sin Turbo: lo quita un
+-- momento y lo devuelve)
 function Pruebas.paseDineroX2()
 	local j = jugador()
 	local p = Perfiles.obtener(j)
-	local turbo = p.turboHasta
-	p.turboHasta = 0
-	local sin = conPases(false, function()
-		return Bolsa.depositarItems(j, papel(5), 0, nil).dinero
+	local turbo = p.turboRestante
+	p.turboRestante = 0
+	local exito, sin, con = pcall(function()
+		local s = conPases(false, function()
+			return Bolsa.depositarItems(j, papel(5), 0, nil).dinero
+		end)
+		local c = conPases(true, function()
+			return Bolsa.depositarItems(j, papel(5), 0, nil).dinero
+		end)
+		return s, c
 	end)
-	local con = conPases(true, function()
-		return Bolsa.depositarItems(j, papel(5), 0, nil).dinero
-	end)
-	p.turboHasta = turbo
+	p.turboRestante = turbo
+	Perfiles.marcarSucio(j)
+	if not exito then
+		return "error: " .. tostring(sin) .. " => FALLO"
+	end
 	return string.format("sin pase $%d | con pase $%d => %s", sin, con, ok(con == sin * 2 and sin > 0))
 end
 
@@ -72,17 +111,19 @@ function Pruebas.paseBolsaXL()
 	return string.format("Bolsa nivel %d: %d huecos sin pase, %d con Bolsa XL => %s", Mejoras.nivel(j, "Bolsa"), sin, con, ok(con == sin + 10))
 end
 
--- El Turbo de Robux suma 15 min al que quede
+-- El Turbo se acumula: 15 min sobre 15 min son 30 (en segundos que quedan,
+-- perfil.turboRestante: economia v4)
 function Pruebas.turboAcumula()
 	local j = jugador()
 	local p = Perfiles.obtener(j)
-	local antes = p.turboHasta
-	p.turboHasta = 0
+	local antes = p.turboRestante
+	p.turboRestante = 0
 	Turbo.anadir(j, 15 * 60)
 	local uno = Turbo.restante(j)
 	Turbo.anadir(j, 15 * 60)
 	local dos = Turbo.restante(j)
-	p.turboHasta = antes
+	p.turboRestante = antes
+	Turbo.sincronizar(j)
 	Perfiles.marcarSucio(j)
 	return string.format("uno %d s, dos %d s => %s", uno, dos, ok(math.abs(uno - 900) <= 1 and math.abs(dos - 1800) <= 1))
 end

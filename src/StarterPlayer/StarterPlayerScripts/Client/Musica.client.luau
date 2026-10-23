@@ -10,11 +10,14 @@
 	          una se sortea ya la siguiente y se crea su Sound, para que este
 	          cargada cuando toque el fundido (son minutos de audio: crearla
 	          al final dejaba un hueco). Si al llegar no cargo, va otra que si.
-	  Turbo   al activarse (perfil.turboHasta, contra la hora del servidor:
-	          workspace:GetServerTimeNow) funde a MUSICA.turbo; suena como
-	          mucho REPETICIONES_TURBO veces y vuelve la del patio aunque el
-	          Turbo siga (dura 10-15 min: entera cansaria, §5.2). Si el Turbo
-	          acaba antes, vuelve el patio con fundido.
+	  Turbo   mientras CORRE (economia v4, K1: perfil.turboRestante > 0 y
+	          sin el atributo TurboPausado del Player; el Turbo solo corre
+	          mientras se juega) funde a MUSICA.turbo; suena como mucho
+	          REPETICIONES_TURBO veces y vuelve la del patio aunque el Turbo
+	          siga (dura 10-15 min: entera cansaria, §5.2). Si se acaba o se
+	          pausa (2 min sin hacer nada), vuelve el patio con fundido; al
+	          reanudarse vuelve la del Turbo si aun no ha sonado esas veces:
+	          se cuentan por Turbo (de 0 a algo), no por cada pausa.
 	  Baja    a lo que diga Sonido.atenuacion() (las celebraciones, el
 	          rebirth y las insignias la ponen a la mitad mientras suenan),
 	          con una transicion corta.
@@ -29,6 +32,7 @@
 	"Pista" del SoundGroup Musica (lo ensena Sonido.prueba.listar).
 ]]
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
@@ -37,6 +41,8 @@ local Sonidos = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("C
 
 local EstadoCliente = require(script.Parent:WaitForChild("EstadoCliente"))
 local Sonido = require(script.Parent:WaitForChild("Sonido"))
+
+local jugador = Players.LocalPlayer
 
 local FUNDIDO = Sonidos.FUNDIDO_MUSICA
 -- s que se espera a que cargue una pista antes de saltar a otra
@@ -95,12 +101,20 @@ local function sonables(lista: { string }): { string }
 	return claves
 end
 
--- turboHasta es un os.time() del servidor: se compara con su hora, no con
--- el reloj del dispositivo
-local function turboActivo(): boolean
+-- Le quedan segundos de Turbo (el servidor los publica en el perfil y lo
+-- pone a 0 al acabarse), en pausa o no
+local function hayTurbo(): boolean
 	local p = EstadoCliente.perfil
-	return p ~= nil and typeof(p.turboHasta) == "number" and p.turboHasta > workspace:GetServerTimeNow()
+	return p ~= nil and typeof(p.turboRestante) == "number" and p.turboRestante > 0
 end
+
+-- El Turbo corre: le queda y no esta en pausa
+local function turboActivo(): boolean
+	return hayTurbo() and jugador:GetAttribute("TurboPausado") ~= true
+end
+-- Si en el ultimo Heartbeat quedaba Turbo: las veces de la pista del Turbo
+-- se cuentan por Turbo, no por cada vez que se reanuda tras una pausa
+local habiaTurbo = false
 
 local function yaCargo(clave: string): boolean
 	local b = bucles[clave]
@@ -237,11 +251,17 @@ end
 RunService.Heartbeat:Connect(function(dt)
 	local suena = Sonido.activado("Musica")
 
-	-- El Turbo empieza o acaba: se cambia de lista ya, con fundido
+	-- Un Turbo nuevo: su pista vuelve a poder sonar REPETICIONES_TURBO veces.
+	-- Una pausa y su vuelta no la reinician
+	local hay = hayTurbo()
+	if hay and not habiaTurbo then
+		vecesTurbo = 0
+	end
+	habiaTurbo = hay
+	-- El Turbo empieza, se pausa, sigue o acaba: se cambia de lista ya, con fundido
 	local turbo = turboActivo()
 	if turbo ~= enTurbo then
 		enTurbo = turbo
-		vecesTurbo = 0
 		if suena then
 			local clave, esTurbo = elegir()
 			local esta = actual
