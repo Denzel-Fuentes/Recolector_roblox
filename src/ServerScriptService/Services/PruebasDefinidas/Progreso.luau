@@ -1,6 +1,6 @@
 --!nonstrict
 --[[
-	Pruebas de progreso y economia: estado y forma del perfil v4, dinero,
+	Pruebas de progreso y economia: estado y forma del perfil v5, dinero,
 	mejoras (las 4 de la v2 y el Brazo), aparicion en la plaza, tutorial,
 	coleccionables, pases, y que no quede nada de lo que la v2 quito.
 ]]
@@ -99,14 +99,18 @@ function Pruebas.darColeccionable(tipo, id)
 	return string.format("%s %s nuevo=%s", tipo, tostring(id), tostring(nuevo))
 end
 
--- El perfil v4 (22 oct) trae el esquema entero de la v2 mas los ajustes de
--- sonido; completar() migra y rellena sin pisar, y la sesion del bloqueo no
--- esta en el perfil (no viaja al cliente)
-function Pruebas.perfilV4()
+-- El perfil v5 (22 oct, economia v4) trae el esquema entero de la v2, los
+-- ajustes de sonido (v4) y los campos de la economia v4 (el Turbo en
+-- segundos que quedan, recompensas, ofertas y compras; Perfiles, cabecera).
+-- completar() migra y rellena sin pisar, tambien dentro de las tablas que se
+-- completan por clave; la sesion del bloqueo no esta en el perfil (no viaja
+-- al cliente) y cada sesion suma la estadistica sesiones
+function Pruebas.perfilV5()
 	local base = Perfiles.porDefecto()
 	local claves = {
-		"dinero", "mejoras", "rebirths", "pedidos", "racha", "turboHasta", "figurinas",
+		"dinero", "mejoras", "rebirths", "pedidos", "racha", "turboRestante", "figurinas",
 		"cintas", "logros", "estadisticas", "semana", "recibos", "pasesCache", "tutorial", "ajustes",
+		"recompensas", "ofertas", "compras",
 	}
 	local faltan = {}
 	for _, c in claves do
@@ -115,10 +119,11 @@ function Pruebas.perfilV4()
 		end
 	end
 	local sobran = {}
-	-- Las mascotas y sus fragmentos se quitaron el 3 oct; los trajes, el 5
+	-- Las mascotas y sus fragmentos se quitaron el 3 oct; los trajes, el 5; la
+	-- hora de fin del Turbo (turboHasta), con la v5
 	for _, c in {
 		"gemas", "exhibidas", "skins", "pity", "montonesExtra", "meGusta", "acompanante", "siguienteUid", "medidores", "capsulasLibres",
-		"mascotas", "equipadas", "fragmentos", "pityMascotas", "fragmentosLibres", "trajes", "trajePuesto",
+		"mascotas", "equipadas", "fragmentos", "pityMascotas", "fragmentosLibres", "trajes", "trajePuesto", "turboHasta",
 	} do
 		if base[c] ~= nil then
 			table.insert(sobran, c)
@@ -131,19 +136,40 @@ function Pruebas.perfilV4()
 	local viejo = Perfiles.completar({ dinero = 55, mejoras = { Bolsa = 3 } })
 	local ajustesOk = base.ajustes.musica == true and base.ajustes.efectos == true
 		and typeof(viejo.ajustes) == "table" and viejo.ajustes.musica == true
+	-- Los valores por defecto de la economia v4, y que completar rellena lo que
+	-- falte dentro de recompensas sin pisar lo que habia
+	local r = base.recompensas
+	local defectoOk = base.turboRestante == 0 and r.calendario.siguiente == 1 and r.calendario.vueltas == 0
+		and r.calendario.ultimoDia == 0 and r.regalos.dia == 0 and r.regalos.minutos == 0 and r.regalos.cobrados == 0
+		and r.ultimoDiaJugado == 0 and next(base.ofertas.porId) == nil and #base.ofertas.historial == 0
+		and base.compras.packInicio == false and base.compras.ultimaRobux == 0
+	local aMedias = Perfiles.completar({
+		version = GameConfig.VERSION_PERFIL,
+		recompensas = { calendario = { siguiente = 4 }, ultimoDiaJugado = 20000 },
+		ofertas = { porId = { VIP = { vistas = 1, ultima = 5, rechazos = 1 } } },
+	})
+	local anidadoOk = aMedias.recompensas.calendario.siguiente == 4 and aMedias.recompensas.calendario.vueltas == 0
+		and aMedias.recompensas.ultimoDiaJugado == 20000 and aMedias.recompensas.regalos.cobrados == 0
+		and aMedias.ofertas.porId.VIP.rechazos == 1 and typeof(aMedias.ofertas.historial) == "table"
+		and aMedias.compras.packInicio == false
 	-- La sesion va en el registro del DataStore, no en el perfil
 	local j = Players:GetPlayers()[1]
 	local vivo = j and Perfiles.obtener(j)
 	local sinSesion = Perfiles.snapshot(base).sesion == nil and (not vivo or Perfiles.snapshot(vivo).sesion == nil)
-	-- anterior: copia de como llego (ultimaSesion de la vez anterior, 0 si es nuevo)
+	-- anterior: copia de como llego (ultimaSesion de la vez anterior, 0 si es
+	-- nuevo); la sesion de ahora ya esta contada en el vivo y no en la copia
 	local anterior = j and Perfiles.anterior(j)
-	local anteriorOk = not vivo or (anterior ~= nil and anterior ~= vivo and anterior.ultimaSesion < vivo.ultimaSesion)
-	return string.format("v%d, faltan [%s], sobran [%s], %d mejoras, ajustes=%s, sin sesion en el snapshot=%s, anterior.ultimaSesion=%s (ahora %s) | completar: dinero=%d Bolsa=%d Brazo=%d rebirths=%d v%d => %s",
-		base.version, table.concat(faltan, ","), table.concat(sobran, ","), nMejoras, tostring(ajustesOk), tostring(sinSesion),
+	local anteriorOk = not vivo or (anterior ~= nil and anterior ~= vivo and anterior.ultimaSesion < vivo.ultimaSesion
+		and (vivo.estadisticas.sesiones or 0) == (anterior.estadisticas.sesiones or 0) + 1)
+	return string.format("v%d, faltan [%s], sobran [%s], %d mejoras, ajustes=%s, economia v4 por defecto=%s, completa por dentro=%s, sin sesion en el snapshot=%s, anterior.ultimaSesion=%s (ahora %s), sesiones %s -> %s | completar: dinero=%d Bolsa=%d Brazo=%d rebirths=%d turbo=%s v%d => %s",
+		base.version, table.concat(faltan, ","), table.concat(sobran, ","), nMejoras, tostring(ajustesOk), tostring(defectoOk), tostring(anidadoOk), tostring(sinSesion),
 		tostring(anterior and anterior.ultimaSesion), tostring(vivo and vivo.ultimaSesion),
-		viejo.dinero, viejo.mejoras.Bolsa, viejo.mejoras.Brazo, viejo.rebirths, viejo.version,
-		ok(base.version == 4 and #faltan == 0 and #sobran == 0 and nMejoras == 4 and ajustesOk and sinSesion and anteriorOk
-			and viejo.dinero == 55 and viejo.mejoras.Bolsa == 3 and viejo.mejoras.Brazo == 0 and viejo.rebirths == 0 and viejo.version == 4))
+		tostring(anterior and anterior.estadisticas.sesiones), tostring(vivo and vivo.estadisticas.sesiones),
+		viejo.dinero, viejo.mejoras.Bolsa, viejo.mejoras.Brazo, viejo.rebirths, tostring(viejo.turboRestante), viejo.version,
+		ok(base.version == 5 and GameConfig.VERSION_PERFIL == 5 and #faltan == 0 and #sobran == 0 and nMejoras == 4 and ajustesOk
+			and defectoOk and anidadoOk and sinSesion and anteriorOk
+			and viejo.dinero == 55 and viejo.mejoras.Bolsa == 3 and viejo.mejoras.Brazo == 0 and viejo.rebirths == 0
+			and viejo.turboRestante == 0 and viejo.version == 5))
 end
 
 -- Las 4 mejoras del diseno v2: valores en 0 y 10, costes y total $118.030

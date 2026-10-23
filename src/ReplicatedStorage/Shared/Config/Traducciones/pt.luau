@@ -9,7 +9,7 @@
 	Glosario: bolsa = saco, contenedor = lixeira, monton = pilha, patio =
 	lixao, pedido = pedido, mejora = melhoria, insignia = emblema (asi lo
 	llama Roblox en pt-br), racha = sequencia, tesoro = tesouro, encestar =
-	acertar. "Rebirth" y "Turbo" no se traducen.
+	acertar. "Rebirth", "Turbo" y "VIP" no se traducen.
 	Bolsa llena = saco LOTADO, llenar la bolsa = LOTAR o saco (22 oct): en
 	Brasil "encher o saco" es fastidiar y "estar de saco cheio", estar harto;
 	con "saco" como termino del juego, nunca "cheio" ni "encher".
@@ -32,6 +32,8 @@ return {
 		fuerza = "Força",
 		bonusAqui = "+{pct} %",
 		bolsaLlenaBarra = "LOTADO!",
+		-- C3, 22 oct
+		recompensas = "Recompensas",
 	},
 
 	MUNDO = {
@@ -43,6 +45,8 @@ return {
 		tendero = "Reciclador",
 		patio = "Lixão ↑",
 		barrera = "Rebirth {n} · {zona}",
+		-- C3, 22 oct
+		vip = "VIP",
 	},
 
 	ZONAS = {
@@ -150,7 +154,11 @@ return {
 			metal = "Desbloqueia o lixo de metal",
 			organico = "Desbloqueia o lixo orgânico",
 			bolsaPlateada = "Dá o Saco prateado",
-			insignia = "Só multiplicador e emblema",
+			-- C3, 22 oct
+			bolsaHielo = "Dá o Saco de gelo",
+			estelaFuego = "Dá o Rastro de fogo e um emblema",
+			multiplicador = "Aumenta seu multiplicador de dinheiro",
+			leyenda = "Dá o emblema Lenda da reciclagem",
 		},
 		reinicia = "O dinheiro e as melhorias são zerados",
 		conserva = "Você mantém as zonas abertas, os recordes, os emblemas e os passes",
@@ -176,6 +184,13 @@ return {
 		robux = "{precio} Robux",
 		sinIds = "Produto ainda não disponível",
 		mejoraComprada = "{nombre} → nível {nivel}",
+		-- C3, 22 oct
+		conInsignia = "Com o emblema {nombre}",
+		dePack = "Do Pacote inicial",
+		deVip = "Exclusivo VIP",
+		compraUnica = "Compra única",
+		turboTope = "Você já tem mais de {horas} h de Turbo guardado",
+		cargandoPrecio = "Carregando preço…",
 	},
 
 	LOGROS = {
@@ -200,6 +215,8 @@ return {
 		cerrados = "Os pedidos abrem quando você comprar sua primeira melhoria",
 		nuevos = "Pedidos novos todo dia",
 		insigniasConseguidas = "{n}/{total} conquistados",
+		-- C3, 22 oct
+		vip = "Pedido VIP",
 	},
 
 	PEDIDOS_HUD = {
@@ -221,6 +238,9 @@ return {
 
 	TURBO = {
 		activo = "x2 {tiempo}",
+		-- C3, 22 oct
+		pausado = "x2 pausado",
+		soloJugando = "O Turbo só corre enquanto você joga",
 	},
 
 	NOTIFICACIONES = {
@@ -233,6 +253,8 @@ return {
 		-- C2, 22 oct
 		versionNueva = "Há uma versão nova do jogo: entre de novo para continuar jogando.",
 		progresoRecuperado = "Seu progresso salvo voltou. O que você jogou enquanto não dava para salvar não fica guardado.",
+		-- C3, 22 oct
+		packTurbo = "Pacote inicial: +{minutos} min de Turbo",
 	},
 
 	MATERIALES = {
@@ -276,6 +298,53 @@ return {
 		consejo5 = "Os rebirths liberam novos tipos de lixo.",
 	},
 
+	-- C3, 22 oct
+	RECOMPENSAS = {
+		titulo = "Recompensas",
+		calendario = "Calendário",
+		dia = "Dia {n}",
+		semana = "Semana {n}",
+		reclamar = "Resgatar",
+		reclamado = "Resgatado",
+		vuelveManana = "Volte amanhã para o dia {n}",
+		listo = "Seu prêmio do dia está pronto!",
+		cobrado = "Dia {n}: {premio}",
+		sinPrisa = "Se ficar um dia sem jogar, você não perde nada: o calendário te espera",
+		regalos = "Presentes por jogar",
+		minutosHoy = "Hoje você já jogou {n} min",
+		siguiente = "Próximo presente aos {n} min",
+		todos = "Você ganhou todos os presentes de hoje! Amanhã tem mais",
+		soloActivo = "Só contam os minutos em que você pega, joga ou cava",
+		regalo = "Presente por jogar {n} min! {premio}",
+		tramo = "{n} min",
+		regresoTitulo = "Que bom te ver de novo!",
+		regresoTexto = "Por voltar, você ganha {premio}",
+		genial = "Demais!",
+		cerradas = "As recompensas abrem quando você comprar sua primeira melhoria",
+		abiertas = "Novas recompensas! Veja no botão Recompensas",
+		premioTurbo = "Turbo {minutos} min",
+		premioY = "{a} e {b}",
+	},
+
+	-- C3, 22 oct. bolsaXLTitulo dice "lotado" y no "cheio" como ponia el
+	-- documento: ver la cabecera ("saco cheio" es estar harto)
+	OFERTAS = {
+		comprar = "Comprar · {precio} Robux",
+		ahoraNo = "Agora não",
+		packTitulo = "Pacote inicial",
+		packTexto = "30 min de Turbo e o Saco do reciclador, que só vem neste pacote. Compra única.",
+		bolsaXLTitulo = "Seu saco vive lotado?",
+		bolsaXLTexto = "Saco XL: 10 espaços a mais para sempre. Menos viagens até a lixeira.",
+		turboTitulo = "Seu Turbo acabou",
+		turboTexto = "O Turbo paga o dobro enquanto você joga e só corre enquanto você está no jogo.",
+		turboOpcion = "{minutos} min · {precio} Robux",
+		dineroTitulo = "Seu dinheiro agora vale {mult}",
+		dineroTexto = "Com Dinheiro x2 valeria {mult2}, para sempre.",
+		vipTitulo = "VIP",
+		vipTexto = "Coroa VIP sobre a sua cabeça, o Rastro VIP e um pedido a mais todo dia.",
+		gracias = "Obrigado! Agora é seu: {nombre}",
+	},
+
 	DEF = {
 		Mejoras = {
 			Bolsa = { nombre = "Saco", descripcion = "Cabe mais lixo no saco" },
@@ -288,16 +357,28 @@ return {
 			BolsaXL = { nombre = "Saco XL", descripcion = "10 espaços a mais no saco, para sempre" },
 			EstelaArcoiris = { nombre = "Rastro arco-íris", descripcion = "Seu saco deixa um arco-íris ao ser jogado" },
 			BolsaDorada = { nombre = "Saco dourado", descripcion = "Um saco de ouro para exibir" },
+			-- C3, 22 oct
+			PackInicio = { nombre = "Pacote inicial", descripcion = "30 min de Turbo (uma vez) e o Saco do reciclador, que só vem neste pacote" },
+			VIP = { nombre = "VIP", descripcion = "Coroa VIP sobre a sua cabeça, o Rastro VIP e um pedido a mais todo dia" },
 		},
 		Productos = {
-			Turbo15 = { nombre = "Turbo 15 min", descripcion = "Dinheiro x2 por 15 minutos (soma ao que você ainda tiver)" },
+			Turbo15 = { nombre = "Turbo 15 min", descripcion = "Dinheiro x2 por 15 minutos de jogo (soma ao que você ainda tiver)" },
+			-- C3, 22 oct
+			Turbo60 = { nombre = "Turbo 60 min", descripcion = "Dinheiro x2 por 60 minutos de jogo (soma ao que você ainda tiver)" },
 		},
 		Bolsas = {
 			Plateada = { nombre = "Saco prateado" },
 			Dorada = { nombre = "Saco dourado" },
+			-- C3, 22 oct
+			Carton = { nombre = "Saco de papelão" },
+			Hielo = { nombre = "Saco de gelo" },
+			Reciclador = { nombre = "Saco do reciclador" },
 		},
 		Estelas = {
 			Arcoiris = { nombre = "Rastro arco-íris" },
+			-- C3, 22 oct
+			Fuego = { nombre = "Rastro de fogo" },
+			VIP = { nombre = "Rastro VIP" },
 		},
 		Insignias = {
 			primerReciclaje = { nombre = "Primeira reciclagem", descripcion = "Recicle seu primeiro saco" },
@@ -316,6 +397,11 @@ return {
 			todasMax = { nombre = "Equipe completa", descripcion = "As 4 melhorias no máximo" },
 			rebirth1 = { nombre = "Renascido", descripcion = "Faça seu primeiro Rebirth" },
 			rebirth3 = { nombre = "Veterano", descripcion = "Chegue ao Rebirth 3" },
+			-- C3, 22 oct
+			rebirth5 = { nombre = "Reciclador de elite", descripcion = "Chegue ao Rebirth 5" },
+			rebirth10 = { nombre = "Lenda da reciclagem", descripcion = "Chegue ao Rebirth 10" },
+			semanaCompleta = { nombre = "Dedicado", descripcion = "Resgate os 7 prêmios do calendário" },
+			pedidos30 = { nombre = "Confiável", descripcion = "Cumpra 30 pedidos" },
 		},
 	},
 }

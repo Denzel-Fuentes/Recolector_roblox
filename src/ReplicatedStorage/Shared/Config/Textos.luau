@@ -35,6 +35,9 @@ Textos.HUD = {
 	-- Sobre la barra de fuerza, en el patio: lo que daria acertar desde aqui
 	bonusAqui = "+{pct} %",
 	bolsaLlenaBarra = "¡LLENA!",
+	-- C3, 22 oct: el boton del regalo (sexto hueco de la botonera), que abre
+	-- el panel Recompensas
+	recompensas = "Recompensas",
 }
 
 -- Carteles flotantes del mundo (los pinta el cliente sobre lo etiquetado)
@@ -55,6 +58,9 @@ Textos.MUNDO = {
 	patio = "Patio de basura ↑",
 	-- Barrera de un cuadrante cerrado
 	barrera = "Rebirth {n} · {zona}",
+	-- C3, 22 oct: debajo de la corona sobre la cabeza de quien tiene el pase
+	-- VIP (atributo VIP del Player; la pinta cada cliente)
+	vip = "VIP",
 }
 
 -- Las zonas del patio (GameConfig.CUADRANTES): la mezcla de sus montones
@@ -178,7 +184,14 @@ Textos.REBIRTH = {
 		metal = "Desbloquea la basura de metal",
 		organico = "Desbloquea la basura orgánica",
 		bolsaPlateada = "Regala la Bolsa plateada",
-		insignia = "Solo multiplicador e insignia",
+		-- C3, 22 oct (economia v4, §3): el R4 y el R5 regalan un cosmetico, del
+		-- R6 al R9 solo sube el multiplicador y el R10 da la insignia Leyenda.
+		-- "Solo multiplicador e insignia" se quito: prometia insignias que no
+		-- existian
+		bolsaHielo = "Regala la Bolsa de hielo",
+		estelaFuego = "Regala la Estela de fuego y una insignia",
+		multiplicador = "Sube tu multiplicador de dinero",
+		leyenda = "Regala la insignia Leyenda del reciclaje",
 	},
 	reinicia = "Se reinician el dinero y las mejoras",
 	conserva = "Te quedas las zonas abiertas, los récords, las insignias y los pases",
@@ -204,6 +217,16 @@ Textos.TIENDA = {
 	robux = "{precio} Robux",
 	sinIds = "Producto no disponible todavía",
 	mejoraComprada = "{nombre} → nivel {nivel}",
+	-- C3, 22 oct (economia v4): de donde sale cada cosmetico nuevo (en Estilo;
+	-- {nombre} es el de la insignia), la etiqueta del Pack de inicio, el tope
+	-- de los botones de Turbo ({horas}, un numero) y el boton mientras llega
+	-- de Roblox el precio de verdad
+	conInsignia = "Con la insignia {nombre}",
+	dePack = "Del Pack de inicio",
+	deVip = "Exclusivo VIP",
+	compraUnica = "Compra única",
+	turboTope = "Ya tienes más de {horas} h de Turbo guardado",
+	cargandoPrecio = "Cargando precio…",
 }
 
 Textos.LOGROS = {
@@ -230,6 +253,8 @@ Textos.PEDIDOS = {
 	cerrados = "Los pedidos se abren cuando compres tu primera mejora",
 	nuevos = "Pedidos nuevos cada día",
 	insigniasConseguidas = "{n}/{total} conseguidas",
+	-- C3, 22 oct: la etiqueta del 4.º pedido del dia, el del pase VIP
+	vip = "Pedido VIP",
 }
 
 -- Version corta para la barra del HUD: "{etiqueta} n/objetivo"
@@ -253,6 +278,10 @@ Textos.PEDIDOS_AVISOS = {
 -- El Turbo en el HUD (dinero x2 un rato)
 Textos.TURBO = {
 	activo = "x2 {tiempo}",
+	-- C3, 22 oct (economia v4): el Turbo solo corre mientras se juega. En
+	-- pausa (tras un rato sin hacer nada) el HUD lo dice; la tienda lo explica
+	pausado = "x2 en pausa",
+	soloJugando = "El Turbo solo corre mientras juegas",
 }
 
 Textos.NOTIFICACIONES = {
@@ -270,6 +299,8 @@ Textos.NOTIFICACIONES = {
 	-- C2, 22 oct: la carga en segundo plano encontro la partida guardada y
 	-- sustituye al perfil provisional (lo jugado con el se pierde)
 	progresoRecuperado = "Ya cargó tu progreso guardado. Lo que jugaste mientras no se podía guardar no se conserva.",
+	-- C3, 22 oct: el Turbo del Pack de inicio, que se da una sola vez
+	packTurbo = "Pack de inicio: +{minutos} min de Turbo",
 }
 
 -- Nombres de los materiales en minuscula, para frases ("recicla 40 de papel")
@@ -318,6 +349,68 @@ Textos.CARGA = {
 	consejo3 = "Cada día hay pedidos nuevos en la recicladora.",
 	consejo4 = "Vuelve cada día a por tu recompensa diaria.",
 	consejo5 = "Los rebirths abren tipos nuevos de basura.",
+}
+
+-- C3, 22 oct (economia v4, docs/Economia-v4.md §4; lo hace R1): el panel
+-- Recompensas, que abre el boton del regalo del HUD. Tiene el calendario de
+-- 7 casillas (una por dia jugado: saltarse un dia no reinicia nada), los
+-- regalos por minutos activos del dia y la ventana del bono de regreso.
+-- {premio} es un dinero (Idioma.dinero, ya trae el "$") o un mensaje anidado
+-- (premioTurbo, premioY, el nombre de un cosmetico con Idioma.mensajeNombre);
+-- {n} y {minutos} son numeros sueltos. El documento ponia las recompensas en
+-- una pestana de Pedidos: tienen panel y boton propios, y "abiertas" lo dice
+Textos.RECOMPENSAS = {
+	titulo = "Recompensas",
+	calendario = "Calendario",
+	dia = "Día {n}",
+	-- La vuelta al calendario (tras la casilla 7 se vuelve a la 1)
+	semana = "Semana {n}",
+	reclamar = "Reclamar",
+	reclamado = "Reclamado",
+	vuelveManana = "Vuelve mañana para el día {n}",
+	listo = "¡Tu premio del día está listo!",
+	cobrado = "Día {n}: {premio}",
+	sinPrisa = "Si un día no juegas, no pierdes nada: el calendario te espera",
+	regalos = "Regalos por jugar",
+	minutosHoy = "Hoy llevas {n} min jugando",
+	siguiente = "Siguiente regalo a los {n} min",
+	todos = "¡Ya tienes todos los regalos de hoy! Mañana hay más",
+	soloActivo = "Cuentan los minutos en los que recoges, lanzas o excavas",
+	regalo = "¡Regalo por jugar {n} min! {premio}",
+	-- La etiqueta de cada tramo de regalos
+	tramo = "{n} min",
+	regresoTitulo = "¡Qué bien verte otra vez!",
+	regresoTexto = "Por volver te llevas {premio}",
+	-- El boton que cierra la ventana del regreso (el premio ya se dio solo)
+	genial = "¡Genial!",
+	cerradas = "Las recompensas se abren cuando compres tu primera mejora",
+	abiertas = "¡Recompensas nuevas! Míralas en el botón Recompensas",
+	premioTurbo = "Turbo {minutos} min",
+	premioY = "{a} y {b}",
+}
+
+-- C3, 22 oct (economia v4, §5.6; lo hace K1): las ofertas en el momento
+-- justo. Normas de Roblox con menores: "Comprar" y "Ahora no" igual de
+-- visibles, sin cuentas atras, sin "solo hoy", sin precios tachados y sin la
+-- palabra oferta en pantalla (el precio no cambia nunca). {precio} y
+-- {minutos} son numeros; {mult} y {mult2}, Idioma.multiplicador; {nombre},
+-- el nombre de lo comprado (Idioma.mensajeNombre)
+Textos.OFERTAS = {
+	comprar = "Comprar · {precio} Robux",
+	ahoraNo = "Ahora no",
+	packTitulo = "Pack de inicio",
+	packTexto = "30 min de Turbo y la Bolsa del reciclador, que solo está en este pack. Se compra una sola vez.",
+	bolsaXLTitulo = "¿Se te llena la bolsa?",
+	bolsaXLTexto = "Bolsa XL: 10 huecos más para siempre. Menos viajes al contenedor.",
+	turboTitulo = "Se acabó tu Turbo",
+	turboTexto = "El Turbo paga el doble mientras juegas y solo corre mientras estás en el juego.",
+	-- Cada boton de la oferta de Turbo (15 y 60 min), al lado de "Ahora no"
+	turboOpcion = "{minutos} min · {precio} Robux",
+	dineroTitulo = "Tu dinero ya vale {mult}",
+	dineroTexto = "Con Dinero x2 valdría {mult2}, para siempre.",
+	vipTitulo = "VIP",
+	vipTexto = "Corona VIP sobre tu cabeza, la Estela VIP y un pedido más cada día.",
+	gracias = "¡Gracias! Ya es tuyo: {nombre}",
 }
 
 function Textos.formatear(plantilla: string, valores: { [string]: any }): string

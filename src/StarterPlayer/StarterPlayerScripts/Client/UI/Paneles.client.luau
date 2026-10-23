@@ -4,8 +4,9 @@
 	Carga todos los paneles (cada modulo se registra en Menu al cargarse) y
 	pone los atajos globales: Esc / ButtonB cierran el panel abierto, y las
 	teclas de acceso rapido abren la Tienda (Q o T), Rebirth (R), Pedidos
-	(P) y Ajustes, el del boton Sonido (M, de Musica / Music: A1) (las que
-	aun no existen se ignoran).
+	(P), Ajustes, el del boton Sonido (M, de Musica / Music: A1) y
+	Recompensas, el del boton del regalo (G, de gift: C3) (las que aun no
+	existen se ignoran).
 
 	Cada boton de panel del HUD necesita su tecla: en PC, sin panel abierto,
 	Camara bloquea el raton en el centro de la pantalla (primera y tercera
@@ -13,7 +14,9 @@
 	Studio el 22 oct con el boton Sonido, que nacio sin atajo).
 
 	Los paneles se buscan por nombre y se ignoran los que no existan, para que
-	el juego arranque aunque una fase aun no este escrita.
+	el juego arranque aunque una fase aun no este escrita. Recompensas (lo
+	rellena R1) y Oferta (K1; sin boton ni atajo: la abre la oferta que manda
+	el servidor) los dejo C3 (22 oct) como ventana vacia.
 
 	Y el sonido de abrir y cerrar ventanas (Client/Sonido): "panelAbrir" al
 	pasar a un panel (tambien de uno a otro), "panelCerrar" al volver a no
@@ -28,7 +31,7 @@ local UI = script.Parent
 local Menu = require(UI:WaitForChild("Menu"))
 local Sonido = require(UI.Parent:WaitForChild("Sonido"))
 
-local PANELES = { "Tienda", "Rebirth", "Pedidos", "Ajustes" }
+local PANELES = { "Tienda", "Rebirth", "Pedidos", "Ajustes", "Recompensas", "Oferta" }
 
 -- (abrir el que ya estaba abierto, p. ej. el prompt de la tienda con la
 -- tienda delante, vuelve a avisar: sin cambio, sin sonido)
@@ -69,6 +72,7 @@ local ATAJOS = {
 	[Enum.KeyCode.R] = "Rebirth",
 	[Enum.KeyCode.P] = "Pedidos",
 	[Enum.KeyCode.M] = "Ajustes", -- el boton Sonido
+	[Enum.KeyCode.G] = "Recompensas", -- el boton del regalo
 }
 
 UserInputService.InputBegan:Connect(function(input, procesado)

@@ -16,7 +16,25 @@
 	El Rebirth 3 daba la segunda mascota equipada; al quitar las mascotas
 	(3 oct) regala un diseno de bolsa (DefinicionesCosmeticos). Lo que abre
 	cada rebirth no se repite aqui: las zonas las dice GameConfig.CUADRANTES.
+
+	=== Coste del siguiente rebirth (economia v4, C3 22 oct) ===
+	costeSiguiente(rebirths) es la base de todos los premios en dinero: los
+	pedidos (E1) y el calendario, los regalos y el bono de regreso (R1) pagan
+	un porcentaje de el (docs/Economia-v4.md §2.4 y §4.1). Es el tramo
+	entero: el requisito en mano del rebirth rebirths + 1 mas las 4 mejoras
+	de 0 a 10 (DefinicionesMejoras.costeTotal), como lo define el documento,
+	y NO lo que le falta al jugador: asi un premio solo cambia al renacer
+	(los pedidos pendientes pasan a valer lo del rebirth nuevo), no baja al
+	comprar mejoras y vale lo mismo para todos los del mismo rebirth. El
+	segundo argumento (niveles de las mejoras) se acepta y se ignora, para
+	que la firma no cambie si algun dia se decide medir lo que falta. Lee las
+	tablas al llamarlo: sigue valiendo cuando cambien los numeros.
+	redondear(n) deja un premio en dos cifras significativas, como los
+	redondea el documento ($757,3 -> $760, $1.009,7 -> $1.000; por debajo de
+	100, a la unidad): asi pedidos y recompensas dan cifras redondas iguales.
 ]]
+
+local DefinicionesMejoras = require(script.Parent.DefinicionesMejoras)
 
 export type Rebirth = {
 	requisito: number, -- $ en mano para hacerlo
@@ -59,6 +77,32 @@ function DefinicionesRebirths.multiplicador(rebirths: number): number
 		return 1
 	end
 	return DefinicionesRebirths.rebirth(rebirths).multiplicador
+end
+
+-- Lo que cuesta el siguiente rebirth con `rebirths` hechos: su requisito mas
+-- las 4 mejoras de 0 a 10. La base de los premios en dinero (ver cabecera,
+-- tambien por que se ignoran los niveles)
+function DefinicionesRebirths.costeSiguiente(rebirths: number, _nivelesMejoras: { [string]: number }?): number
+	return DefinicionesRebirths.rebirth(rebirths + 1).requisito + DefinicionesMejoras.costeTotal()
+end
+
+-- Dos cifras significativas (1.009,7 -> 1.000; 757,3 -> 760); por debajo de
+-- 100, a la unidad (docs/Economia-v4.md §2.4). Para los premios en dinero y
+-- los requisitos que no estan en la tabla
+function DefinicionesRebirths.redondear(n: number): number
+	if n < 100 then
+		return math.floor(n + 0.5)
+	end
+	-- La potencia de 10 de n. log10 de una potencia exacta (1.000) puede
+	-- quedarse un pelo corto o largo: se corrige con la potencia misma
+	local exponente = math.floor(math.log10(n))
+	if 10 ^ (exponente + 1) <= n then
+		exponente += 1
+	elseif 10 ^ exponente > n then
+		exponente -= 1
+	end
+	local paso = 10 ^ (exponente - 1)
+	return math.floor(n / paso + 0.5) * paso
 end
 
 return DefinicionesRebirths

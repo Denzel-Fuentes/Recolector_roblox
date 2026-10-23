@@ -7,14 +7,19 @@
 
 	  izquierda      botonera de 2 columnas x 3 filas: Tienda (Q), Rebirth
 	                 (R), Pedidos (P), Camara (V: primera/tercera persona,
-	                 lote 9) y Sonido (M; A1, 22 oct: abre el panel Ajustes
-	                 con Musica y Efectos); el sexto hueco queda para el boton de
-	                 Recompensas. Cada boton de panel aparece cuando su panel
+	                 lote 9), Sonido (M; A1, 22 oct: abre el panel Ajustes
+	                 con Musica y Efectos) y Recompensas (G, de gift; C3,
+	                 22 oct: el regalo). Cada boton de panel aparece cuando su panel
 	                 existe (UI/<Nombre>), asi cada lote que trae un panel
-	                 trae su boton. Todos suenan "clic" (Client/Sonido)
+	                 trae su boton. Todos suenan "clic" (Client/Sonido). Si
+	                 el modulo del panel devuelve `indicador` (un estado de
+	                 Fusion o un booleano), su boton lleva un punto rojo
+	                 mientras sea true: lo decide el panel (Recompensas: algo
+	                 por cobrar), el HUD no sabe de que va cada uno
 	  arriba-dcha    "Contadores": la pildora verde grande del dinero, el
-	                 Turbo si esta en marcha (x2 y lo que le queda) y, debajo,
-	                 el pedido del dia mas avanzado ("Separa 12/40")
+	                 Turbo si le queda (x2 y lo que le queda; en gris "x2 en
+	                 pausa" mientras no corre) y, debajo, el pedido del dia
+	                 mas avanzado ("Separa 12/40")
 	  derecha        barra de FUERZA de lanzamiento (mantener F; encima, el bonus
 	                 que daria acertar desde donde estas) y, a su lado,
 	                 la de BOLSA: cuanto llevas, sin numeros (decision del
@@ -153,7 +158,7 @@ local HUECO_ICONOS = Tema.BOTONERA.HUECO
 local COLUMNAS_BOTONERA = Tema.BOTONERA.COLUMNAS
 local FILAS_BOTONERA = Tema.BOTONERA.FILAS
 
-local function botonIcono(nombre: string, texto: string, icono: string, tecla: string?, orden: number, alPulsar: () -> (), extra: any?)
+local function botonIcono(nombre: string, texto: string, icono: string, tecla: string?, orden: number, alPulsar: () -> (), extra: any?, indicador: any?)
 	local encima = scope:Value(false)
 	local escala = scope:Spring(
 		scope:Computed(function(use)
@@ -170,6 +175,26 @@ local function botonIcono(nombre: string, texto: string, icono: string, tecla: s
 			Position = UDim2.new(1, -2, 0, 2),
 			AnchorPoint = Vector2.new(1, 0),
 			ZIndex = 5,
+		})
+	end
+	-- El punto rojo del panel (ver cabecera): arriba a la derecha, o a la
+	-- izquierda si ahi va la tecla
+	local punto = nil
+	if indicador ~= nil then
+		punto = scope:New("Frame")({
+			Name = "Indicador",
+			Size = UDim2.fromOffset(22, 22),
+			Position = if tecla then UDim2.fromOffset(2, 2) else UDim2.new(1, -2, 0, 2),
+			AnchorPoint = if tecla then Vector2.zero else Vector2.new(1, 0),
+			BackgroundColor3 = Paleta.UI_PELIGRO,
+			Visible = scope:Computed(function(use)
+				return use(indicador) == true
+			end),
+			ZIndex = 6,
+			[Children] = {
+				scope:New("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+				scope:New("UIStroke")({ Color = Paleta.UI_PAPEL, Thickness = 2.5 }),
+			},
 		})
 	end
 	return scope:New("TextButton")({
@@ -212,9 +237,24 @@ local function botonIcono(nombre: string, texto: string, icono: string, tecla: s
 				ZIndex = 3,
 			}),
 			insignia,
+			punto,
 			extra,
 		},
 	})
+end
+
+-- El `indicador` que exporta el modulo de un panel, o nil. Un modulo que no
+-- carga no tiene punto (y Paneles.client ya avisa del error)
+local function indicadorDe(panel: string): any?
+	local modulo = script.Parent:FindFirstChild(panel)
+	if not (modulo and modulo:IsA("ModuleScript")) then
+		return nil
+	end
+	local cargo, exportado = pcall(require, modulo)
+	if not cargo or typeof(exportado) ~= "table" then
+		return nil
+	end
+	return (exportado :: any).indicador
 end
 
 -- Barrita bajo el icono de Rebirth: lo que falta para el siguiente (dinero
@@ -254,6 +294,7 @@ local BOTONES: { { panel: string?, accion: (() -> ())?, texto: string, icono: st
 	{ panel = "Pedidos", texto = Textos.HUD.pedidos, icono = "libreta", tecla = "P" },
 	{ accion = alternarVista, texto = Textos.HUD.camara, icono = "camara", tecla = "V" },
 	{ panel = "Ajustes", texto = Textos.SONIDO.boton, icono = "sonido", tecla = "M" },
+	{ panel = "Recompensas", texto = Textos.HUD.recompensas, icono = "regalo", tecla = "G" },
 }
 
 local hijosBotonera: { any } = {
@@ -272,7 +313,7 @@ for orden, b in BOTONES do
 		local extra = if panel == "Rebirth" then barraRebirth() else nil
 		table.insert(hijosBotonera, botonIcono(panel, b.texto, b.icono, b.tecla, orden, function()
 			Menu.alternar(panel)
-		end, extra))
+		end, extra, indicadorDe(panel)))
 	end
 end
 
@@ -320,19 +361,57 @@ local pedidoHud = scope:Computed(function(use)
 	return mejor
 end)
 
--- Turbo: segundos que le quedan (un reloj de 1 s; el perfil solo trae la
--- hora de fin)
-local ahora = scope:Value(os.time())
-task.spawn(function()
-	while true do
-		task.wait(1)
-		ahora:set(os.time())
-	end
-end)
-local turboRestante = scope:Computed(function(use)
+-- Turbo (economia v4): perfil.turboRestante son los segundos que le quedan,
+-- que el servidor solo descuenta mientras se juega (K1); mientras no corren,
+-- el Player lleva el atributo TurboPausado. Entre dos perfiles el HUD
+-- descuenta con su reloj de 1 s (salvo en pausa): asi el servidor no tiene
+-- que publicar el perfil cada segundo y el numero no da saltos. Respaldo
+-- mientras el Turbo sea el antiguo: perfil.turboHasta, la hora de fin (un
+-- os.time() del servidor), que la v5 del perfil ya no guarda.
+local turboDelPerfil = scope:Computed(function(use)
 	local p = use(reactivo.perfil)
-	return math.max(0, ((p and p.turboHasta) or 0) - use(ahora))
+	local r = p and p.turboRestante
+	return if typeof(r) == "number" then r else 0
 end)
+local turboHasta = scope:Computed(function(use)
+	local p = use(reactivo.perfil)
+	local h = p and p.turboHasta
+	return if typeof(h) == "number" then h else 0
+end)
+local turboPausado = scope:Value(jugador:GetAttribute("TurboPausado") == true)
+local turboRestante = scope:Value(0) -- lo que se ensena, en s
+do
+	-- Lo ultimo que dijo el servidor y desde cuando se descuenta
+	local base, desde = Fusion.peek(turboDelPerfil), os.clock()
+	local function queda(): number
+		if Fusion.peek(turboPausado) then
+			return base
+		end
+		return math.max(0, base - (os.clock() - desde))
+	end
+	local function pintar()
+		local antiguo = math.max(0, Fusion.peek(turboHasta) - workspace:GetServerTimeNow())
+		turboRestante:set(math.ceil(math.max(queda(), antiguo)))
+	end
+	scope:Observer(turboDelPerfil):onChange(function()
+		base, desde = Fusion.peek(turboDelPerfil), os.clock()
+		pintar()
+	end)
+	scope:Observer(turboHasta):onChange(pintar)
+	-- Al pausarse o reanudarse, lo que quedaba en ese momento es la base: en
+	-- pausa no baja y al volver se descuenta desde ahora
+	jugador:GetAttributeChangedSignal("TurboPausado"):Connect(function()
+		base, desde = queda(), os.clock()
+		turboPausado:set(jugador:GetAttribute("TurboPausado") == true)
+		pintar()
+	end)
+	task.spawn(function()
+		while true do
+			pintar()
+			task.wait(1)
+		end
+	end)
+end
 
 local contadores = scope:New("Frame")({
 	Name = "Contadores",
@@ -375,7 +454,23 @@ local contadores = scope:New("Frame")({
 			Position = UDim2.new(1, -258, 0, 7),
 			AnchorPoint = Vector2.new(1, 0),
 			Visible = scope:Computed(function(use)
-				return use(turboRestante) > 0
+				return use(turboRestante) > 0 and not use(turboPausado)
+			end),
+		}),
+		-- El mismo Turbo en pausa: gris y mas ancha ("x2 en pausa" es mas largo
+		-- que el reloj), en el mismo sitio
+		scope:Pildora({
+			Nombre = "TurboPausado",
+			Icono = "rayo",
+			Texto = Textos.TURBO.pausado,
+			Color = Paleta.UI_BLOQUEADO,
+			Ancho = 176,
+			Alto = 44,
+			TamanoTexto = 20,
+			Position = UDim2.new(1, -258, 0, 7),
+			AnchorPoint = Vector2.new(1, 0),
+			Visible = scope:Computed(function(use)
+				return use(turboRestante) > 0 and use(turboPausado)
 			end),
 		}),
 		-- El pedido del dia mas avanzado (abre el panel al pulsar la P)

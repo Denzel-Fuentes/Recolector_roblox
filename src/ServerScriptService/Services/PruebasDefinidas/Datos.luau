@@ -582,36 +582,54 @@ end
 
 -- completar migra version a version (MIGRACIONES) antes de rellenar y no
 -- pisa nada; un perfil de una version mas nueva conserva su version y sus
--- campos (ni siquiera se borra lo obsoleto) y no se guarda (revision 4)
+-- campos (ni siquiera se borra lo obsoleto) y no se guarda (revision 4).
+-- v5 (economia v4): el Turbo que quedaba (turboHasta) pasa a turboRestante
 function Pruebas.migracionPerfil()
 	local partes, bien = {}, true
+	local actual = GameConfig.VERSION_PERFIL
 
 	local v3 = { version = 3, dinero = 55, mejoras = { Bolsa = 3 }, mascotas = { "x" }, estadisticas = { aciertos = 4 } }
 	local m = Perfiles.completar(v3)
-	local caso1 = m.version == 4 and m.dinero == 55 and m.mejoras.Bolsa == 3 and m.mejoras.Brazo == 0
+	local caso1 = m.version == actual and m.dinero == 55 and m.mejoras.Bolsa == 3 and m.mejoras.Brazo == 0
 		and m.ajustes.musica == true and m.ajustes.efectos == true and m.mascotas == nil and m.estadisticas.aciertos == 4
+		and m.turboRestante == 0
 	bien = bien and caso1
 	table.insert(partes, string.format("v3 -> v%d con ajustes=%s, dinero=%d, sin mascotas=%s", m.version, tostring(typeof(m.ajustes) == "table"), m.dinero, tostring(m.mascotas == nil)))
 
-	-- La cadena, en orden y una version cada vez (5 y 6 de prueba, se quitan al acabar)
+	-- La cadena, en orden y una version cada vez: dos versiones de prueba por
+	-- encima de la actual, que se quitan al acabar (las reales no se tocan)
 	local orden = {}
-	Perfiles.MIGRACIONES[5] = function(d)
-		table.insert(orden, "5:" .. tostring(d.version))
+	local siguiente, otra = actual + 1, actual + 2
+	local previas = { Perfiles.MIGRACIONES[siguiente], Perfiles.MIGRACIONES[otra] }
+	Perfiles.MIGRACIONES[siguiente] = function(d)
+		table.insert(orden, siguiente .. ":" .. tostring(d.version))
 		d.renombrado = d.dinero
 	end
-	Perfiles.MIGRACIONES[6] = function(d)
-		table.insert(orden, "6:" .. tostring(d.version))
+	Perfiles.MIGRACIONES[otra] = function(d)
+		table.insert(orden, otra .. ":" .. tostring(d.version))
 	end
-	local exito, m2 = pcall(Perfiles.completar, { version = 4, dinero = 7 }, 6)
-	Perfiles.MIGRACIONES[5], Perfiles.MIGRACIONES[6] = nil, nil
-	local caso2 = exito and table.concat(orden, ",") == "5:4,6:5" and m2.version == 6 and m2.renombrado == 7
+	local exito, m2 = pcall(Perfiles.completar, { version = actual, dinero = 7 }, otra)
+	Perfiles.MIGRACIONES[siguiente], Perfiles.MIGRACIONES[otra] = previas[1], previas[2]
+	local esperado = string.format("%d:%d,%d:%d", siguiente, actual, otra, siguiente)
+	local caso2 = exito and table.concat(orden, ",") == esperado and m2.version == otra and m2.renombrado == 7
 	bien = bien and caso2
-	table.insert(partes, string.format("cadena 4 -> 6: [%s] v%s", table.concat(orden, ","), tostring(exito and m2.version)))
+	table.insert(partes, string.format("cadena %d -> %d: [%s] v%s", actual, otra, table.concat(orden, ","), tostring(exito and m2.version)))
 
-	local alDia = Perfiles.completar({ version = 4, dinero = 3, ajustes = { musica = false } })
-	local caso3 = alDia.version == 4 and alDia.dinero == 3 and alDia.ajustes.musica == false and alDia.ajustes.efectos == true
+	local alDia = Perfiles.completar({ version = actual, dinero = 3, ajustes = { musica = false } })
+	local caso3 = alDia.version == actual and alDia.dinero == 3 and alDia.ajustes.musica == false and alDia.ajustes.efectos == true
 	bien = bien and caso3
 	table.insert(partes, string.format("al dia: musica=%s efectos=%s", tostring(alDia.ajustes.musica), tostring(alDia.ajustes.efectos)))
+
+	-- v4 -> v5: lo que le quedaba de Turbo al cargar pasa a turboRestante (el
+	-- caducado, 0) y turboHasta desaparece (OBSOLETO)
+	local ahora = os.time()
+	local conTurbo = Perfiles.completar({ version = 4, turboHasta = ahora + 600 })
+	local caducado = Perfiles.completar({ version = 4, turboHasta = ahora - 50 })
+	local caso7 = conTurbo.version == actual and math.abs(conTurbo.turboRestante - 600) <= 2 and conTurbo.turboHasta == nil
+		and caducado.turboRestante == 0 and caducado.turboHasta == nil
+	bien = bien and caso7
+	table.insert(partes, string.format("v4 -> v5: turboHasta +600 s -> turboRestante=%s, caducado -> %s, sin turboHasta=%s",
+		tostring(conTurbo.turboRestante), tostring(caducado.turboRestante), tostring(conTurbo.turboHasta == nil and caducado.turboHasta == nil)))
 
 	local nueva = Perfiles.completar({ version = 9, dinero = 1, campoFuturo = "x", mascotas = { "y" } })
 	local caso4 = nueva.version == 9 and nueva.campoFuturo == "x" and typeof(nueva.mascotas) == "table" and typeof(nueva.ajustes) == "table"
@@ -620,15 +638,15 @@ function Pruebas.migracionPerfil()
 		nueva.version, tostring(nueva.campoFuturo == "x"), tostring(typeof(nueva.mascotas) == "table")))
 
 	-- Lo que decide Guardado con cada carga
-	local _, guardableAlDia, avisoAlDia = Guardado.prepararPerfil({ ok = true, estado = "libre", perfil = { version = 4 }, intentos = 1 })
+	local _, guardableAlDia, avisoAlDia = Guardado.prepararPerfil({ ok = true, estado = "libre", perfil = { version = actual }, intentos = 1 })
 	local perfilNuevo, guardableNuevo, avisoNuevo = Guardado.prepararPerfil({ ok = true, estado = "libre", perfil = { version = 9, mascotas = { "z" } }, intentos = 1 })
 	local _, guardableFallo, avisoFallo = Guardado.prepararPerfil({ ok = false, estado = "error", perfil = nil, intentos = 3 })
 	local caso5 = guardableAlDia == true and avisoAlDia == nil
 		and guardableNuevo == false and avisoNuevo == "NOTIFICACIONES.versionNueva" and perfilNuevo.version == 9 and typeof(perfilNuevo.mascotas) == "table"
 		and guardableFallo == false and avisoFallo == "NOTIFICACIONES.perfilNoCargado"
 	bien = bien and caso5
-	table.insert(partes, string.format("al cargar: v4 guardable=%s | v9 guardable=%s aviso %s | carga fallida guardable=%s aviso %s",
-		tostring(guardableAlDia), tostring(guardableNuevo), tostring(avisoNuevo), tostring(guardableFallo), tostring(avisoFallo)))
+	table.insert(partes, string.format("al cargar: v%d guardable=%s | v9 guardable=%s aviso %s | carga fallida guardable=%s aviso %s",
+		actual, tostring(guardableAlDia), tostring(guardableNuevo), tostring(avisoNuevo), tostring(guardableFallo), tostring(avisoFallo)))
 
 	local vacio = Perfiles.completar(nil)
 	local caso6 = vacio.version == GameConfig.VERSION_PERFIL and vacio.dinero == 0

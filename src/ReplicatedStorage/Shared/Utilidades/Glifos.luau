@@ -301,6 +301,29 @@ DIBUJOS.cofre = function(l, color)
 	forma(l, 0.42, 0.42, 0.16, 0.18, Paleta.DORADO, 0.3)
 end
 
+-- Caja de regalo con lazo: el boton Recompensas del HUD (C3, 22 oct). Las
+-- dos lazadas van detras de la tapa; la cinta, por encima de todo
+DIBUJOS.regalo = function(l, color)
+	local c = color or Paleta.UI_PELIGRO
+	forma(l, 0.22, 0.1, 0.28, 0.18, Paleta.UI_PRIMARIO, 0.5, 30)
+	forma(l, 0.5, 0.1, 0.28, 0.18, Paleta.UI_PRIMARIO, 0.5, -30)
+	forma(l, 0.16, 0.44, 0.68, 0.48, c, 0.1)
+	forma(l, 0.1, 0.28, 0.8, 0.2, claro(c), 0.2)
+	forma(l, 0.43, 0.28, 0.14, 0.64, Paleta.UI_PRIMARIO, 0.1)
+end
+
+-- Hoja de calendario con dos anillas y un 7 (las casillas del calendario de
+-- recompensas, C3 22 oct)
+DIBUJOS.calendario = function(l, color)
+	local c = color or Paleta.UI_PELIGRO
+	forma(l, 0.12, 0.18, 0.76, 0.72, Paleta.UI_PAPEL, 0.12)
+	forma(l, 0.12, 0.18, 0.76, 0.22, c, 0.12)
+	forma(l, 0.27, 0.07, 0.1, 0.22, Paleta.UI_TINTA_SUAVE, 0.5)
+	forma(l, 0.63, 0.07, 0.1, 0.22, Paleta.UI_TINTA_SUAVE, 0.5)
+	local numero = letra(l, "7", Paleta.UI_TINTA, 0.44)
+	numero.Position = UDim2.fromScale(0.5, 0.64)
+end
+
 DIBUJOS.setMetal = function(l, color)
 	local c = color or Paleta.MATERIAL.Metal
 	forma(l, 0.12, 0.12, 0.76, 0.76, c, 0.5)

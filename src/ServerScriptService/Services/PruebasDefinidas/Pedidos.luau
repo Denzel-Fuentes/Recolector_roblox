@@ -186,11 +186,12 @@ function Pruebas.insignias()
 	local otraVez = Insignias.comprobar(j)
 	p.mejoras.Bolsa = 10
 	local mejoraMax = Insignias.comprobar(j)
-	local resultado = string.format("de 16 posibles, %d (estadisticas reales) | primerReciclaje antes=%s | al reciclar +%d, otra vez +%d | mejora al maximo +%d (%s)",
-		cero, tostring(tieneAntes), una, otraVez, mejoraMax, tostring(p.logros.mejoraMax))
+	local resultado = string.format("de %d posibles, %d (estadisticas reales) | primerReciclaje antes=%s | al reciclar +%d, otra vez +%d | mejora al maximo +%d (%s)",
+		#DefinicionesInsignias.LISTA, cero, tostring(tieneAntes), una, otraVez, mejoraMax, tostring(p.logros.mejoraMax))
 	local bien = not tieneAntes and una == 1 and p.logros.primerReciclaje == true and otraVez == 0 and mejoraMax == 1 and p.logros.mejoraMax == true
 	restaurar(j, p, copia)
-	return resultado .. " (" .. #DefinicionesInsignias.LISTA .. " insignias) => " .. ok(bien and #DefinicionesInsignias.LISTA == 16)
+	-- 16 del diseno v2 y 4 de la economia v4 (22 oct)
+	return resultado .. " (" .. #DefinicionesInsignias.LISTA .. " insignias) => " .. ok(bien and #DefinicionesInsignias.LISTA == 20)
 end
 
 return Pruebas

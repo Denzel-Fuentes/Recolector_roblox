@@ -34,11 +34,51 @@
 	=== Versiones ===
 	v3 (diseno v2, 26 sep): el esquema entero de la v2. v4 (22 oct): store
 	nuevo y perfiles desde cero (GameConfig), mas los ajustes de sonido.
+	v5 (22 oct, economia v4, docs/Economia-v4.md): el Turbo deja de ser una
+	hora de fin (turboHasta, un os.time()) y pasa a los segundos que quedan
+	(turboRestante), que solo bajan mientras se juega: la migracion pasa lo
+	que quedaba y turboHasta es OBSOLETO. Mas los campos nuevos de abajo.
 	`completar` primero MIGRA (MIGRACIONES[v] lleva un perfil de v-1 a v, una
 	version tras otra) y despues rellena las claves que falten y borra las
 	OBSOLETAS (campos de sistemas quitados: las mascotas el 3 oct, los trajes
 	el 5). Rellenar ya cubre los campos nuevos: una migracion solo hace falta
 	cuando algo cambia de forma o de sentido.
+
+	=== Campos de la economia v4 (contrato del paquete C3) ===
+	Los deja preparados C3 para que E1, R1 y K1 trabajen sin tocar este
+	modulo. Los dias son numeros de dia de DefinicionesPedidos.dia (el mismo
+	reloj que los pedidos, que con la economia v4 cambia a las 06:00 UTC).
+	  turboRestante     s de Turbo (dinero x2) que quedan. Los descuenta
+	                    Services/Turbo solo mientras se juega (K1); mientras
+	                    no corre, el Player lleva el atributo TurboPausado
+	                    (el HUD dice "x2 en pausa")
+	  recompensas       R1 (Services/Recompensas):
+	    .calendario     siguiente = casilla por cobrar (1..7), vueltas =
+	                    semanas completas (tras la 7.a se vuelve a la 1),
+	                    ultimoDia = dia de la ultima cobrada (una por dia
+	                    jugado; saltarse un dia no reinicia nada)
+	    .regalos        dia = el de la cuenta, minutos = minutos activos de
+	                    ese dia, cobrados = tramos de REGALOS ya dados ese dia
+	    .ultimoDiaJugado  dia del ultimo minuto activo (o del ultimo bono de
+	                    regreso): el bono de regreso mira cuanto hace. No es
+	                    ultimaSesion, que se escribe al entrar y no al jugar
+	  ofertas           K1 (Services/Ofertas): porId[id de la oferta] =
+	                    { vistas, ultima (os.time), rechazos } e historial =
+	                    os.time() de cada una ensenada (el tope de 3 por
+	                    semana; K1 lo recorta a 7 dias)
+	  compras           K1: packInicio = ya se dio el Turbo del Pack de inicio
+	                    (una sola vez aunque se recargue el perfil);
+	                    ultimaRobux = os.time() de la ultima compra con Robux
+	                    (24 h sin ofertas). El documento ponia la marca del
+	                    pack en recompensas.packOtorgado: es una compra
+	  pedidos.lista[i].vip  el 4.o pedido del dia, solo con el pase VIP (K1)
+	  estadisticas      claves nuevas (sin entrada = 0): sesiones (la suma
+	                    registrar al entrar; las ofertas no salen en la
+	                    primera), minutosActivos y diasCalendario (casillas
+	                    cobradas: la insignia semanaCompleta) las suma R1
+	Y la senal alMinuto: el tic de 60 s de tiempoJugado, por jugador, para
+	que R1 cuente ahi los minutos activos. Lo que hace activo un minuto (y
+	lo que pausa el Turbo) lo dice Services/Actividad.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -58,8 +98,21 @@ export type Pedido = {
 	progreso: number,
 	parametro: any?, -- material, distancia...
 	cobrado: boolean,
-	recompensa: number?, -- $ al cumplirlo (con el multiplicador de rebirth del dia)
+	-- $ al cumplirlo, fijado al generarlo. En la economia v4 el premio se
+	-- calcula al cobrar (E1); se queda opcional por los pedidos ya guardados
+	recompensa: number?,
+	vip: boolean?, -- el 4.o pedido del dia, el del pase VIP (ver cabecera)
 }
+
+-- Economia v4 (ver cabecera)
+export type Recompensas = {
+	calendario: { siguiente: number, vueltas: number, ultimoDia: number },
+	regalos: { dia: number, minutos: number, cobrados: number },
+	ultimoDiaJugado: number,
+}
+export type Oferta = { vistas: number, ultima: number, rechazos: number }
+export type Ofertas = { porId: { [string]: Oferta }, historial: { number } }
+export type Compras = { packInicio: boolean, ultimaRobux: number }
 
 export type Perfil = {
 	version: number,
@@ -72,7 +125,11 @@ export type Perfil = {
 	estela: string?, -- DefinicionesCosmeticos.ESTELAS
 	disenoBolsa: string?, -- DefinicionesCosmeticos.BOLSAS
 	camara: string?, -- "primera" | "tercera" en el patio (Client/Camara)
-	turboHasta: number, -- os.time() hasta el que dura el Turbo de dinero
+	turboRestante: number, -- s de Turbo de dinero que quedan (v5; solo bajan jugando)
+	-- OBSOLETO desde v5 (completar lo borra al cargar): la hora de fin del
+	-- Turbo antiguo. Sigue en el tipo mientras Services/Turbo lo use (K1 lo
+	-- pasa a turboRestante)
+	turboHasta: number?,
 	-- Pospuesto (GameConfig.FUNCIONES): se guarda para no migrar al volver
 	figurinas: { [string]: boolean },
 	cintas: { [string]: boolean },
@@ -88,6 +145,10 @@ export type Perfil = {
 	ultimaSesion: number,
 	tutorial: number, -- pasos completados (DefinicionesTutorial)
 	ajustes: { musica: boolean, efectos: boolean }, -- sonido (v4)
+	-- Economia v4 (v5; ver cabecera)
+	recompensas: Recompensas,
+	ofertas: Ofertas,
+	compras: Compras,
 }
 
 local Perfiles = {}
@@ -102,6 +163,9 @@ Perfiles.alCambiar = Senal.nueva() :: Senal.Senal<Player, Perfil>
 -- Lo dispara Guardado al salir cada jugador, ANTES de su guardado de salida
 -- (ver cabecera). El perfil es nil si se fue antes de que cargara.
 Perfiles.alSalir = Senal.nueva() :: Senal.Senal<Player, Perfil?>
+-- Cada tic de 60 s de tiempoJugado, por jugador con perfil (economia v4: R1
+-- cuenta ahi los minutos activos). Cada oyente va en su hilo (Senal)
+Perfiles.alMinuto = Senal.nueva() :: Senal.Senal<Player, Perfil>
 
 local perfiles: { [Player]: Perfil } = {}
 local cargados: { [Player]: boolean } = {}
@@ -138,7 +202,7 @@ function Perfiles.porDefecto(): Perfil
 		racha = 0,
 		estela = nil,
 		disenoBolsa = nil,
-		turboHasta = 0,
+		turboRestante = 0,
 		figurinas = {},
 		cintas = {},
 		logros = {},
@@ -150,16 +214,38 @@ function Perfiles.porDefecto(): Perfil
 		ultimaSesion = 0,
 		tutorial = 0,
 		ajustes = { musica = true, efectos = true },
+		recompensas = {
+			calendario = { siguiente = 1, vueltas = 0, ultimoDia = 0 },
+			regalos = { dia = 0, minutos = 0, cobrados = 0 },
+			ultimoDiaJugado = 0,
+		},
+		ofertas = { porId = {}, historial = {} },
+		compras = { packInicio = false, ultimaRobux = 0 },
 	}
 end
 
--- Campos de sistemas quitados (las mascotas, 3 oct; los trajes, 5 oct)
-local OBSOLETOS = { "mascotas", "equipadas", "fragmentos", "pityMascotas", "fragmentosLibres", "trajes", "trajePuesto" }
+-- Campos de sistemas quitados (las mascotas, 3 oct; los trajes, 5 oct) o
+-- sustituidos (turboHasta por turboRestante, v5)
+local OBSOLETOS = { "mascotas", "equipadas", "fragmentos", "pityMascotas", "fragmentosLibres", "trajes", "trajePuesto", "turboHasta" }
 
--- Tablas cuyas claves se completan una a una (una mejora o un ajuste nuevo
--- en un perfil que ya tenia la tabla). Las demas tablas son datos del
--- jugador (listas, contadores) y se dejan como estan.
-local COMPLETAR_POR_CLAVE = { "mejoras", "ajustes" }
+-- Tablas cuyas claves se completan una a una, a cualquier profundidad (una
+-- mejora, un ajuste o un campo de las recompensas nuevo en un perfil que ya
+-- tenia la tabla). Las demas tablas son datos del jugador (listas,
+-- contadores) y se dejan como estan; dentro de estas, lo que por defecto es
+-- una tabla vacia (ofertas.porId, ofertas.historial) tambien es de datos y no
+-- hay nada que completar.
+local COMPLETAR_POR_CLAVE = { "mejoras", "ajustes", "recompensas", "ofertas", "compras" }
+
+local function completarClaves(destino: { [any]: any }, defecto: { [any]: any })
+	for clave, valor in pairs(defecto) do
+		local actual = destino[clave]
+		if actual == nil then
+			destino[clave] = valor
+		elseif typeof(actual) == "table" and typeof(valor) == "table" then
+			completarClaves(actual, valor)
+		end
+	end
+end
 
 -- MIGRACIONES[v](datos): lleva un perfil de la version v-1 a la v. Solo para
 -- lo que cambia de forma o de sentido: los campos nuevos los pone completar.
@@ -171,6 +257,14 @@ Perfiles.MIGRACIONES = {
 		if typeof(datos.ajustes) ~= "table" then
 			datos.ajustes = { musica = true, efectos = true }
 		end
+	end,
+	-- v5 (economia v4): el Turbo que le quedaba al cargar (turboHasta era la
+	-- hora de fin; el tiempo fuera del juego ya corrio) pasa entero a
+	-- turboRestante, que desde ahora solo baja jugando. turboHasta lo borra
+	-- despues OBSOLETOS
+	[5] = function(datos: any)
+		local quedaba = math.max(0, (tonumber(datos.turboHasta) or 0) - os.time())
+		datos.turboRestante = math.max(0, tonumber(datos.turboRestante) or 0) + quedaba
 	end,
 } :: { [number]: (datos: any) -> () }
 
@@ -204,12 +298,8 @@ function Perfiles.completar(datos: any, hasta: number?): Perfil
 		local v = datos[clave]
 		if v == nil then
 			(datos :: any)[clave] = valorDefecto
-		elseif typeof(v) == "table" and table.find(COMPLETAR_POR_CLAVE, clave) then
-			for subclave, valor in pairs(valorDefecto) do
-				if v[subclave] == nil then
-					v[subclave] = valor
-				end
-			end
+		elseif typeof(v) == "table" and typeof(valorDefecto) == "table" and table.find(COMPLETAR_POR_CLAVE, clave) then
+			completarClaves(v, valorDefecto)
 		end
 	end
 	datos.version = math.max(desde, objetivo)
@@ -233,6 +323,10 @@ function Perfiles.registrar(jugador: Player, perfil: Perfil, cargado: boolean)
 	perfiles[jugador] = perfil
 	cargados[jugador] = cargado
 	perfil.ultimaSesion = os.time()
+	-- Una sesion mas (estadistica sesiones, ver cabecera). Si un provisional
+	-- se sustituye por el guardado, cuenta en los dos, pero solo el guardado
+	-- persiste: una vez por sesion
+	perfil.estadisticas.sesiones = (perfil.estadisticas.sesiones or 0) + 1
 	Perfiles.semanaAlDia(perfil)
 	sucios[jugador] = true
 	jugador:SetAttribute("PerfilListo", cargado)
@@ -363,12 +457,13 @@ RunService.Heartbeat:Connect(function()
 	end
 end)
 
--- Tiempo jugado: un tick por minuto
+-- Tiempo jugado: un tick por minuto (y alMinuto, ver arriba)
 task.spawn(function()
 	while true do
 		task.wait(60)
-		for _, perfil in perfiles do
+		for jugador, perfil in perfiles do
 			perfil.tiempoJugado += 60
+			Perfiles.alMinuto:Fire(jugador, perfil)
 		end
 	end
 end)

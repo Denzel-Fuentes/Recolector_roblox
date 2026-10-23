@@ -53,6 +53,10 @@ Iconos.IMAGENES = {
 	bota = 17368052918, -- Speed (zapatilla)
 	cofre = 15402896733, -- GemChest
 	cruz = 17368208554, -- Deny
+	-- Recompensas (economia v4, C3 22 oct): glifos dibujados mientras no haya
+	-- imagen. corona (VIP) y estrella (Pack de inicio) ya estaban
+	regalo = 0, -- el boton Recompensas del HUD y los regalos por jugar
+	calendario = 0, -- el calendario de 7 casillas
 
 	-- Tipos de basura (contenedores, pedidos)
 	setMetal = 0,
