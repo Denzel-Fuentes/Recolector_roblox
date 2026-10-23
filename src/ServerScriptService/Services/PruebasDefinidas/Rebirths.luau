@@ -31,7 +31,7 @@ end
 -- cosmeticos: "renacer" se pone la estela para ver que se conserva, y antes
 -- se quedaba puesta en el perfil)
 local function copiar(p)
-	return { dinero = p.dinero, rebirths = p.rebirths, mejoras = table.clone(p.mejoras), estela = p.estela, disenoBolsa = p.disenoBolsa }
+	return { dinero = p.dinero, rebirths = p.rebirths, mejoras = table.clone(p.mejoras), estela = p.estela, disenoBolsa = p.disenoBolsa, turboRestante = p.turboRestante }
 end
 local function restaurar(j, p, copia)
 	p.dinero = copia.dinero
@@ -39,6 +39,7 @@ local function restaurar(j, p, copia)
 	p.mejoras = copia.mejoras
 	p.estela = copia.estela
 	p.disenoBolsa = copia.disenoBolsa
+	p.turboRestante = copia.turboRestante
 	Perfiles.marcarSucio(j)
 end
 
@@ -112,7 +113,12 @@ function Pruebas.renacer()
 	local grupo = root and root.CollisionGroup
 	local velocidad = humanoide and humanoide.WalkSpeed
 	local antesPago = Economia.dinero(j)
-	local resumen = Bolsa.depositarItems(j, { { tipo = "basura", nombre = "Papel", material = "Papel" } }, 0)
+	-- Solo el multiplicador del rebirth: sin Turbo (el creador trae el del
+	-- Pack de inicio) ni pases de verdad (Dinero x2, Comunes.sinPasesReales)
+	p.turboRestante = 0
+	local resumen = Comunes.sinPasesReales(j, function()
+		return Bolsa.depositarItems(j, { { tipo = "basura", nombre = "Papel", material = "Papel" } }, 0)
+	end)
 	local cobrado = Economia.dinero(j) - antesPago
 	local conserva = p.estela == "Arcoiris" and (p.estadisticas.aciertos or 0) == aciertos
 	restaurar(j, p, copia)

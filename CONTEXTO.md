@@ -1540,7 +1540,9 @@ a origin/master). Lo que falta, en orden:
    (quitarlo después): tutorial en el paso 7+, 2.ª sesión o posterior, más de
    3 min, sin compras en 24 h y sin el Pack → depositar → sale el Pack en el
    siguiente momento tranquilo; "Comprar · 99" abre el prompt real y "Ahora
-   no" suma `perfil.ofertas.porId.PackInicio.rechazos`. Una compra de prueba
+   no" suma `perfil.ofertas.porId.PackInicio.rechazos` (con la cuenta del
+   creador, que ya tiene el Pack, no sale: hace falta otra cuenta o apartarle
+   los pases como `Comunes.sinPasesReales`). Una compra de prueba
    de Turbo15 suma 900 s y pone `ultimaRobux`. Con 2 jugadores, la corona se
    ve desde el otro cliente (Q1).
 3. **N1b**: hecho el 23 oct y verificado en Lune; falta pasar
@@ -1579,7 +1581,11 @@ a origin/master). Lo que falta, en orden:
    y en portugués, la consola limpia y capturas de cada panel) y Q4b (revisión
    de todo el diff desde `base-lanzamiento`); **el usuario publica el place**;
    Q1, multijugador con 2–3 clientes (`README-pruebas.md`); Q2, un móvil real,
-   y Q3, una compra real de cada tipo (estas dos, del usuario).
+   y Q3, una compra real de cada tipo (estas dos, del usuario). **Ojo con Q3**:
+   Roblox da a su creador los pases que crea (`UserOwnsGamePassAsync` da
+   `true` en los seis para fuentes_arial12, comprobado el 23 oct), así que
+   con esa cuenta no se puede comprar ningún pase ni ver sus ofertas: hace
+   falta otra cuenta. Los Turbo (productos) sí los puede comprar.
 9. **Abrir**: T1, pública para mayores de 16 (el usuario se verifica o hace
    una compra con dinero real y la hace pública con la ficha completa; tag
    `v1.0`); L10, calibración de 1–2 semanas con los datos del Dashboard

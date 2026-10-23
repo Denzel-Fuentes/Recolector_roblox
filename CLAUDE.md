@@ -214,7 +214,12 @@ un módulo de solo tipos.
   dos repiten nombre), y dejan el perfil como estaba. Las que mueven al
   jugador usan `Comunes.teletransportar` (avisa a Movimiento); las que lanzan,
   `Comunes.llenarBolsa` (el servidor solo lanza bolsas llenas) y
-  `Comunes.limpiarBolsasCaidas` (tope de 3 en el suelo). En el cliente, un
+  `Comunes.limpiarBolsasCaidas` (tope de 3 en el suelo); las que comparan
+  con y sin pase, `Comunes.sinPasesReales`, y las que cuentan dinero exacto,
+  `Comunes.cobroLimpio` (además sin Turbo): desde F1b Roblox da los seis
+  pases a su creador, que es quien prueba en Studio, y el Pack de inicio le
+  deja Turbo. Toda prueba con veredicto acaba en "=> OK" o "=> FALLO". En el
+  cliente, un
   ModuleScript con `prueba = { accion = fn }` (bajo `Client` o en
   `ReplicatedFirst`) se prueba con `("modulo", nombre, accion, ...)`:
   `PruebasCliente` ya no se edita.

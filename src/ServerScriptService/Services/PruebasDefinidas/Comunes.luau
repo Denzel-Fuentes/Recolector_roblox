@@ -110,6 +110,55 @@ function Comunes.excavar(j: Player, m)
 	return ok, motivo
 end
 
+-- Corre fn con el jugador sin sus pases de verdad (pasesCache vacio) y se
+-- los devuelve al acabar. Desde F1b (23 oct) los pases tienen id y Roblox
+-- se los da a su creador, que es quien prueba en Studio: sin esto, "sin
+-- pase" seria con los seis. Al devolverlos avisa a quien mira los pases
+-- (Monetizacion.alCambiarPases: el atributo VIP, el Pedido VIP)
+function Comunes.sinPasesReales(j: Player, fn: () -> any): any
+	local Perfiles = require(script.Parent.Parent:WaitForChild("Perfiles"))
+	local Monetizacion = require(script.Parent.Parent:WaitForChild("Monetizacion"))
+	local perfil = Perfiles.obtener(j)
+	local cache = perfil and perfil.pasesCache
+	if perfil then
+		perfil.pasesCache = {}
+	end
+	local ok, resultado = pcall(fn)
+	if perfil then
+		perfil.pasesCache = cache
+		Perfiles.marcarSucio(j)
+		Monetizacion.alCambiarPases:Fire(j)
+	end
+	if not ok then
+		error(resultado, 0)
+	end
+	return resultado
+end
+
+-- Corre fn cobrando solo lo de la formula: sin los pases de verdad
+-- (sinPasesReales) ni Turbo (turboRestante a 0 mientras dura, y se
+-- devuelve). Para las que cuentan dinero exacto: el creador trae Dinero x2 y
+-- el Turbo del Pack de inicio, y un pedido de otra prueba puede dejar Turbo
+function Comunes.cobroLimpio(j: Player, fn: () -> any): any
+	local Perfiles = require(script.Parent.Parent:WaitForChild("Perfiles"))
+	local Turbo = require(script.Parent.Parent:WaitForChild("Turbo"))
+	local perfil = Perfiles.obtener(j)
+	local turbo = perfil and perfil.turboRestante
+	if perfil then
+		perfil.turboRestante = 0
+	end
+	local ok, resultado = pcall(Comunes.sinPasesReales, j, fn)
+	if perfil then
+		perfil.turboRestante = turbo
+		Turbo.sincronizar(j)
+		Perfiles.marcarSucio(j)
+	end
+	if not ok then
+		error(resultado, 0)
+	end
+	return resultado
+end
+
 -- Corre fn con una GameConfig.FUNCIONES encendida (lo pospuesto en la v2
 -- sigue probandose para cuando se reactive)
 function Comunes.conFuncion(nombre: string, fn: () -> any): any

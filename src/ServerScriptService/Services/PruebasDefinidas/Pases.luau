@@ -9,6 +9,8 @@
 	Usan el modo dev de pases (Monetizacion.fijarModoDev) y lo dejan como
 	estaba. Desde E1, Pedidos mete el Pedido VIP al ver el pase (y el modo
 	dev se lo da a todos): conPases quita al acabar los VIP que aparecieron.
+	Desde F1b el creador tiene los pases de verdad: conPases le aparta los
+	suyos mientras dura (Comunes.sinPasesReales).
 ]]
 
 local Servicios = script.Parent.Parent
@@ -55,16 +57,18 @@ local function quitarVipNuevos(antes)
 end
 
 local function conPases(activo: boolean, fn: () -> any): any
-	local antes = Monetizacion.modoDev()
-	local pedidos = pedidosDeTodos()
-	Monetizacion.fijarModoDev(activo)
-	local bien, resultado = pcall(fn)
-	Monetizacion.fijarModoDev(antes)
-	quitarVipNuevos(pedidos)
-	if not bien then
-		error(resultado, 0)
-	end
-	return resultado
+	return Comunes.sinPasesReales(jugador(), function()
+		local antes = Monetizacion.modoDev()
+		local pedidos = pedidosDeTodos()
+		Monetizacion.fijarModoDev(activo)
+		local bien, resultado = pcall(fn)
+		Monetizacion.fijarModoDev(antes)
+		quitarVipNuevos(pedidos)
+		if not bien then
+			error(resultado, 0)
+		end
+		return resultado
+	end)
 end
 
 local function papel(n: number)

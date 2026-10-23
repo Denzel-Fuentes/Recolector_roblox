@@ -7,7 +7,9 @@
 
 	Desde el 22 oct (P3) el servidor solo lanza bolsas llenas: las que lanzan
 	llenan la bolsa con Comunes.llenarBolsa y cuentan con su capacidad, y
-	quitan antes las bolsas caidas que dejaran otras pruebas.
+	quitan antes las bolsas caidas que dejaran otras pruebas. Las que cuentan
+	dinero exacto cobran dentro de Comunes.cobroLimpio (sin los pases de
+	verdad del creador ni Turbo).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -50,15 +52,17 @@ end
 -- Un billete ocupa un hueco y NO paga al meterlo: paga al depositar
 function Pruebas.billeteEnBolsa()
 	local j = jugador()
-	Bolsa.vaciar(j)
-	local dineroAntes = Economia.dinero(j)
-	local metido = Bolsa.meter(j, { tipo = "billete", nombre = "Billete", valor = 50 })
-	local cuenta = Bolsa.cuenta(j)
-	local dineroTrasMeter = Economia.dinero(j)
-	local resumen = Bolsa.depositar(j)
-	return string.format("billete $50: metido=%s bolsa=%d dinero al meter %d->%d | deposito objetos=%d +$%d => %s",
-		tostring(metido), cuenta, dineroAntes, dineroTrasMeter, resumen.objetos, resumen.dinero,
-		(metido and cuenta == 1 and dineroTrasMeter == dineroAntes and resumen.objetos == 1 and resumen.dinero == 50) and "OK" or "FALLO")
+	return Comunes.cobroLimpio(j, function()
+		Bolsa.vaciar(j)
+		local dineroAntes = Economia.dinero(j)
+		local metido = Bolsa.meter(j, { tipo = "billete", nombre = "Billete", valor = 50 })
+		local cuenta = Bolsa.cuenta(j)
+		local dineroTrasMeter = Economia.dinero(j)
+		local resumen = Bolsa.depositar(j)
+		return string.format("billete $50: metido=%s bolsa=%d dinero al meter %d->%d | deposito objetos=%d +$%d => %s",
+			tostring(metido), cuenta, dineroAntes, dineroTrasMeter, resumen.objetos, resumen.dinero,
+			(metido and cuenta == 1 and dineroTrasMeter == dineroAntes and resumen.objetos == 1 and resumen.dinero == 50) and "OK" or "FALLO")
+	end)
 end
 
 -- Recoger de una montana (lo que sea que salga) no cambia el dinero
@@ -107,18 +111,20 @@ end
 -- Al salir la bolsa se recicla sin bonus (se llama a lo mismo que PlayerRemoving)
 function Pruebas.salirRecicla()
 	local j = jugador()
-	local items = {
-		{ tipo = "basura", nombre = "Chatarra", material = "Metal", valor = 12 },
-		{ tipo = "billete", nombre = "Billete", valor = 50 },
-	}
-	local esperado = 0
-	for _, item in items do
-		esperado += Bolsa.valorDeposito(j, item)
-	end
-	local antes = Economia.dinero(j)
-	local resumen = Bolsa.reciclarSinBonus(j, items)
-	local cobrado = Economia.dinero(j) - antes
-	return string.format("esperado $%d, resumen $%d, cobrado $%d => %s", esperado, resumen.dinero, cobrado, (resumen.dinero == esperado and cobrado == esperado) and "OK" or "FALLO")
+	return Comunes.cobroLimpio(j, function()
+		local items = {
+			{ tipo = "basura", nombre = "Chatarra", material = "Metal", valor = 12 },
+			{ tipo = "billete", nombre = "Billete", valor = 50 },
+		}
+		local esperado = 0
+		for _, item in items do
+			esperado += Bolsa.valorDeposito(j, item)
+		end
+		local antes = Economia.dinero(j)
+		local resumen = Bolsa.reciclarSinBonus(j, items)
+		local cobrado = Economia.dinero(j) - antes
+		return string.format("esperado $%d, resumen $%d, cobrado $%d => %s", esperado, resumen.dinero, cobrado, (resumen.dinero == esperado and cobrado == esperado) and "OK" or "FALLO")
+	end)
 end
 
 -- Premio por separar (3 oct): en el contenedor de Papel, 4 papeles pagan x2,
@@ -137,8 +143,10 @@ function Pruebas.pagoSeparado()
 		return items
 	end
 	local mult = Rebirths.multiplicador(j)
-	local enPapel = Bolsa.depositarItems(j, bolsa(), 0, "Papel")
-	local enGeneral = Bolsa.depositarItems(j, bolsa(), 0, nil)
+	local depositos = Comunes.cobroLimpio(j, function()
+		return { papel = Bolsa.depositarItems(j, bolsa(), 0, "Papel"), general = Bolsa.depositarItems(j, bolsa(), 0, nil) }
+	end)
+	local enPapel, enGeneral = depositos.papel, depositos.general
 	local esperadoPapel = math.floor((4 * 10 * GameConfig.MULT_SEPARADO + 2 * 10 * GameConfig.MULT_MAL_SEPARADO + 50) * mult + 0.5)
 	local esperadoGeneral = math.floor((60 + 50) * mult + 0.5)
 	return string.format("papel: $%d (esperado %d) bien %d mal %d | general: $%d (esperado %d) bien %d mal %d => %s",

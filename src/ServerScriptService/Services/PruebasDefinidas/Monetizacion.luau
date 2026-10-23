@@ -450,7 +450,9 @@ function Pruebas.modoDevSoloStudio()
 	local estudioMon, estudioAdmin = Monetizacion.esStudio, Admin.esStudio
 	local modoAntes = Monetizacion.modoDev()
 	local r = {}
-	local exito, err = pcall(function()
+	-- Sin los pases de verdad del creador (Comunes.sinPasesReales): aqui se
+	-- mira que el modo dev no de ninguno
+	local exito, err = pcall(Comunes.sinPasesReales, j, function()
 		r.enStudio = Monetizacion.fijarModoDev(true) and Monetizacion.modoDev()
 		-- Como si fuera el juego publicado, con el modo dev pedido
 		Monetizacion.esStudio = function()

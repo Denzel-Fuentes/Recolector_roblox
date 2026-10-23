@@ -62,7 +62,8 @@ function Pruebas.excavar(indice)
 	for _, n in conteo do
 		total += n
 	end
-	return string.format("excavar monton %d (%s): ok=%s motivo=%s | piezas=%d objetos=%d (%s) | %s", m.id, m.tamano, tostring(ok), motivo, piezas, total, if piezas == total then "IGUAL OK" else "DIFERENTE", table.concat(partes, " "))
+	return string.format("excavar monton %d (%s): ok=%s motivo=%s | piezas=%d objetos=%d (%s) | %s => %s", m.id, m.tamano, tostring(ok), motivo, piezas, total,
+		if piezas == total then "iguales" else "DIFERENTES", table.concat(partes, " "), if ok and piezas == total then "OK" else "FALLO")
 end
 
 -- Reclama todos los objetos libres para el jugador
@@ -111,7 +112,7 @@ function Pruebas.reclamoAtomico()
 	local ok3, mot3 = Botin.reclamar(j, basuras[2], "toque")
 	local ok4, mot4 = Botin.reclamar(falso, basuras[2], "toque")
 	local correcto = ok1 and not ok2 and (mot2 == "yaReclamado" or mot2 == "noExiste") and ok3 and not ok4 and (mot4 == "yaReclamado" or mot4 == "noExiste")
-	return string.format("caso1: falso=%s real=%s(%s) | caso2: real=%s falso=%s(%s) => %s", tostring(ok1), tostring(ok2), mot2, tostring(ok3), tostring(ok4), mot4, correcto and "ATOMICO OK" or "FALLO")
+	return string.format("caso1: falso=%s real=%s(%s) | caso2: real=%s falso=%s(%s) => %s", tostring(ok1), tostring(ok2), mot2, tostring(ok3), tostring(ok4), mot4, correcto and "OK" or "FALLO")
 end
 
 function Pruebas.repoblar()

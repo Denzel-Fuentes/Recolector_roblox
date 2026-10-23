@@ -35,20 +35,23 @@ local function ok(cond: boolean): string
 	return if cond then "OK" else "FALLO"
 end
 
+-- El perfil del jugador de un vistazo; pasa si cargo del DataStore y va en
+-- la version del codigo (un perfil sin cargar se juega pero no se guarda)
 function Pruebas.estado()
 	local j = jugador()
 	local p = Perfiles.obtener(j)
 	if not p then
-		return "sin perfil"
+		return "sin perfil => FALLO"
 	end
 	local mejoras = {}
 	for _, def in DefinicionesMejoras.LISTA do
 		table.insert(mejoras, def.id .. "=" .. (p.mejoras[def.id] or 0))
 	end
 	return string.format(
-		"%s: cargado=%s v%d dinero=%d rebirths=%d bolsa=%d/%d mejoras[%s] tutorial=%d modoDev=%s",
+		"%s: cargado=%s v%d dinero=%d rebirths=%d bolsa=%d/%d mejoras[%s] tutorial=%d modoDev=%s => %s",
 		j.Name, tostring(Perfiles.estaCargado(j)), p.version, p.dinero, p.rebirths,
-		Bolsa.cuenta(j), Bolsa.capacidad(j), table.concat(mejoras, " "), p.tutorial, tostring(Monetizacion.modoDev())
+		Bolsa.cuenta(j), Bolsa.capacidad(j), table.concat(mejoras, " "), p.tutorial, tostring(Monetizacion.modoDev()),
+		ok(Perfiles.estaCargado(j) and p.version == GameConfig.VERSION_PERFIL)
 	)
 end
 
