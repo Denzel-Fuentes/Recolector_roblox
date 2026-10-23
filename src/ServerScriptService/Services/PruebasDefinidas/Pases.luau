@@ -1,8 +1,10 @@
 --!nonstrict
 --[[
 	Pruebas de los pases y cosmeticos (lote 8): Dinero x2 dobla el pago,
-	Bolsa XL suma 10 huecos, el producto Turbo se acumula, y los cosmeticos
-	solo se ponen si se tienen (y se ven en la bolsa lanzada).
+	Bolsa XL suma 10 huecos, el Turbo se acumula, y los cosmeticos solo se
+	ponen si se tienen (y se ven en la bolsa lanzada). Las del catalogo de
+	la economia v4 (Turbo que solo corre jugando, VIP, Pack de inicio,
+	cosmeticos nuevos, ofertas) estan en Catalogo.
 
 	Usan el modo dev de pases (Monetizacion.fijarModoDev) y lo dejan como
 	estaba.
@@ -44,19 +46,27 @@ local function papel(n: number)
 	return items
 end
 
--- Dinero x2: el mismo deposito paga el doble
+-- Dinero x2: el mismo deposito paga el doble (sin Turbo: lo quita un
+-- momento y lo devuelve)
 function Pruebas.paseDineroX2()
 	local j = jugador()
 	local p = Perfiles.obtener(j)
-	local turbo = p.turboHasta
-	p.turboHasta = 0
-	local sin = conPases(false, function()
-		return Bolsa.depositarItems(j, papel(5), 0, nil).dinero
+	local turbo = p.turboRestante
+	p.turboRestante = 0
+	local exito, sin, con = pcall(function()
+		local s = conPases(false, function()
+			return Bolsa.depositarItems(j, papel(5), 0, nil).dinero
+		end)
+		local c = conPases(true, function()
+			return Bolsa.depositarItems(j, papel(5), 0, nil).dinero
+		end)
+		return s, c
 	end)
-	local con = conPases(true, function()
-		return Bolsa.depositarItems(j, papel(5), 0, nil).dinero
-	end)
-	p.turboHasta = turbo
+	p.turboRestante = turbo
+	Perfiles.marcarSucio(j)
+	if not exito then
+		return "error: " .. tostring(sin) .. " => FALLO"
+	end
 	return string.format("sin pase $%d | con pase $%d => %s", sin, con, ok(con == sin * 2 and sin > 0))
 end
 
@@ -72,17 +82,19 @@ function Pruebas.paseBolsaXL()
 	return string.format("Bolsa nivel %d: %d huecos sin pase, %d con Bolsa XL => %s", Mejoras.nivel(j, "Bolsa"), sin, con, ok(con == sin + 10))
 end
 
--- El Turbo de Robux suma 15 min al que quede
+-- El Turbo se acumula: 15 min sobre 15 min son 30 (en segundos que quedan,
+-- perfil.turboRestante: economia v4)
 function Pruebas.turboAcumula()
 	local j = jugador()
 	local p = Perfiles.obtener(j)
-	local antes = p.turboHasta
-	p.turboHasta = 0
+	local antes = p.turboRestante
+	p.turboRestante = 0
 	Turbo.anadir(j, 15 * 60)
 	local uno = Turbo.restante(j)
 	Turbo.anadir(j, 15 * 60)
 	local dos = Turbo.restante(j)
-	p.turboHasta = antes
+	p.turboRestante = antes
+	Turbo.sincronizar(j)
 	Perfiles.marcarSucio(j)
 	return string.format("uno %d s, dos %d s => %s", uno, dos, ok(math.abs(uno - 900) <= 1 and math.abs(dos - 1800) <= 1))
 end

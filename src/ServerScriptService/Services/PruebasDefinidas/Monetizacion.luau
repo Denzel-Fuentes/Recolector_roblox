@@ -29,6 +29,7 @@ local Monetizacion = require(Servicios:WaitForChild("Monetizacion"))
 local Admin = require(Servicios:WaitForChild("Admin"))
 local Insignias = require(Servicios:WaitForChild("Insignias"))
 local Turbo = require(Servicios:WaitForChild("Turbo"))
+local Actividad = require(Servicios:WaitForChild("Actividad"))
 
 local Comunes = require(script.Parent:WaitForChild("Comunes"))
 local jugador = Comunes.jugador
@@ -109,15 +110,34 @@ local function conPrueba(ctx, fn)
 	return table.unpack(resultado, 2, resultado.n)
 end
 
--- Lo que toca un recibo del Turbo, para dejarlo como estaba
+-- Lo que toca un recibo del Turbo, para dejarlo como estaba: el Turbo que
+-- queda (economia v4: turboRestante), los recibos, la cuenta de compras y
+-- la hora de la ultima compra (compras.ultimaRobux, la regla de 24 h de las
+-- ofertas)
 local function foto(p)
-	return { turboHasta = p.turboHasta, recibos = table.clone(p.recibos), compras = p.estadisticas.comprasRobux }
+	return {
+		turboRestante = p.turboRestante,
+		recibos = table.clone(p.recibos),
+		compras = p.estadisticas.comprasRobux,
+		ultimaRobux = p.compras.ultimaRobux,
+	}
 end
 local function devolver(j, p, f)
-	p.turboHasta = f.turboHasta
+	p.turboRestante = f.turboRestante
 	p.recibos = f.recibos
 	p.estadisticas.comprasRobux = f.compras
+	p.compras.ultimaRobux = f.ultimaRobux
+	Turbo.sincronizar(j)
 	Perfiles.marcarSucio(j)
+end
+
+-- Sin Turbo y quieto (Actividad.olvidar): el Turbo que da el recibo no corre
+-- mientras la prueba espera al guardado y la cuenta de 900 s es exacta. Si
+-- no, una prueba con depositos en los 2 minutos de antes lo dejaria correr
+local function sinTurbo(j, p)
+	p.turboRestante = 0
+	Actividad.olvidar(j)
+	Turbo.sincronizar(j)
 end
 
 local function reciboDePrueba(j)
@@ -148,7 +168,7 @@ function Pruebas.reciboIdempotente()
 	local recibo = reciboDePrueba(j)
 	local r = {}
 	local exito, err = pcall(conPrueba, ctx, function()
-		p.turboHasta = 0
+		sinTurbo(j, p)
 		local compras = p.estadisticas.comprasRobux or 0
 		r.uno = Monetizacion.procesarRecibo(recibo)
 		r.turbo1 = Turbo.restante(j)
@@ -242,7 +262,7 @@ function Pruebas.reciboGuardaAntes()
 	})
 	local r = {}
 	local exito, err = pcall(function()
-		p.turboHasta = 0
+		sinTurbo(j, p)
 		r.uno = conPrueba(ctxMalo, function()
 			return Monetizacion.procesarRecibo(recibo)
 		end)
@@ -281,6 +301,8 @@ function Pruebas.compraPase()
 	local p = Perfiles.obtener(j)
 	local pase = Productos.PASE_POR_ID.EstelaArcoiris
 	local idAntes, cacheAntes = pase.gamePassId, p.pasesCache.EstelaArcoiris
+	-- Una compra confirmada deja compras.ultimaRobux (K1): se devuelve
+	local ultimaRobuxAntes = p.compras.ultimaRobux
 	local poseeAntes, esperaAntes = Monetizacion.poseePase, Monetizacion.ESPERA_REINTENTO_PASE
 	local recibidos = {}
 	local conexion = Monetizacion.alComprarPase:Connect(function(quien, idPase)
@@ -339,6 +361,7 @@ function Pruebas.compraPase()
 	Monetizacion.poseePase, Monetizacion.ESPERA_REINTENTO_PASE = poseeAntes, esperaAntes
 	pase.gamePassId = idAntes
 	p.pasesCache.EstelaArcoiris = cacheAntes
+	p.compras.ultimaRobux = ultimaRobuxAntes
 	Perfiles.marcarSucio(j)
 	Monetizacion.alCambiarPases:Fire(j)
 	if not exito then
@@ -380,7 +403,7 @@ function Pruebas.reciboConcurrente()
 	local recibo = reciboDePrueba(j)
 	local r = {}
 	local exito, err = pcall(conPrueba, ctx, function()
-		p.turboHasta = 0
+		sinTurbo(j, p)
 		local compras = p.estadisticas.comprasRobux or 0
 		local listos = 0
 		task.spawn(function()

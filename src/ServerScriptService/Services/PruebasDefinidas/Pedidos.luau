@@ -35,7 +35,7 @@ end
 local function guardar(p)
 	return {
 		pedidos = p.pedidos,
-		turboHasta = p.turboHasta,
+		turboRestante = p.turboRestante,
 		tutorial = p.tutorial,
 		logros = table.clone(p.logros),
 		estadisticas = table.clone(p.estadisticas),
@@ -47,10 +47,10 @@ local function restaurar(j, p, copia)
 	for k, v in copia do
 		p[k] = v
 	end
-	-- Lo que no habia no sale en el bucle: en un perfil v5 turboHasta es nil
-	-- y el Turbo que pusiera la prueba seguiria corriendo (y doblaria el
-	-- dinero de las pruebas siguientes, p. ej. salirRecicla)
-	p.turboHasta = copia.turboHasta
+	-- El Turbo que pusiera la prueba (los tres pedidos dan 10 min) doblaria
+	-- el dinero de las pruebas siguientes (p. ej. salirRecicla): vuelve a lo
+	-- que habia. turboRestante siempre esta en un perfil v5 (K1)
+	p.turboRestante = copia.turboRestante or 0
 	Perfiles.marcarSucio(j)
 end
 
@@ -137,13 +137,14 @@ function Pruebas.pedidoSeparadas()
 end
 
 -- Cumplir los tres da el Turbo del dia (10 min) una sola vez, y el Turbo
--- dobla el dinero
+-- dobla el dinero. Economia v4 (K1): son segundos que quedan
+-- (perfil.turboRestante, Turbo.restante) y se suman al que hubiera
 function Pruebas.premioTurbo()
 	local j = jugador()
 	local p = Perfiles.obtener(j)
 	local copia = guardar(p)
 	p.tutorial = 99
-	p.turboHasta = 0
+	p.turboRestante = 0
 	p.pedidos = {
 		dia = DefinicionesPedidos.dia(os.time()),
 		lista = {

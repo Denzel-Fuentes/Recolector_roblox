@@ -126,10 +126,6 @@ export type Perfil = {
 	disenoBolsa: string?, -- DefinicionesCosmeticos.BOLSAS
 	camara: string?, -- "primera" | "tercera" en el patio (Client/Camara)
 	turboRestante: number, -- s de Turbo de dinero que quedan (v5; solo bajan jugando)
-	-- OBSOLETO desde v5 (completar lo borra al cargar): la hora de fin del
-	-- Turbo antiguo. Sigue en el tipo mientras Services/Turbo lo use (K1 lo
-	-- pasa a turboRestante)
-	turboHasta: number?,
 	-- Pospuesto (GameConfig.FUNCIONES): se guarda para no migrar al volver
 	figurinas: { [string]: boolean },
 	cintas: { [string]: boolean },

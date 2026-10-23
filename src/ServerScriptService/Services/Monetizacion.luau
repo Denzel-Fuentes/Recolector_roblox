@@ -40,6 +40,18 @@
 	    el jugador se va, el guardado de salida lo persiste.
 	La lista de recibos se recorta a 50 (FIFO): mas que suficiente para los
 	reintentos, sin crecer para siempre.
+
+	=== Economia v4 (K1, 22 oct) ===
+	- Cada compra con Robux (un producto otorgado, un pase confirmado) deja
+	  perfil.compras.ultimaRobux = os.time(): en las 24 h siguientes no sale
+	  ninguna oferta (Config/DefinicionesOfertas, nada de encadenar compras).
+	- El atributo VIP del Player dice si tiene el pase VIP (tambien con el
+	  modo dev): cada cliente le pinta la corona encima (CoronaVIP.client) y
+	  la etiqueta del chat (EtiquetaVIP.client). Se pone al cargar el perfil
+	  y cada vez que cambian los pases.
+	- Lo que da cada cosa no esta aqui: el Turbo de los productos y el del
+	  Pack de inicio (una sola vez) los registra Services/Turbo, las estelas
+	  y bolsas los mira Services/Cosmeticos con tienePase.
 ]]
 
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -92,6 +104,8 @@ end
 -- cuanto
 Monetizacion.REINTENTOS_PASE = 2
 Monetizacion.ESPERA_REINTENTO_PASE = 2
+-- La hora de una compra (compras.ultimaRobux)
+Monetizacion.ahora = os.time
 
 local MAX_RECIBOS = 50
 
@@ -130,6 +144,26 @@ function Monetizacion.tienePase(jugador: Player, idPase: string): boolean
 		return false
 	end
 	return perfil.pasesCache[idPase] == true
+end
+
+-- Los atributos del Player que dependen de los pases (ver cabecera)
+function Monetizacion.publicarAtributos(jugador: Player)
+	if typeof(jugador) ~= "Instance" or not jugador:IsA("Player") then
+		return
+	end
+	local vip = Monetizacion.tienePase(jugador, "VIP")
+	if jugador:GetAttribute("VIP") ~= vip then
+		jugador:SetAttribute("VIP", vip)
+	end
+end
+
+-- Una compra con Robux: la hora, para las ofertas (ver cabecera)
+local function anotarCompra(jugador: Player)
+	local perfil = Perfiles.obtener(jugador)
+	if perfil then
+		perfil.compras.ultimaRobux = Monetizacion.ahora()
+		Perfiles.marcarSucio(jugador)
+	end
 end
 
 -- Consulta real a Roblox para los pases con id. Se llama al entrar.
@@ -192,6 +226,7 @@ function Monetizacion.registrarCompraPase(jugador: Player, gamePassId: number): 
 	if not confirmado or not jugador.Parent then
 		return nil
 	end
+	anotarCompra(jugador)
 	Monetizacion.marcarPase(jugador, pase.id)
 	Monetizacion.alComprarPase:Fire(jugador, pase.id)
 	return pase
@@ -207,11 +242,14 @@ function Monetizacion.registrarProducto(idProducto: string, otorgar: (Player) ->
 end
 
 -- Devuelve false si el producto no tiene quien lo otorgue o no se pudo.
+-- Nunca mira topes (el de 3 h de Turbo lo pone el cliente antes del
+-- prompt): lo pagado se da entero.
 local function otorgarProducto(jugador: Player, producto: Productos.Producto): boolean
 	local otorgar = otorgadores[producto.id]
 	if not otorgar or not otorgar(jugador) then
 		return false
 	end
+	anotarCompra(jugador)
 	Monetizacion.alComprarProducto:Fire(jugador, producto.id)
 	return true
 end
@@ -276,5 +314,17 @@ function Monetizacion.otorgarProductoPorId(jugador: Player, idProducto: string, 
 	end
 	return otorgarProducto(jugador, producto)
 end
+
+-- El atributo VIP al cargar y cada vez que cambian los pases (compra,
+-- refrescarPases, modo dev)
+Perfiles.alCargar:Connect(function(jugador)
+	Monetizacion.publicarAtributos(jugador)
+end)
+for jugador in Perfiles.todos() do
+	Monetizacion.publicarAtributos(jugador)
+end
+Monetizacion.alCambiarPases:Connect(function(jugador)
+	Monetizacion.publicarAtributos(jugador)
+end)
 
 return Monetizacion

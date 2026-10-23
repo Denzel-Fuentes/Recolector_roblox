@@ -10,11 +10,13 @@
 	          una se sortea ya la siguiente y se crea su Sound, para que este
 	          cargada cuando toque el fundido (son minutos de audio: crearla
 	          al final dejaba un hueco). Si al llegar no cargo, va otra que si.
-	  Turbo   al activarse (perfil.turboHasta, contra la hora del servidor:
-	          workspace:GetServerTimeNow) funde a MUSICA.turbo; suena como
-	          mucho REPETICIONES_TURBO veces y vuelve la del patio aunque el
-	          Turbo siga (dura 10-15 min: entera cansaria, §5.2). Si el Turbo
-	          acaba antes, vuelve el patio con fundido.
+	  Turbo   mientras CORRE (economia v4, K1: perfil.turboRestante > 0 y
+	          sin el atributo TurboPausado del Player; el Turbo solo corre
+	          mientras se juega) funde a MUSICA.turbo; suena como mucho
+	          REPETICIONES_TURBO veces y vuelve la del patio aunque el Turbo
+	          siga (dura 10-15 min: entera cansaria, §5.2). Si se acaba o se
+	          pausa (2 min sin hacer nada), vuelve el patio con fundido; al
+	          reanudarse vuelve a sonar la del Turbo.
 	  Baja    a lo que diga Sonido.atenuacion() (las celebraciones, el
 	          rebirth y las insignias la ponen a la mitad mientras suenan),
 	          con una transicion corta.
@@ -29,6 +31,7 @@
 	"Pista" del SoundGroup Musica (lo ensena Sonido.prueba.listar).
 ]]
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
@@ -37,6 +40,8 @@ local Sonidos = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("C
 
 local EstadoCliente = require(script.Parent:WaitForChild("EstadoCliente"))
 local Sonido = require(script.Parent:WaitForChild("Sonido"))
+
+local jugador = Players.LocalPlayer
 
 local FUNDIDO = Sonidos.FUNDIDO_MUSICA
 -- s que se espera a que cargue una pista antes de saltar a otra
@@ -95,11 +100,14 @@ local function sonables(lista: { string }): { string }
 	return claves
 end
 
--- turboHasta es un os.time() del servidor: se compara con su hora, no con
--- el reloj del dispositivo
+-- El Turbo corre: le quedan segundos (el servidor los publica en el perfil
+-- y lo pone a 0 al acabarse) y no esta en pausa
 local function turboActivo(): boolean
 	local p = EstadoCliente.perfil
-	return p ~= nil and typeof(p.turboHasta) == "number" and p.turboHasta > workspace:GetServerTimeNow()
+	return p ~= nil
+		and typeof(p.turboRestante) == "number"
+		and p.turboRestante > 0
+		and jugador:GetAttribute("TurboPausado") ~= true
 end
 
 local function yaCargo(clave: string): boolean
