@@ -1575,6 +1575,8 @@ a origin/master). Lo que falta, en orden:
    También del 23 oct: con mando, las insignias de tecla (Q, R…) no sirven;
    y el poste del cartel "Patio de basura ↑" de la plaza tapa una letra
    desde el este ("Patio de|asura", "Junk|ard"): moverlo pide re-hornear.
+   La píldora flotante del candado ("REBIRTH 1", `ContenedoresBloqueados.client`)
+   a veces sale vacía (TextBounds 0,0: el BillboardGui con TextScaled).
    (Hecho ese día: las pestañas con el mismo color en los tres idiomas,
    `Kit/Pestanas` con `Claves`, y `REBIRTH.conserva` sin las "zonas
    abiertas".) Y lo menor de la revisión Q4b: con el perfil
@@ -1597,11 +1599,23 @@ a origin/master). Lo que falta, en orden:
    24 h (el cupo se renueva a las 00:00 GMT y se consulta en
    `badges.roblox.com/v1/universes/10766595888/free-badges-quota`). Se
    traducen a en/pt en el Creator Hub al crearlas.
-7. **Miniaturas** (I1b: 1920×1080, sin texto; los planos en
-   `docs/Ficha-lanzamiento.md` §4; necesitan Studio), la elección y el orden
-   del usuario (G10) y subirlas. Los **pases y productos** ya están (F1b,
-   23 oct: los 6 pases y los 2 Turbo con su imagen de `thumbnails/` y sus
-   traducciones, ids en `Config/Productos`).
+7. **Miniaturas**: hechas (I1b, 23 oct) y elegidas por el usuario (G10):
+   01 (portada), 02, 03, 05 y 07 en `thumbnails/thumb_*` (las que llevan
+   texto, en `_es`, `_en` y `_pt`; `hoja-miniaturas.png` las enseña juntas).
+   Son capturas de Studio de 1424×801 ampliadas a 1920×1080: algo blandas;
+   para más nitidez, repetirlas con la vista de Studio a 1920 de ancho. **Subida
+   a medias**: en el Creator Hub (Places → el place → Thumbnails → Experience
+   Detail Page, porque la experiencia las hereda del place de inicio) solo
+   están la 01 y la 02_es, en orden inverso y sin texto alternativo
+   (moderación "Completed"); el control de permisos del modo automático paró
+   al agente al editarlas. Falta: subir la 03_es, 05_es y 07_es, ordenarlas
+   (01, 02, 03, 05, 07), los textos alternativos de la ficha §4.3, Save
+   Changes, y la serie entera en Localization → English y Portuguese →
+   Information. La 4, la 6 y la 8 piden varias cuentas (Q1). Ojo: Game
+   details enseñaba el nombre y la descripción en inglés; comprobar en
+   Localization que el idioma fuente sigue siendo el español. Los **pases y
+   productos** ya están (F1b, 23 oct: los 6 pases y los 2 Turbo con su
+   imagen de `thumbnails/` y sus traducciones, ids en `Config/Productos`).
 8. **Verificación de lanzamiento**: Q0, la regresión completa (la batería de
    CLAUDE.md "Verificar", `("hud")` en PC, táctil y mando, el juego en inglés
    y en portugués, la consola limpia y capturas de cada panel) y Q4b (revisión
