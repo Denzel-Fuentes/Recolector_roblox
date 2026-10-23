@@ -12,8 +12,8 @@ insignias, pases, tutorial de 8 pasos y tercera persona (CONTEXTO §3
 anti-trampas, recibos seguros, admin solo en Studio, pantalla de carga,
 analítica, audio y la **economía v4** (`docs/Economia-v4.md`, aprobada:
 curva, pedidos en %, recompensas y el catálogo K1: Turbo solo jugando, VIP,
-Pack de inicio, ofertas y precio real; E1 y K1, unidos sin verificar aún en
-Studio). El place está publicado y privado (PlaceId 139915415713937,
+Pack de inicio, ofertas y precio real; verificados en Studio el 23 oct).
+El place está publicado y privado (PlaceId 139915415713937,
 universo 10766595888). El diseño original está en `docs/GDD.md`; el estado
 del proyecto, lo pendiente y las decisiones no obvias en `CONTEXTO.md`.
 Léelos antes de tocar balance o estructura.
