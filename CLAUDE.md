@@ -42,8 +42,16 @@ Léelos antes de tocar balance o estructura.
   instancia nueva en la página de inicio):
   `& (Get-ChildItem "$env:LOCALAPPDATA\Roblox\Versions\*\RobloxStudioBeta.exe" | Sort-Object LastWriteTime | Select-Object -Last 1).FullName -task EditPlace -placeId 139915415713937 -universeId 10766595888`.
   Antes, `list_roblox_studios`: si el place ya está abierto, no abrir otro.
-  Computer use solo para lo que no tiene otra vía: Connect en el plugin de
-  Rojo y Start en Test → Clients and Servers.
+  Desde una sesión de Claude, lanzarlo (y Rojo y `servir-fuentes`) en el
+  panel de Terminal: lo que sale de la shell aislada de la sesión muere
+  cuando la sesión se reinicia. Si Studio tiene actualización, su
+  instalador vuelve a abrir el place solo al acabar. El place está en Team
+  Create: lo que se cambia en Edit se guarda solo (montar en Play, y quitar
+  después los atributos de prueba). Con Studio detrás de otra ventana la
+  vista 3D no se pinta y `screen_capture` sale negro:
+  `herramientas/studio-al-frente.ps1` (en el panel de Terminal) lo trae al
+  frente. Computer use solo para lo que no tiene otra vía: Connect en el
+  plugin de Rojo y Start en Test → Clients and Servers.
 - Pruebas dentro de la VM del juego (Play): `game.ServerStorage.EjecutarPrueba:Invoke("estado")`
   (ver `Services/PruebasDefinidas/`) y `ReplicatedStorage.EjecutarPruebaCliente:Invoke("abrir","Tienda")`.
   La barra de comandos corre en la VM del plugin: `require` allí da copias vacías.
