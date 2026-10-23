@@ -7,9 +7,9 @@
 
 	  izquierda      botonera de 2 columnas x 3 filas: Tienda (Q), Rebirth
 	                 (R), Pedidos (P), Camara (V: primera/tercera persona,
-	                 lote 9), Sonido (A1, 22 oct: abre el panel Ajustes con
-	                 Musica y Efectos) y Recompensas (C3, 22 oct: el regalo,
-	                 sin atajo). Cada boton de panel aparece cuando su panel
+	                 lote 9), Sonido (M; A1, 22 oct: abre el panel Ajustes
+	                 con Musica y Efectos) y Recompensas (G, de gift; C3,
+	                 22 oct: el regalo). Cada boton de panel aparece cuando su panel
 	                 existe (UI/<Nombre>), asi cada lote que trae un panel
 	                 trae su boton. Todos suenan "clic" (Client/Sonido). Si
 	                 el modulo del panel devuelve `indicador` (un estado de
@@ -285,15 +285,16 @@ local function alternarVista()
 end
 
 -- Panel (o accion), texto, icono y atajo de cada boton. Los de panel solo
--- salen si su panel existe. Sonido abre el panel "Ajustes" (UI/Ajustes);
--- ni el ni Recompensas tienen atajo.
+-- salen si su panel existe. Sonido abre el panel "Ajustes" (UI/Ajustes).
+-- Todos llevan tecla (Paneles.client): en PC, sin panel abierto, el raton
+-- esta bloqueado en el centro (Camara) y la botonera solo se usa con ella
 local BOTONES: { { panel: string?, accion: (() -> ())?, texto: string, icono: string, tecla: string? } } = {
 	{ panel = "Tienda", texto = Textos.HUD.tienda, icono = "telefono", tecla = "Q" },
 	{ panel = "Rebirth", texto = Textos.HUD.rebirth, icono = "estrella", tecla = "R" },
 	{ panel = "Pedidos", texto = Textos.HUD.pedidos, icono = "libreta", tecla = "P" },
 	{ accion = alternarVista, texto = Textos.HUD.camara, icono = "camara", tecla = "V" },
-	{ panel = "Ajustes", texto = Textos.SONIDO.boton, icono = "sonido" },
-	{ panel = "Recompensas", texto = Textos.HUD.recompensas, icono = "regalo" },
+	{ panel = "Ajustes", texto = Textos.SONIDO.boton, icono = "sonido", tecla = "M" },
+	{ panel = "Recompensas", texto = Textos.HUD.recompensas, icono = "regalo", tecla = "G" },
 }
 
 local hijosBotonera: { any } = {
