@@ -18,7 +18,8 @@
 	Economia, moneda "Dinero" (LogEconomyEvent, siempre con el saldo final),
 	campos: plataforma, rebirths, nivel medio de las mejoras
 	  fuente   Gameplay  Deposito_<General|Papel|Plastico|Metal|Organico>
-	  fuente   Gameplay  Pedido_<facil|medio|dificil>
+	  fuente   Gameplay  Pedido_<facil|medio|dificil> (con la que paga: el
+	                     Pedido VIP, dificil)
 	  fuente   Gameplay  Reciclaje_SinBonus (al salir: lo que entro sin
 	                     senal en la sesion, ver "Decisiones")
 	  sumidero Shop      Mejora_<id>_<nivel>
@@ -685,7 +686,9 @@ Analitica.deposito = protegido("deposito", function(jugador: Player, resumen: Bo
 	saldos[jugador] = perfil.dinero
 end)
 
--- Pedidos.alCumplir: el pedido ya esta pagado
+-- Pedidos.alCumplir: el pedido ya esta pagado (pedido.recompensa es lo que se
+-- pago, Services/Pedidos). El sku es la dificultad con la que pago, no la de
+-- su plantilla: el Pedido VIP paga como dificil (DefinicionesPedidos.dificultad)
 Analitica.pedido = protegido("pedido", function(jugador: Player, pedido: Perfiles.Pedido)
 	if not esJugador(jugador) or typeof(pedido) ~= "table" then
 		return
@@ -696,8 +699,10 @@ Analitica.pedido = protegido("pedido", function(jugador: Player, pedido: Perfile
 	end
 	local cantidad = tonumber(pedido.recompensa) or 0
 	if cantidad > 0 then
-		local plantilla = DefinicionesPedidos.POR_ID[if typeof(pedido.id) == "string" then pedido.id else ""]
-		local sku = "Pedido_" .. (if plantilla then plantilla.dificultad else "otro")
+		local dificultad = if typeof(pedido.id) == "string"
+			then DefinicionesPedidos.dificultad({ id = pedido.id, vip = pedido.vip == true })
+			else ""
+		local sku = "Pedido_" .. (if dificultad ~= "" then dificultad else "otro")
 		Analitica.economia(jugador, "fuente", cantidad, perfil.dinero, TRANSACCION_JUEGO, sku, perfil)
 		contado[jugador] = (contado[jugador] or 0) + cantidad
 	end

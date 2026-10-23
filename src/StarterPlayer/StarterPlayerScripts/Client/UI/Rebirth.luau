@@ -11,6 +11,14 @@
 	perfil (dinero, rebirths, nivel de cada mejora) y de las definiciones de
 	Config; las cuentas son las mismas que usa el servidor
 	(DefinicionesRebirths).
+
+	Lo que abre el siguiente (economia v4, 22 oct) sale de su `desbloquea`:
+	el texto de Textos.REBIRTH.desbloquea y un icono que lo dice sin leer
+	(ICONO_DESBLOQUEO): el metal y el organico con su tipo, los regalos de
+	bolsa (R3 plateada, R4 hielo) con la bolsa, la Estela de fuego (R5, con
+	su insignia) con el lanzamiento, el R10 con el trofeo y los que solo
+	suben el multiplicador (R6-R9, desde el 11) con el billete. Una clave sin
+	texto cae en la del multiplicador: el panel nunca se queda en blanco.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -41,6 +49,19 @@ local RenacerEvent = Red.evento("RenacerEvent")
 local NOMBRE = "Rebirth"
 local reactivo = EstadoCliente.reactivo
 
+-- Icono de lo que abre cada rebirth: clave de Textos.REBIRTH.desbloquea ->
+-- clave de Config/Iconos (ver cabecera)
+local ICONO_DESBLOQUEO: { [string]: string } = {
+	metal = "setMetal",
+	organico = "setOrganico",
+	bolsaPlateada = "bolsa",
+	bolsaHielo = "bolsa",
+	estelaFuego = "lanzar",
+	multiplicador = "billete",
+	leyenda = "trofeo",
+}
+local DESBLOQUEO_RESPALDO = "multiplicador"
+
 local scope = Fusion.scoped(Fusion, Kit)
 
 -- Primitivos del perfil
@@ -65,6 +86,11 @@ end
 
 local requisito = scope:Computed(function(use)
 	return DefinicionesRebirths.rebirth(use(rebirths) + 1).requisito
+end)
+-- Lo que abre el siguiente: una clave con texto (ver cabecera)
+local desbloquea = scope:Computed(function(use)
+	local clave = DefinicionesRebirths.rebirth(use(rebirths) + 1).desbloquea
+	return if (Textos.REBIRTH.desbloquea :: any)[clave] then clave else DESBLOQUEO_RESPALDO
 end)
 local mejorasListas = scope:Computed(function(use)
 	for _, def in DefinicionesMejoras.LISTA do
@@ -186,7 +212,15 @@ local tarjetaPremio = scope:Tarjeta({
 	Size = UDim2.new(1, 0, 0, 84),
 	Color = Color3.fromRGB(236, 224, 255),
 	Hijos = {
-		scope:Icono({ Clave = "estrella", Tamano = 52, Position = UDim2.new(0, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5) }),
+		scope:Icono({
+			Nombre = "IconoDesbloquea",
+			Clave = scope:Computed(function(use)
+				return ICONO_DESBLOQUEO[use(desbloquea)] or "estrella"
+			end),
+			Tamano = 52,
+			Position = UDim2.new(0, 0, 0.5, 0),
+			AnchorPoint = Vector2.new(0, 0.5),
+		}),
 		scope:Texto({
 			Texto = scope:Computed(function(use)
 				local siguiente = DefinicionesRebirths.rebirth(use(rebirths) + 1)
@@ -199,9 +233,9 @@ local tarjetaPremio = scope:Tarjeta({
 			Color = Paleta.CABECERA_PANEL.Rebirth,
 		}),
 		scope:Texto({
+			Nombre = "Desbloquea",
 			Texto = scope:Computed(function(use)
-				local siguiente = DefinicionesRebirths.rebirth(use(rebirths) + 1)
-				return (Textos.REBIRTH.desbloquea :: any)[siguiente.desbloquea] or ""
+				return (Textos.REBIRTH.desbloquea :: any)[use(desbloquea)] or ""
 			end),
 			Size = UDim2.new(1, -62, 0, 36),
 			Position = UDim2.fromOffset(62, 32),

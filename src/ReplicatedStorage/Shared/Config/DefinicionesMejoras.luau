@@ -10,8 +10,13 @@
 	lanzamiento, y con el el techo del bonus por distancia.
 
 	Coste del siguiente nivel = costeBase * FACTOR ^ nivelActual, redondeado a
-	la unidad: con FACTOR 1.6 el nivel 10 de Bolsa cuesta $10.308 y llevar las
-	4 al maximo, $118.030 (los numeros del diseno).
+	la unidad. Economia v4 (22 oct, docs/Economia-v4.md §2.1): FACTOR 1,35
+	(GameConfig; era 1,6) con los mismos costes base, asi que el nivel 10 de
+	Bolsa cuesta $2.234 y llevar las 4 al maximo, $35.485 (antes $10.308 y
+	$118.030). Para acortar el ritmo bastaba con abaratar lo que se compra:
+	los valores (base, porNivel) y lo que paga la basura no cambian. Ese
+	total entra en el coste de cada rebirth
+	(DefinicionesRebirths.costeSiguiente) y, con el, en los premios en dinero.
 
 	Valor = base + porNivel * nivel. Se calcula aqui (y solo aqui); los pases
 	que suman (Bolsa XL) van encima, en Services/Mejoras. La tienda no ensena
@@ -64,7 +69,8 @@ function DefinicionesMejoras.valor(id: string, nivel: number): number
 end
 
 
--- Coste total de llevar las 4 de 0 a 10 (dato de calibracion: $118.030)
+-- Coste total de llevar las 4 de 0 a 10 ($35.485 con la economia v4; es
+-- parte de DefinicionesRebirths.costeSiguiente)
 function DefinicionesMejoras.costeTotal(): number
 	local total = 0
 	for _, m in DefinicionesMejoras.LISTA do

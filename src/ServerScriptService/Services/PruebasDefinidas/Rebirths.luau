@@ -48,19 +48,24 @@ local function maxear(p)
 	end
 end
 
--- Los cinco del diseno y la formula desde el sexto (x4 y +0,5)
+-- Los diez de la tabla y la formula desde el 11 (economia v4, 22 oct;
+-- docs/Economia-v4.md §2.2): requisito x1,4 en dos cifras significativas y
+-- multiplicador +1. Y lo que anuncia cada uno (§3)
 function Pruebas.rebirthTabla()
-	local requisitos, mults = {}, {}
-	for n = 1, 7 do
+	local requisitos, mults, abre = {}, {}, {}
+	for n = 1, 13 do
 		local r = DefinicionesRebirths.rebirth(n)
 		table.insert(requisitos, tostring(r.requisito))
 		table.insert(mults, tostring(r.multiplicador))
+		table.insert(abre, r.desbloquea)
 	end
-	local req, mul = table.concat(requisitos, ","), table.concat(mults, ",")
-	return string.format("requisitos %s | multiplicadores %s | x%s sin rebirths | el 3 abre %s => %s",
-		req, mul, tostring(DefinicionesRebirths.multiplicador(0)), DefinicionesRebirths.rebirth(3).desbloquea,
-		ok(req == "50000,200000,800000,3200000,12800000,51200000,204800000" and mul == "1.5,2,2.5,3,3.5,4,4.5"
-			and DefinicionesRebirths.multiplicador(0) == 1 and DefinicionesRebirths.rebirth(3).desbloquea == "bolsaPlateada"))
+	local req, mul, des = table.concat(requisitos, ","), table.concat(mults, ","), table.concat(abre, ",")
+	return string.format("requisitos %s | multiplicadores %s | abren %s | x%s sin rebirths => %s",
+		req, mul, des, tostring(DefinicionesRebirths.multiplicador(0)),
+		ok(req == "15000,100000,250000,500000,800000,1200000,1800000,2500000,3500000,5000000,7000000,9800000,14000000"
+			and mul == "1.5,2,3,4,5,6,7,8,9,10,11,12,13"
+			and des == "metal,organico,bolsaPlateada,bolsaHielo,estelaFuego,multiplicador,multiplicador,multiplicador,multiplicador,leyenda,multiplicador,multiplicador,multiplicador"
+			and DefinicionesRebirths.multiplicador(0) == 1))
 end
 
 -- Sin mejoras al maximo, o sin el dinero, no se renace
