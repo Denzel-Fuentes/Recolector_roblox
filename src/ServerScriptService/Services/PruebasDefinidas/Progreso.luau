@@ -172,13 +172,15 @@ function Pruebas.perfilV5()
 			and viejo.turboRestante == 0 and viejo.version == 5))
 end
 
--- Las 4 mejoras del diseno v2: valores en 0 y 10, costes y total $118.030
+-- Las 4 mejoras del diseno v2: valores en 0 y 10, el coste del nivel 1 y del
+-- 10, y el total. Economia v4 (22 oct, docs/Economia-v4.md §2.1): factor
+-- 1,35, total $35.485 (era $118.030 con 1,6)
 function Pruebas.mejorasV2()
 	local esperado = {
-		Bolsa = { 10, 40, 150, 10308 },
-		Alcance = { 6, 16, 120, 8246 },
-		Velocidad = { 16, 28, 200, 13744 },
-		Brazo = { 25, 70, 180, 12370 },
+		Bolsa = { 10, 40, 150, 2234 },
+		Alcance = { 6, 16, 120, 1787 },
+		Velocidad = { 16, 28, 200, 2979 },
+		Brazo = { 25, 70, 180, 2681 },
 	}
 	local mal = {}
 	for id, e in esperado do
@@ -191,8 +193,9 @@ function Pruebas.mejorasV2()
 		end
 	end
 	local total = DefinicionesMejoras.costeTotal()
-	return string.format("%d mejoras, total $%d, mal [%s] => %s", #DefinicionesMejoras.LISTA, total, table.concat(mal, " "),
-		ok(#DefinicionesMejoras.LISTA == 4 and total == 118030 and #mal == 0))
+	return string.format("%d mejoras, factor %s, total $%d (esperado 35485), mal [%s] => %s", #DefinicionesMejoras.LISTA,
+		tostring(GameConfig.FACTOR_COSTE_MEJORA), total, table.concat(mal, " "),
+		ok(#DefinicionesMejoras.LISTA == 4 and GameConfig.FACTOR_COSTE_MEJORA == 1.35 and total == 35485 and #mal == 0))
 end
 
 -- El Brazo limita el alcance: a 40 studs del contenedor, con el Brazo a 0
