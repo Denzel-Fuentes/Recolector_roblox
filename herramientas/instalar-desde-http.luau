@@ -25,6 +25,10 @@ local ChangeHistoryService = game:GetService("ChangeHistoryService")
 
 local BASE = "http://localhost:8123"
 
+-- Las peticiones HTTP solo se encienden mientras dura la instalacion: el juego
+-- no las usa, y en Team Create lo que se cambia en Edit se guarda solo y
+-- saldria al publicar.
+local httpAntes = HttpService.HttpEnabled
 HttpService.HttpEnabled = true
 
 -- Rojo sube los scripts con finales de linea LF aunque en disco esten en
@@ -230,5 +234,7 @@ end
 if grabando then
 	ChangeHistoryService:FinishRecording(grabando, Enum.FinishRecordingOperation.Commit)
 end
+
+HttpService.HttpEnabled = httpAntes
 
 return string.format("instalado: %d creados, %d actualizados, %d iguales, %d borrados", creados, actualizados, iguales, borrados)

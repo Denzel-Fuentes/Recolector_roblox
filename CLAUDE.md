@@ -34,10 +34,12 @@ Léelos antes de tocar balance o estructura.
 - Sincronizar sin el plugin (agentes, MCP): arrancar
   `powershell -ExecutionPolicy Bypass -File herramientas/servir-fuentes.ps1` y en
   la barra de comandos / `execute_luau` (Edit):
-  `loadstring(game:GetService("HttpService"):GetAsync("http://localhost:8123/herramientas/instalar-desde-http.luau", true))()`.
+  `local H = game:GetService("HttpService") local antes = H.HttpEnabled H.HttpEnabled = true local ok, r = pcall(function() return loadstring(H:GetAsync("http://localhost:8123/herramientas/instalar-desde-http.luau", true))() end) H.HttpEnabled = antes assert(ok, r) return r`.
   Crea el mismo árbol que Rojo (también `ReplicatedFirst`, donde borra lo que
   sobre), normaliza CRLF→LF como Rojo y solo escribe lo que cambió: un
-  segundo pase da 0 cambios.
+  segundo pase da 0 cambios. Las peticiones HTTP solo se encienden mientras
+  instala: el juego no las usa y el place las tiene apagadas (en Team Create
+  se quedarían guardadas y saldrían al publicar).
 - Studio se abre por shell, nunca con `open_application` (abre una
   instancia nueva en la página de inicio):
   `& (Get-ChildItem "$env:LOCALAPPDATA\Roblox\Versions\*\RobloxStudioBeta.exe" | Sort-Object LastWriteTime | Select-Object -Last 1).FullName -task EditPlace -placeId 139915415713937 -universeId 10766595888`.
