@@ -1,6 +1,6 @@
 # Recíclatas — el juego tal como se juega hoy
 
-Este documento describe **solo lo que el jugador ve y puede hacer** en la versión actual (23 oct 2026, antes de unir K1), para quien escriba textos del juego o de la ficha, o guíe a probadores. No habla de cómo está construido por dentro (eso es `CONTEXTO.md`). Si algo no está aquí, no es jugable todavía; lo que está a medias se marca **(llega con K1)**, el paquete del catálogo que aún no está terminado. Los números salen de `src/ReplicatedStorage/Shared/Config` y de la economía v4 (`docs/Economia-v4.md`); si alguno no coincide, manda Config. El copy exacto está en `Config/Textos.luau` (y en inglés y portugués en `Config/Traducciones`, con su glosario en la cabecera).
+Este documento describe **solo lo que el jugador ve y puede hacer** en la versión actual (23 oct 2026, con K1 ya unido), para quien escriba textos del juego o de la ficha, o guíe a probadores. No habla de cómo está construido por dentro (eso es `CONTEXTO.md`). Si algo no está aquí, no es jugable todavía. Los números salen de `src/ReplicatedStorage/Shared/Config` y de la economía v4 (`docs/Economia-v4.md`); si alguno no coincide, manda Config. El copy exacto está en `Config/Textos.luau` (y en inglés y portugués en `Config/Traducciones`, con su glosario en la cabecera).
 
 > Hasta el 22 oct este documento describía el juego anterior a la v2 (mascotas, energía, bases, gemas, trajes). Todo eso se quitó: ver CONTEXTO §3 "Diseño v2" y "Lanzamiento: v3".
 
@@ -111,7 +111,7 @@ Una valla de madera rodea todo el mapa. De norte a sur:
 
 Pago de una bolsa = el valor de sus piezas (con el x2 / x0,5 de separar) × (1 + bonus de distancia + racha) × el multiplicador del rebirth, × 2 con el pase **Dinero x2** y × 2 con **Turbo**. La primera bolsa (10 piezas al general, sin bonus) ronda los **$97**.
 
-- **Turbo**: dinero x2 durante unos minutos, que se suman si llega otro; el HUD enseña "x2 7:30". Se gana con los pedidos y las recompensas (y se venderá, §11). Hoy corre en tiempo real y no se guarda al salir; **(llega con K1)** que solo corra mientras juegas.
+- **Turbo**: dinero x2 durante unos minutos de **juego**, que se suman si llega otro; el HUD enseña "x2 7:30". Se gana con los pedidos y las recompensas y se compra (§11). Solo corre mientras juegas: tras 2 min sin hacer nada (o fuera del juego) se pone en pausa ("x2 en pausa", en gris) y lo que queda se guarda para la siguiente vez; al entrar empieza en pausa y arranca con lo primero que hagas. En pausa la bolsa sigue pagando x2.
 - Los premios en dinero (pedidos, calendario, regalos, regreso) **no** los multiplican ni los pases ni el Turbo.
 
 ---
@@ -173,7 +173,7 @@ Se cobran solos al cumplirse ("¡Pedido cumplido! +$1.000"). Pagan el **1,5 % (f
 
 Se abren con la primera mejora. Todo premio en dinero es un porcentaje de lo que cuesta tu siguiente rebirth (con 0 rebirths, 1 % = $500).
 
-- **Calendario** de 7 casillas, una por **día jugado**, con botón **Reclamar**: 2 % · 2 % · Turbo 10 min · 3 % · 3 % · Turbo 15 min · 4 %. Si un día no juegas, **no pierdes nada**: la casilla te espera. La 7.ª da la insignia **Constante**, que regala la Bolsa de cartón (ponérsela **llega con K1**); desde la segunda semana, la 7.ª suma Turbo 15 min.
+- **Calendario** de 7 casillas, una por **día jugado**, con botón **Reclamar**: 2 % · 2 % · Turbo 10 min · 3 % · 3 % · Turbo 15 min · 4 %. Si un día no juegas, **no pierdes nada**: la casilla te espera. La 7.ª da la insignia **Constante**, que regala la Bolsa de cartón (se pone en Estilo); desde la segunda semana, la 7.ª suma Turbo 15 min.
 - **Regalos por jugar**, que se dan solos según los minutos que llevas jugando **hoy** (cuentan los minutos en los que recoges, lanzas o excavas, también entre varias sesiones del mismo día): a los 5, 10, 20, 30, 45 y 60 min, 0,5 % · 0,5 % · 1 % · Turbo 5 min · 1 % · 2 %.
 - **Bono de regreso**, al volver tras 3 días o más sin jugar: Turbo 15 min + 4 % (tras 14 días, Turbo 30 min + 8 %), con la ventana *"¡Qué bien verte otra vez!"*.
 
@@ -184,21 +184,23 @@ Se abren con la primera mejora. Todo premio en dinero es un porcentaje de lo que
 Se abre con Q (o T), con el botón Tienda o en el aviso del tendero. Tres pestañas:
 
 - **Mejoras** (§8).
-- **Pases** (Robux), creados en Roblox el 23 oct: cada tarjeta lleva su botón de compra con el precio de la tabla.
+- **Pases** (Robux), creados en Roblox el 23 oct: cada tarjeta lleva su botón de compra con el precio que dice Roblox (el de la tabla si no responde). Arriba van el Pack de inicio ("Compra única"; al comprarlo baja al final) y el VIP; debajo de los pases, "El Turbo solo corre mientras juegas". Con 3 h de Turbo guardadas, los Turbo no se pueden comprar y la fila dice por qué.
 
   | Pase o producto | Robux | Da |
   |---|---|---|
-  | Pack de inicio (compra única) | 99 | 30 min de Turbo una vez **(llega con K1)** y la Bolsa del reciclador |
+  | Pack de inicio (compra única) | 99 | 30 min de Turbo una vez y la Bolsa del reciclador |
   | Dinero x2 | 199 | todo lo que reciclas paga el doble, para siempre |
   | Bolsa XL | 149 | 10 huecos más en la bolsa, para siempre |
-  | VIP | 249 | la Estela VIP, un pedido más cada día y una corona sobre la cabeza **(llega con K1)** |
+  | VIP | 249 | la Estela VIP, un pedido más cada día, una corona sobre la cabeza (la ven todos; la tuya no en primera persona) y [VIP] delante de tu nombre en el chat |
   | Estela arcoíris | 99 | tu bolsa deja un arcoíris al lanzarla |
   | Bolsa dorada | 99 | una bolsa de oro |
   | Turbo 15 min / 60 min | 49 / 149 | dinero x2 ese tiempo, sumado al que te quede |
 
 - **Estilo**: diseños de la bolsa (en las manos, lanzada y caída) y estelas al lanzarla. Bolsas plateada (Rebirth 3), de hielo (Rebirth 4), de cartón (insignia Constante), del reciclador (Pack de inicio) y dorada (pase); estelas arcoíris (pase), de fuego (Rebirth 5) y VIP (pase VIP). Solo se ven: no dan ventaja.
 
-Nada de lo que se vende es aleatorio ni hace el trabajo por ti, y no se vende dinero ni rebirths. **(Llega con K1)**: el precio real de Roblox en la tienda y, de vez en cuando, una oferta en una ventana con "Comprar" y "Ahora no" igual de visibles, nunca en la primera sesión.
+Nada de lo que se vende es aleatorio ni hace el trabajo por ti, y no se vende dinero ni rebirths. Cada cosa de Estilo dice de dónde sale; las del Pack y del VIP no se venden sueltas.
+
+**Ofertas**: de vez en cuando, en un momento tranquilo (sin panel abierto, sin celebración ni lanzamiento a medias), sale una ventana con algo de la tienda y dos botones iguales, "Comprar" y "Ahora no" (tres con el Turbo: 15 min, 60 min y "Ahora no"). Nunca en la primera sesión, ni antes del primer pedido del tutorial, ni en los 3 primeros minutos de una sesión, ni en las 24 h siguientes a una compra; como mucho una por sesión y tres por semana. Tras un "Ahora no" esa no vuelve en 7 días, y con 3 deja de salir sola. Sin cuentas atrás, sin "solo hoy" ni precios tachados. Cuáles: el Pack de inicio (en la 2.ª y la 4.ª sesión, con 1 rebirth como mucho), Dinero x2 al hacer los Rebirths 1 y 3, el VIP al hacer el 2, Bolsa XL tras 5 intentos de recoger con la bolsa llena en una sesión (con la mejora Bolsa en el nivel 3 o más) y el Turbo tras acabarse uno ganado (desde la 3.ª sesión).
 
 ---
 
@@ -226,7 +228,7 @@ Nada de lo que se vende es aleatorio ni hace el trabajo por ti, y no se vende di
 
 ## 13. Pantalla y avisos
 
-- **Arriba a la derecha**: la píldora verde del **dinero**, el **Turbo** si queda y el pedido más avanzado.
+- **Arriba a la derecha**: la píldora verde del **dinero**, el **Turbo** si queda (en gris, "x2 en pausa", cuando no corre) y el pedido más avanzado.
 - **A la derecha**: la barra de **Fuerza** (con el bonus que daría acertar desde donde estás) y la de **Bolsa**.
 - **Abajo**: "MANTÉN [F] PARA LANZAR" con la bolsa llena y la pista de recoger (se va sola tras 20 recogidas).
 - **Burbujas en el mundo**, a media pantalla, para lo que se rechaza ("Es de Ana: libre en 12 s", "Se abre con el Rebirth 2", "Llena la bolsa para poder lanzarla", "No llevas nada que reciclar"…).
@@ -253,8 +255,7 @@ Nada de lo que se vende es aleatorio ni hace el trabajo por ti, y no se vende di
 
 ## 16. Lo que todavía no hay
 
-- **(Llega con K1)**: el Turbo que solo corre mientras juegas (y en pausa si no haces nada), el Turbo del Pack de inicio, la corona VIP, la Bolsa de cartón puesta, el precio real en la tienda y las ofertas.
-- Pases y productos **a la venta**: faltan crearlos en Roblox; también 10 de los 20 Badges.
+- 10 de los 20 Badges de Roblox (la insignia se gana igual en el juego; el Badge llega cuando se cree, a quien ya la tenía también).
 - **Pospuestas**: figuritas escondidas y cintas de música en los montones.
 - **Después del lanzamiento**: amigos, grupo e invitaciones, códigos, contenido nuevo pasado el Rebirth 3, premios semanales de ranking.
 - **Quitadas** (no vuelven sin una decisión nueva): mascotas, energía y refrescos, bases, gemas, sobres y Contenedor Dorado, trajes, venta, reparación y fusión.

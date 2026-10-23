@@ -11,8 +11,9 @@ insignias, pases, tutorial de 8 pasos y tercera persona (CONTEXTO §3
 (CONTEXTO §3 "Lanzamiento por agentes"): guardado con bloqueo de sesión,
 anti-trampas, recibos seguros, admin solo en Studio, pantalla de carga,
 analítica, audio y la **economía v4** (`docs/Economia-v4.md`, aprobada:
-curva, pedidos en %, recompensas; el catálogo, K1, está a medias fuera de
-master). El place está publicado y privado (PlaceId 139915415713937,
+curva, pedidos en %, recompensas y el catálogo K1: Turbo solo jugando, VIP,
+Pack de inicio, ofertas y precio real; E1 y K1, unidos sin verificar aún en
+Studio). El place está publicado y privado (PlaceId 139915415713937,
 universo 10766595888). El diseño original está en `docs/GDD.md`; el estado
 del proyecto, lo pendiente y las decisiones no obvias en `CONTEXTO.md`.
 Léelos antes de tocar balance o estructura.
@@ -90,7 +91,7 @@ Capas (la dependencia va siempre hacia abajo, nunca al revés):
 
 ```
 Config            datos puros: números, textos (Textos + Traducciones en/pt), tablas de probabilidad,
-                  definiciones (mejoras, rebirths, pedidos, recompensas, cosméticos, insignias…),
+                  definiciones (mejoras, rebirths, pedidos, recompensas, cosméticos, insignias, ofertas…),
                   Productos (ids de Roblox), Paleta (grises whitebox + Paleta.MUNDO + VARIANTES),
                   Iconos (ids del arte 2D), Sonidos (ids del audio)
 Utilidades        sin estado de juego, servidor y cliente por igual:
@@ -102,7 +103,9 @@ Services          reglas y estado (Perfiles, Bolsa, Mejoras, Economia, Turbo,
                   Cosmeticos, Pedidos, Insignias, Recompensas, Ajustes…).
                   Guardado es lo único que habla con el DataStore de perfiles
                   (cola y bloqueo de sesión); Movimiento vigila los saltos
-                  imposibles; Monetizacion, pases y recibos; Analitica traduce
+                  imposibles; Monetizacion, pases y recibos; Ofertas, cuándo
+                  se enseña cada oferta (no vende: la compra la confirma
+                  Roblox); Analitica traduce
                   Senales a AnalyticsService; Actividad sabe cuándo hizo algo
                   cada jugador (sin dependencias: la requiere Turbo); Admin,
                   solo en Studio. El patio es una fachada
@@ -302,6 +305,13 @@ un módulo de solo tipos.
      día a las 06:00 UTC), `pedidoSeparadas`, `premioTurbo`, `insignias` (20).
    - Pases: `paseDineroX2`, `paseBolsaXL`, `turboAcumula`, `cosmeticoBolsa`
      (usan el modo dev de pases y lo dejan como estaba).
+   - Catalogo (K1): `turboPausa` (solo corre jugando; pausa a los 120 s),
+     `turboTope` (3 h; un recibo con el tope lleno se otorga igual),
+     `turboProductos`, `packInicioUnaVez` (su toast "+30 min" es lo esperado),
+     `vipVentajas`, `cosmeticosNuevos`, `ofertaReglas` (41 reglas y el viaje
+     de una oferta). En Studio las ofertas no salen solas: para verlas de
+     verdad, `ServerStorage:SetAttribute("OfertasEnStudio", true)` (vale en
+     Play), y quitarlo después.
    - Punteria: `bonusDistancia`, `racha`, `primeroEntra`, `pagoFormula`.
    - Cuadrantes: `cuadrantes`, `materialPorRebirth`, `variedadPiezas`,
      `tesoroGrande`, `valoresMaterial`, `prioridadExcavador`, `reposicion`,
@@ -340,11 +350,18 @@ un módulo de solo tipos.
    y `("modulo", "Carga", "ocultar")`;
    `("modulo", "Recompensas", "indicador", true | false | "auto")` (el punto
    rojo del botón), `("modulo", "Recompensas", "regreso", 3)` (la ventana del
-   bono de regreso) y `("modulo", "Recompensas", "estado")`. Para ver la
+   bono de regreso) y `("modulo", "Recompensas", "estado")`;
+   `("modulo", "Oferta", "mostrar", "PackInicio")` (o `DineroX2`, `VIP`,
+   `BolsaXL`, `Turbo`: la ventana con datos de ejemplo, sin servidor) y
+   `("modulo", "Oferta", "estado")` (título, botones y sus tamaños);
+   `("modulo", "PreciosRobux", "listar")` (el precio de cada pase y producto
+   y de dónde sale). Para ver la
    pantalla de carga de verdad: `ServerStorage:SetAttribute("SimularCargaLenta", 15)`
    en Edit antes de Play (Guardado retrasa la carga; solo Studio), y quitarlo
    después.
-   `PASES_DEV_EN_STUDIO` está apagado: `/pases on` para ver los pases.
+   `PASES_DEV_EN_STUDIO` está apagado: `/pases on` para ver los pases (con
+   el VIP, la corona en tercera persona y `[VIP]` en el chat; el modo dev no
+   da el Turbo del Pack de inicio).
    En Studio el perfil y los rankings van a los stores `_Studio`; sin "Enable
    Studio Access to API Services" se juega sin guardar (con su `warn`).
 4. Multijugador: Studio → Test → Clients and Servers (2 jugadores), ver

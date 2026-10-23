@@ -113,6 +113,13 @@ bolsa ajena a los 30 s (al dueño le llega "X se llevó tu bolsa"); el récord
 del servidor en el feed de los demás; las celebraciones solo para quien
 cobra; las recicladoras (cinta y sonido) para todos; los tablones de la
 plaza; y que los pedidos, el calendario y los regalos sean de cada uno.
+Del catálogo (K1, 23 oct): la corona del VIP se ve sobre su cabeza desde
+los demás clientes (el propio VIP no la ve en primera persona) y `[VIP]`
+sale delante de su nombre en el chat de todos; el Turbo de cada uno se pausa
+por su cuenta (quien se queda quieto 2 min ve "x2 en pausa"; el de los demás
+sigue); y las ofertas son de cada uno y salen en un momento tranquilo, nunca
+en la primera sesión ni a la vez que una celebración. En Studio no salen
+solas: `ServerStorage:SetAttribute("OfertasEnStudio", true)` en Play.
 
 ## Qué apuntar el organizador
 

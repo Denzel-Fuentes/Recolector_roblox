@@ -27,8 +27,9 @@ por minutos activos y bono de regreso); y de la 4, los 6 pases y los 2
 productos de Turbo creados en el Creator Hub con sus ids en `Config/Productos`
 (F1b, 23 oct). El usuario pausó el plan el 23 oct y lo retomó ese mismo día;
 **K1** (catálogo: Turbo solo jugando, VIP, Pack de inicio, ofertas y precio
-real) está **a medias, fuera de master**. La ficha del Creator Hub está hecha
-y el juego sigue **privado**.
+real) se unió a master el 23 oct **verificado en Lune, sin verificar aún en
+Studio** (como E1). La ficha del Creator Hub está hecha y el juego sigue
+**privado**.
 
 **3 oct 2026: v3 para lanzar** (decisiones del usuario, ver §3 "Lanzamiento:
 v3"): **cinco contenedores** (uno por tipo de basura, del color de su tipo,
@@ -76,7 +77,7 @@ mundo vestido; pendientes los paneles (lotes 12–13 de la UI), la prueba con
 | **Cinco contenedores** (3 oct): 4 de tipo (Papel celeste, Plástico amarillo, Metal plomo, Orgánico verde) en fila al este de la caseta y el **general azul** (el volquete de la recicladora). Premio por separar: en el de su tipo cada pieza de basura paga **x2**, en el de otro x0,5, en el general x1; billetes y tesoros x1 en todos. La bolsa entera va al contenedor donde cae (lanzada) o al del prompt (a mano) | `Utilidades/Contenedores`, `Bolsa.factorContenedor`, `Lanzamiento` (una caja y una boca por contenedor), `ConstructorMundo.cajaContenedor`, `ArteMundo.contenedorColor` | verificado (`pagoSeparado`, `lanzarATipo`, capturas) |
 | Puntería: **mantener F carga y lanza la bolsa entera**, el alcance lo da la mejora **Brazo** (25 → 70 studs); al entrar paga el **bonus por distancia** (+20 % desde 10 studs … +150 % desde 60) más la **racha** (+10 % por acierto seguido, tope +50 %); el **primer lanzamiento siempre entra**, pero desde el 22 oct paga como mucho la distancia del Brazo y no cuenta para récords; los 5 primeros llevan **línea de trayectoria**; récord personal y del servidor en una tarjeta (el del servidor, también en el feed de los demás); si falla, racha a 0 y la bolsa queda en el suelo **30 s solo para su dueño** y después para cualquiera (no se recicla sola desde el 29 sep; si cae en alto se baja junto al contenedor). **Solo se lanza con la bolsa llena**: desde el 29 sep el botón táctil y la pista "MANTÉN F" solo salen entonces, y desde el 22 oct (P3) lo impone el servidor; como mucho **3 bolsas caídas** por jugador (con una más, la más vieja se recicla sola, sin bonus y a x0,5). El vuelo se integra con el paso exacto (§3 "Lanzamiento por agentes") | `Services/Lanzamiento.luau`, `Config/DefinicionesPunteria`, `Utilidades/Trayectoria`, `Client/LineaTrayectoria` | verificado (`bonusDistancia`, `racha`, `primeroEntra`, `pagoFormula`, `lanzarBolsa`, `lanzarBolsaFallo`, `bolsaProtegida`, `bolsaLibre`, `brazoLimita`, `lanzarSoloLlena`, `primeroSinRecord`, `topeBolsasCaidas`, `("trayectoria")`) |
 | Primera persona por defecto (en todo el mapa desde el 6 oct) con retícula (punto); en el patio (atributo `EnPatio`), manos+bolsa en 2D (Frames) y brazos extendidos sujetando una bolsa abierta soldada entre las manos (la pose la pinta cada cliente; el bucle del servidor, solo en Studio desde el 22 oct) | `Services/Patio.luau`, `Utilidades/PoseBrazos`, `Client/Camara.client`, `Client/UI/Manos.client`, `Escena.client` | verificado (`enPatio`, `poseSinBucle`, capturas) |
-| HUD: **botonera 2×3** (22 oct; era de 4), cada botón con su tecla: Tienda **Q** (o T), Rebirth **R**, Pedidos **P**, Cámara **V**, Sonido **M** (el panel Ajustes) y Recompensas **G** (con un punto rojo si hay una casilla del calendario por cobrar). En PC, sin panel abierto, el ratón está bloqueado al centro y la botonera solo se usa con su tecla. Píldora del dinero arriba-dcha con el **Turbo** (x2 y el tiempo; "x2 en pausa" cuando K1 lo pause) y el **pedido más avanzado** debajo, barras de fuerza y **bolsa** (sin números, "¡LLENA!" en rojo), pista de lanzar (abajo-dcha) y de recoger (abajo-izq; en táctil bajo los contadores: pisaba las barras) | `Client/UI/HUD.client.luau`, `UI/Paneles.client` (teclas) | verificado (`("hud")` sin avisos en PC y táctil forzada, 3 oct; con la botonera de 6, A1); falta `("hud")` con el punto rojo (§5) |
+| HUD: **botonera 2×3** (22 oct; era de 4), cada botón con su tecla: Tienda **Q** (o T), Rebirth **R**, Pedidos **P**, Cámara **V**, Sonido **M** (el panel Ajustes) y Recompensas **G** (con un punto rojo si hay una casilla del calendario por cobrar). En PC, sin panel abierto, el ratón está bloqueado al centro y la botonera solo se usa con su tecla. Píldora del dinero arriba-dcha con el **Turbo** (x2 y el tiempo; gris, "x2 en pausa", cuando no corre: K1) y el **pedido más avanzado** debajo, barras de fuerza y **bolsa** (sin números, "¡LLENA!" en rojo), pista de lanzar (abajo-dcha) y de recoger (abajo-izq; en táctil bajo los contadores: pisaba las barras) | `Client/UI/HUD.client.luau`, `UI/Paneles.client` (teclas) | verificado (`("hud")` sin avisos en PC y táctil forzada, 3 oct; con la botonera de 6, A1); falta `("hud")` con el punto rojo (§5) |
 | Sistema de diseño en **Fusion 0.3** (`Client/UI/Kit`): Ventana, Boton, Tarjeta, Pestanas, Pildora, Barra, Segmentos, Insignia, Icono, Interruptor (A1), Escala; prompts y carteles del mundo (el prompt del tendero, "Reciclador", abre la tienda; sus diálogos se quitaron el 29 sep) | `Client/UI/Kit/*`, `Prompts.client`, `Escena.client` | verificado |
 | **Mundo v6** (3 oct: los 4 contenedores de tipo en fila, la solera ensanchada al este, el volquete general en azul, un poste movido; v5 el 29 sep; sin barreras desde el 5 oct; re-horneado el 22 oct, W1: placas de los contenedores traducidas y las cajas de cartón de la caseta con su marrón fijo): sin parcelas ni máquina de refrescos, valla a 24 studs del patio por los tres lados, cada contenedor de color con su trituradora, punto de aparición en la plaza con los 3 tablones de ranking; tienda SHOP y recicladora de Blender, vallas, postes, camión, el tendero vestido, iluminación cartoon | `ServerStorage/Herramientas/ArteMundo.luau` + `ConstructorMundo` v6 | verificado (W1, 22 oct: 1.054 instancias, 18 ranuras con `Zona`, 0 barreras, 5 `Contenedor` (4 con `Material`), 5 `RecicladoraArte`, 3 `PantallaRanking`; capturas); **guardar el place** tras hornear |
 | Bolsa: todo lo recogido ocupa hueco (billetes incluidos), **sólo el contenedor paga**; entregar a mano no da bonus de lanzamiento (el de separar sí), lanzar sí. Al salir, lo de la mano, las bolsas caídas y las que vuelan se cobran sin bonus en `Perfiles.alSalir`, antes del guardado de salida (22 oct) | `Services/Bolsa.luau`, `Lanzamiento.cobrarAlSalir` | verificado (`billeteEnBolsa`, `sinDineroAlRecoger`, `salirRecicla`, `vueloAlSalir`) |
@@ -87,10 +88,12 @@ mundo vestido; pendientes los paneles (lotes 12–13 de la UI), la prueba con
 | **Aparición** en la plaza mirando al patio (sin base), también al morir; el personaje se carga cuando llega el perfil (o a los 15 s sin él) y su salto a la plaza se avisa a `Movimiento` | `Services/AparicionHandler.server.luau`, `Mundo.cframeAparicion` | verificado (`aparicion`) |
 | Tutorial jugable de **8 pasos** (patio, excavar, llenar, lanzar al general, mejora, **separar**, **un pedido**, **meta Rebirth 1**); flecha (Beam) y una **píldora** arriba-izq ("Paso 6/8 · …", abre el panel del paso). Cada paso completado sale en `Tutorial.alCompletar` (el embudo de la analítica; el 5 abre pedidos y recompensas) | `Config/DefinicionesTutorial`, `Services/Tutorial.luau`, `Client/UI/Tutorial.client` | verificado (`tutorial`, capturas) |
 | **Pedidos del día** (L7; economía v4 el 22 oct): 3 retos (el primero de puntería; "lejos" adaptado al Brazo, "material" a los tipos abiertos) que se cobran solos y pagan el **1,5 / 2 / 3 %** del coste del siguiente rebirth según la dificultad ($760 / 1.000 / 1.500 con 0 rebirths), calculado al cobrar; los tres dan **10 min de Turbo**; con el pase VIP, un **4.º pedido** ("Pedido VIP", paga como difícil, no cuenta para el Turbo). El día cambia a las **06:00 UTC**. Se abren al comprar la primera mejora | `Config/DefinicionesPedidos`, `Services/Pedidos` + `PedidosHandler`, `Client/UI/Pedidos` | verificado (`pedidosDia`, `pedidoSeparadas`, `premioTurbo`, captura); con la v4 y `pedidoVip`, en Lune: falta Studio |
-| **Recompensas** (22–23 oct, R1): panel propio con el botón del regalo (**G**), pestañas Calendario y Regalos. **Calendario** de 7 casillas, una por día jugado y con botón (2 % · 2 % · Turbo 10 min · 3 % · 3 % · Turbo 15 min · 4 %; saltarse un día no reinicia nada; la 7.ª da la insignia Constante, que regala la Bolsa de cartón (ponérsela llega con K1); desde la 2.ª vuelta suma Turbo 15 min). **Regalos** solos por minutos activos del día (5/10/20/30/45/60: 0,5 % · 0,5 % · 1 % · Turbo 5 min · 1 % · 2 %; un minuto es activo con 3 acciones). **Bono de regreso** al entrar tras 3 días sin jugar (Turbo 15 min + 4 %) o 14 (Turbo 30 min + 8 %), con ventana de bienvenida. Se abre con la primera mejora; el panel se abre solo al entrar si hay algo que cobrar | `Config/DefinicionesRecompensas`, `Services/Recompensas` + `RecompensasHandler`, `Services/Actividad` + `ActividadHandler`, `Client/UI/Recompensas.luau` | verificado (las 8 de `Recompensas`, `actividad`); faltan repetirlas con la curva v4, las capturas del panel y `("hud")` con el punto (§5) |
+| **Recompensas** (22–23 oct, R1): panel propio con el botón del regalo (**G**), pestañas Calendario y Regalos. **Calendario** de 7 casillas, una por día jugado y con botón (2 % · 2 % · Turbo 10 min · 3 % · 3 % · Turbo 15 min · 4 %; saltarse un día no reinicia nada; la 7.ª da la insignia Constante, que regala la Bolsa de cartón (se pone en Estilo desde K1); desde la 2.ª vuelta suma Turbo 15 min). **Regalos** solos por minutos activos del día (5/10/20/30/45/60: 0,5 % · 0,5 % · 1 % · Turbo 5 min · 1 % · 2 %; un minuto es activo con 3 acciones). **Bono de regreso** al entrar tras 3 días sin jugar (Turbo 15 min + 4 %) o 14 (Turbo 30 min + 8 %), con ventana de bienvenida. Se abre con la primera mejora; el panel se abre solo al entrar si hay algo que cobrar | `Config/DefinicionesRecompensas`, `Services/Recompensas` + `RecompensasHandler`, `Services/Actividad` + `ActividadHandler`, `Client/UI/Recompensas.luau` | verificado (las 8 de `Recompensas`, `actividad`); faltan repetirlas con la curva v4, las capturas del panel y `("hud")` con el punto (§5) |
 | **20 insignias** (16 del L7 y 4 de la economía v4: rebirth5, rebirth10, semanaCompleta, pedidos30): en el perfil (`logros`) y como Badge si tienen id (10 creadas en Roblox; 5 gratis al día); al entrar se consultan en lotes (`CheckUserBadgesAsync`) con caché de la sesión; tarjeta al conseguirlas; pestaña Insignias del panel Pedidos | `Config/DefinicionesInsignias`, `Services/Insignias` | verificado (`insignias`, `insigniasLote`); faltan 10 Badges (§5) |
 | **Tablones de ranking** en la plaza (8 oct): Dinero ganado, Racha máxima y Bolsas encestadas, histórico y semanal (desde el lunes 00:00 UTC); stores `Ranking_v2_*` desde el 22 oct (tablones limpios para el lanzamiento); se publican en `alSalir` y el cierre espera las escrituras | `Config/DefinicionesRankings`, `Services/Rankings` + `RankingsHandler`, `Client/Tablones.client` | verificado (`rankings`, `rankingsDatastore`, `("tablones")`) |
-| Tienda (L8): pestañas **Mejoras / Pases / Estilo**. Pases (catálogo de la economía v4; creados en Roblox el 23 oct, F1b, con sus ids en `Config/Productos`): Pack de inicio 99 (compra única), Dinero x2 199, Bolsa XL 149 (+10 huecos), VIP 249, Estela arcoíris 99 y Bolsa dorada 99; productos Turbo 15 min (49) y Turbo 60 min (149). Estilo: bolsas plateada (Rebirth 3), de hielo (R4), de cartón (insignia Constante), del reciclador (Pack) y dorada (pase); estelas arcoíris (pase), de fuego (R5) y VIP (pase); los 2 trajes de pago se quitaron el 5 oct. El precio sale de Config. **K1 (en curso, §5)** trae el precio real, las etiquetas de origen nuevas, los efectos del VIP y del Pack y las ofertas | `Client/UI/Tienda.luau`, `Config/Productos`, `Config/DefinicionesCosmeticos`, `Services/Cosmeticos`, `Services/Turbo`, `TiendaHandler` | verificado (`paseDineroX2`, `paseBolsaXL`, `turboAcumula`, `cosmeticoBolsa`, capturas); K1 sin terminar |
+| Tienda (L8): pestañas **Mejoras / Pases / Estilo**. Pases (catálogo de la economía v4; creados en Roblox el 23 oct, F1b, con sus ids en `Config/Productos`): Pack de inicio 99 (compra única), Dinero x2 199, Bolsa XL 149 (+10 huecos), VIP 249, Estela arcoíris 99 y Bolsa dorada 99; productos Turbo 15 min (49) y Turbo 60 min (149). Estilo: bolsas plateada (Rebirth 3), de hielo (R4), de cartón (insignia Constante), del reciclador (Pack) y dorada (pase); estelas arcoíris (pase), de fuego (R5) y VIP (pase); los 2 trajes de pago se quitaron el 5 oct. Desde K1 (23 oct): el **precio real** de Roblox (`Client/PreciosRobux`, `GetProductInfo` con caché y un reintento; el de Config si falla; lo que Roblox dice que no está a la venta no se ofrece), el Pack ("Compra única"; comprado, baja al final) y el VIP arriba, "El Turbo solo corre mientras juegas" bajo los pases, los Turbo apagados con 3 h guardadas y en Estilo el origen de cada cosmético (los del Pack y del VIP sin botón de Robux) | `Client/UI/Tienda.luau`, `Client/PreciosRobux`, `Config/Productos`, `Config/DefinicionesCosmeticos`, `Services/Cosmeticos`, `Services/Turbo`, `TiendaHandler` | verificado (`paseDineroX2`, `paseBolsaXL`, `turboAcumula`, `cosmeticoBolsa`, capturas); lo de K1, en Lune (`cosmeticosNuevos`, pruebas de UI): falta Studio (§5) |
+| **Turbo, Pack y VIP** (K1, 23 oct; economía v4 §4.6): el Turbo son segundos (`turboRestante`) que **solo bajan jugando**: en pausa tras 120 s sin una acción de `Actividad` y fuera del juego (atributo `TurboPausado`; en pausa sigue pagando x2), se para al salir antes del guardado y vuelve en la siguiente sesión; tope de compra de **3 h** solo en la tienda y las ofertas (un recibo pagado se otorga entero). **Pack de inicio**: 30 min de Turbo una sola vez (`compras.packInicio`) y la Bolsa del reciclador. **VIP**: atributo `VIP`, corona sobre la cabeza (BillboardGui; la propia se oculta en primera persona), `[VIP]` en el chat, la Estela VIP y el Pedido VIP de E1. Cada compra con Robux anota `compras.ultimaRobux` | `Services/Turbo`, `Services/Monetizacion`, `Client/CoronaVIP.client`, `Client/EtiquetaVIP.client`, `UI/HUD.client`, `Musica.client` | en Lune (`turboPausa`, `turboTope`, `turboProductos`, `packInicioUnaVez`, `vipVentajas`, `turboAcumula`): falta Studio (§5) |
+| **Ofertas** (K1, 23 oct; economía v4 §5.6): cinco disparadores por prioridad (Pack de inicio en la 2.ª y la 4.ª sesión; Dinero x2 en los Rebirths 1 y 3; VIP en el 2; Bolsa XL tras 5 intentos de recoger con la bolsa llena y la mejora Bolsa en 3+; Turbo tras acabarse uno ganado, desde la 3.ª sesión). Nunca en la 1.ª sesión, antes del paso 7 del tutorial, en los 3 primeros minutos ni en las 24 h siguientes a una compra; 1 por sesión y 3 por semana; 7 días tras un "Ahora no" y, con 3, no vuelve sola. Ventana con "Comprar" y "Ahora no" iguales, en un momento tranquilo que busca el cliente. En Studio solo salen con `ServerStorage.OfertasEnStudio = true` | `Config/DefinicionesOfertas`, `Services/Ofertas` + `OfertasHandler`, `Client/UI/Oferta.luau` | en Lune (`ofertaReglas`: 41 reglas y el viaje entero; el cableado de punta a punta): falta Studio (§5) |
 | **Cámara** (L9): primera persona por defecto; **V** o el botón Cámara pasa a **tercera persona** sobre el hombro (ratón al centro, el personaje gira con la cámara; las manos 2D se ocultan), en todo el mapa desde el 6 oct. Se guarda en el perfil; `CamaraEvent` con cooldown desde el 22 oct (la última vista pedida no se pierde) | `Client/Camara.client`, `PatioHandler` (CamaraEvent), `Patio.elegirVista` | verificado (`("camara","tercera")`, `camaraCooldown`, captura) |
 | Figuritas (6 fijas) y cintas: **pospuestas** (`FUNCIONES`; los trajes, gratis y de pago, se quitaron el 5 oct) | `Config/DefinicionesColeccionables`, `Services/Coleccionables.luau` | apagados |
 | **Monetización** (P2, 22 oct): los pases se cachean al entrar y una compra solo cuenta si Roblox la confirma (`UserOwnsGamePassAsync`, P3b) y sale en `alComprarPase`; `ProcessReceipt` idempotente, con otorgadores registrados por producto (`Turbo` registra los suyos), **espera al perfil** (hasta `SESION_ESPERA_ROBO` + 15 s) y solo devuelve `PurchaseGranted` con la compra ya guardada (`guardarAhora`); modo dev de pases solo en Studio (apagado por defecto: `/pases on`) | `Services/Monetizacion.luau`, `Config/Productos` | verificado (las 8 de `Monetizacion`); ids reales desde el 23 oct (F1b); falta una compra real de cada uno (Q3, §5) |
@@ -408,14 +411,47 @@ Lo no obvio de cada paquete:
   y después el pago: lo peor es no cobrar, nunca cobrar dos veces; un día
   guardado por delante del de hoy (si cambia la hora del día) tampoco deja
   cobrar dos veces.
-- **Estado transitorio del Turbo** (hasta K1): `Services/Turbo` sigue con la
-  hora de fin (`perfil.turboHasta`, tiempo real), pero desde la v5 del perfil
-  `turboHasta` es OBSOLETO y `completar` lo borra al cargar; la migración solo
-  pasó a `turboRestante` el que quedaba en los perfiles v4, y nada lee aún
-  `turboRestante`. Por eso un Turbo en marcha **no sobrevive a salir y
-  volver**, y las pruebas de pedidos restauran a mano un `turboHasta` que no
-  estaba (`premioTurbo` dejaba 660 s de Turbo que doblaban el dinero de las
-  siguientes: `salirRecicla` daba $124 en vez de $62).
+- **Estado transitorio del Turbo** (22–23 oct, resuelto con K1): entre C3 y
+  K1, `Services/Turbo` seguía con la hora de fin (`perfil.turboHasta`, tiempo
+  real), pero desde la v5 del perfil `turboHasta` es OBSOLETO y `completar` lo
+  borra al cargar, y nada leía aún `turboRestante`: un Turbo en marcha no
+  sobrevivía a salir y volver, y las pruebas de pedidos tenían que restaurar a
+  mano un `turboHasta` que no estaba (`premioTurbo` dejaba 660 s de Turbo que
+  doblaban el dinero de las siguientes: `salirRecicla` daba $124 en vez de
+  $62). Hoy solo quedan la migración v5, `OBSOLETOS` y comentarios.
+- **K1, catálogo** (23 oct; unido verificado en Lune, falta Studio):
+  - El Turbo descuenta con el reloj de `Actividad` (las pruebas lo sustituyen)
+    y entre dos tics cuenta solo hasta la última acción + 120 s: las cuentas
+    salen exactas aunque el reloj salte. **En pausa sigue pagando x2**: lo que
+    paga es reciclar, y reciclar ya es una acción que lo reanuda (si no, la
+    bolsa lanzada tras un rato quieto pagaría x1 con el HUD diciendo x2).
+    **Entrar no es jugar**: el Turbo empieza en pausa y arranca con la
+    primera acción (no se llama a `Actividad.registrar` al entrar). Mientras
+    corre, el perfil se publica cada 30 s para que el HUD no se desvíe; el tic
+    va en `pcall` por jugador.
+  - El tope de 3 h solo apaga los botones (tienda y ofertas): `ProcessReceipt`
+    nunca rechaza una compra pagada, así que un recibo que llegue igual se
+    otorga entero.
+  - El Pack da su Turbo **una vez** (`compras.packInicio`), solo con el pase de
+    verdad en `pasesCache` (el modo dev no lo da: no se envenena el perfil) y
+    con el perfil guardable (un provisional se descarta y lo daría dos veces);
+    se mira al cargar, al cambiar los pases y en cada tic.
+  - Ofertas: el servidor manda la oferta con un **token** y solo cuenta la
+    que el cliente llega a enseñar ("mostrada"); en ese momento se vuelven a
+    pasar las reglas (si mientras esperaba compró algo o le llegó Turbo, se
+    cancela). Una compra cancela la que espera. "Cerrada" (otro panel encima)
+    no es un "Ahora no"; la X y Esc sí. Los intentos con la bolsa llena los
+    avisa el cliente (ControlPatio no pide el reclamo con la bolsa llena) y el
+    servidor solo los cuenta si la bolsa está llena de verdad, uno por segundo.
+    "n por semana" de una oferta se cumple separándolas 7/n días (el perfil
+    solo guarda la última vez de cada una): más estricto que el documento,
+    nunca más permisivo. El Pack, que espera al cobro del calendario, sale en
+    la práctica en el primer depósito pasado el minuto 3.
+  - **En Studio las ofertas no salen solas** (`ServerStorage.OfertasEnStudio`):
+    con los ids reales, cualquier prueba que deposite abriría una ventana de
+    compra a mitad de la batería y se contaría en el perfil de Studio.
+  - La pista de música del Turbo suena solo mientras corre, y sus
+    repeticiones se cuentan por Turbo, no por cada pausa.
 - **Ficha y Creator Hub** (22 oct, `docs/Ficha-lanzamiento.md`; decisiones
   del usuario): nombre **"Recíclatas: Lanza la Basura"** (en "Throw the
   Trash", pt "Jogue o Lixo"), que sustituye a "Garbage Collector" (chocaba
@@ -1468,9 +1504,8 @@ aquí.
   suma ~10 % del siguiente rebirth y ~13 min de Turbo al día. Ningún premio
   en dinero lo multiplican pases ni Turbo.
 - Turbo: x2 a lo reciclado; 10 min por los pedidos, 15 y 60 min por Robux,
-  30 min con el Pack de inicio (K1). Hoy corre en tiempo real; con K1 solo
-  correrá jugando (en pausa tras 120 s sin actividad; los botones de compra
-  se apagan con más de 3 h guardadas).
+  30 min con el Pack de inicio. Solo corre jugando (K1: en pausa tras 120 s
+  sin actividad; los botones de compra se apagan con 3 h guardadas).
 - Precios en Robux (así se crearon en Roblox el 23 oct; los dos Turbo con
   precio fijo, sin el precio gestionado de Roblox, que pedía aceptar un
   acuerdo: decisión del usuario): Turbo 15 min 49 · Pack de inicio 99 ·
@@ -1488,32 +1523,38 @@ a origin/master). Lo que falta, en orden:
    con la curva v4, más capturas de los paneles Pedidos (con el Pedido VIP)
    y Rebirth; en Lune pasaron 21 de 21. De R1 faltan también las capturas del
    panel Recompensas en PC y táctil y `("hud")` con el punto rojo.
-2. **K1, catálogo: EN CURSO, sin terminar.** Está en la rama local
-   `worktree-agent-a3be3b78723d5bfff` (commit de trabajo `a7b80ce`, con master
-   unido después), no en master: el Turbo por segundos que solo bajan jugando
-   (`turboRestante`, pausa a los 120 s sin actividad con el atributo
-   `TurboPausado`, tope de compra de 3 h), el Pack de inicio (30 min de Turbo
-   una sola vez, `compras.packInicio`), el VIP (atributo `VIP`, la corona sobre
-   la cabeza y la etiqueta), el precio real de Roblox en la tienda
-   (`GetProductInfo` con caché) con el VIP y el Pack arriba, las etiquetas de
-   origen nuevas de Estilo, las ofertas (`DefinicionesOfertas`,
-   `Services/Ofertas`, `UI/Oferta`) y sus pruebas. **Mientras no entre, en
-   master**: el Turbo corre en tiempo real y no sobrevive a salir y volver
-   (§3 "Lanzamiento por agentes", estado transitorio); el Pack de inicio no da
-   su Turbo; no se pinta la corona VIP; la tienda enseña el precio de
-   `Config`; la Bolsa de cartón de la insignia Constante no se puede poner
-   (`Cosmeticos.tiene` y la tienda aún no le pasan a `loTiene` las
-   insignias); y el panel Oferta es una ventana vacía que nadie abre.
-3. **N1b**: la analítica de las recompensas (`Recompensas.alReclamar`) y de
-   las ofertas, con la prueba `analiticaRecompensas`.
+2. **Verificar K1 en Studio** (unido el 23 oct; en Lune, sus 6 baterías en
+   verde): `turboPausa`, `turboTope`, `turboProductos`, `packInicioUnaVez` (su
+   toast "Pack de inicio: +30 min" es lo esperado), `vipVentajas`,
+   `cosmeticosNuevos`, `ofertaReglas`, las adaptadas (`turboAcumula`,
+   `paseDineroX2`, `premioTurbo`, las 5 de recibos y `compraPase`) y
+   `cosmeticoBolsa`, `perfilV5`, `idioma`, `sinRestos`, `pedidosDia`,
+   `pedidoSeparadas` y las de `Economia`. En el cliente:
+   `("abrir","Tienda","pases")` (precios de Roblox; el Turbo apagado con
+   `turboRestante` ≥ 10800), `("abrir","Tienda","estilo")`,
+   `("modulo","Oferta","mostrar","PackInicio")` (y `DineroX2`, `VIP`,
+   `BolsaXL`, `Turbo`) con `("modulo","Oferta","estado")`,
+   `("modulo","PreciosRobux","listar")`, `("hud")` con el Turbo corriendo y en
+   pausa, y con `/pases on` la corona en tercera persona y `[VIP]` en el chat.
+   De punta a punta, con `ServerStorage.OfertasEnStudio = true` en Play
+   (quitarlo después): tutorial en el paso 7+, 2.ª sesión o posterior, más de
+   3 min, sin compras en 24 h y sin el Pack → depositar → sale el Pack en el
+   siguiente momento tranquilo; "Comprar · 99" abre el prompt real y "Ahora
+   no" suma `perfil.ofertas.porId.PackInicio.rechazos`. Una compra de prueba
+   de Turbo15 suma 900 s y pone `ultimaRobux`. Con 2 jugadores, la corona se
+   ve desde el otro cliente (Q1).
+3. **N1b**: la analítica de las recompensas (`Recompensas.alReclamar`: su
+   dinero hoy sale al salir como `Reciclaje_SinBonus`) y de las ofertas
+   (`Ofertas.alMostrar` y `alResponder`, ya publicadas por K1), con la prueba
+   `analiticaRecompensas`.
 4. Pulido: la píldora del tutorial en táctil cae dentro de la zona del
    joystick (hay que medirlo en Studio). Hecho el 23 oct: la cabecera del
    panel Recompensas en rosa (`Paleta.CABECERA_PANEL`). Los avisos de
    `RECOMPENSAS` no necesitan entrada en `SONIDO_AVISO`: cada cobro ya suena
    ("regalo") por `RecompensaEvent` "premio" en `UI/Recompensas`, y los
    informativos ("abiertas", "listo") callan como los demás.
-5. Documentación al cerrar K1 (este documento, CLAUDE.md "Verificar",
-   `docs/Juego.md`).
+5. Documentación de K1: hecha el 23 oct (este documento, CLAUDE.md
+   "Verificar", `docs/Juego.md`, `README-pruebas.md`).
 6. **Insignias**: 10 de 20 creadas y con su id en
    `Config/DefinicionesInsignias` (primerReciclaje, primerAcierto,
    primerTesoro, racha5, tiro30, dinero10k, piezas1000, separadas500,
