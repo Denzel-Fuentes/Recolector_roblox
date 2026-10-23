@@ -1,433 +1,260 @@
 # Recíclatas — el juego tal como se juega hoy
 
-Este documento describe **solo lo que el jugador ve y puede hacer** en la versión actual: reglas, números, lugares y pantallas. No habla de cómo está construido por dentro. Si algo no está aquí, no es jugable todavía.
+Este documento describe **solo lo que el jugador ve y puede hacer** en la versión actual (23 oct 2026, antes de unir K1), para quien escriba textos del juego o de la ficha, o guíe a probadores. No habla de cómo está construido por dentro (eso es `CONTEXTO.md`). Si algo no está aquí, no es jugable todavía; lo que está a medias se marca **(llega con K1)**, el paquete del catálogo que aún no está terminado. Los números salen de `src/ReplicatedStorage/Shared/Config` y de la economía v4 (`docs/Economia-v4.md`); si alguno no coincide, manda Config. El copy exacto está en `Config/Textos.luau` (y en inglés y portugués en `Config/Traducciones`, con su glosario en la cabecera).
+
+> Hasta el 22 oct este documento describía el juego anterior a la v2 (mascotas, energía, bases, gemas, trajes). Todo eso se quitó: ver CONTEXTO §3 "Diseño v2" y "Lanzamiento: v3".
 
 ---
 
 ## 1. En una frase
 
-Eres un reciclador en un vertedero: excavas montones de basura, llenas tu bolsa, la llevas (o la lanzas) al contenedor de reciclaje para cobrar, y con el dinero mejoras tu equipo y completas una colección de **41 mascotas hechas de basura** que exhibes en tu base.
+Excavas montañas de basura en un patio compartido, llenas tu bolsa y la **lanzas** a uno de cinco contenedores: cuanto más lejos encestas, más ganas, y si separas la basura por colores, paga el doble. Con el dinero mejoras tu bolsa, tu alcance, tu velocidad y tu brazo, y haces **Rebirth** para multiplicar lo que ganas.
 
-### El bucle principal
+### El bucle
 
-1. **Excavar** un montón del patio: se convierte en una montaña de basura con premios mezclados.
-2. **Recoger** piezas con clic (o con el imán) hasta llenar la bolsa. Cada pieza gasta energía.
-3. **Volver al contenedor** de la recicladora y reciclar la bolsa, o **lanzarla** desde lejos para cobrar más.
-4. **Cobrar**: el dinero *solo* sale del contenedor. Nada se paga al recogerlo.
-5. **Gastar** en mejoras, refrescos de energía y, al final, el Contenedor Dorado.
-6. **Coleccionar**: mascotas, fragmentos, figuritas, cintas y trajes. Reparar lo roto, fusionar duplicados y exhibir lo mejor en tu base.
+1. **Excavar** una colina del patio: se convierte en una montaña de basura de verdad.
+2. **Recoger** piezas con la mira hasta llenar la bolsa. Recoger no paga nada.
+3. **Lanzar** la bolsa llena a un contenedor (o entregarla a mano, sin bonus de lanzamiento).
+4. **Cobrar**: el dinero *solo* sale del contenedor.
+5. **Mejorar** en la tienda y, con todo al máximo y el dinero del requisito, **renacer**.
+6. Por el camino: **pedidos** del día, **recompensas** por volver y por jugar, **insignias** y **tablones de ranking**.
+
+Vocabulario fijo: patio, montón, bolsa, contenedor, encestar, pedido, mejora, insignia, racha; "Rebirth", "Turbo" y "VIP" no se traducen. Las distancias se enseñan en **m** (son studs).
 
 ---
 
 ## 2. Al entrar
 
-- Cada servidor tiene **6 bases**, una por jugador. Al entrar se te asigna la primera libre y **apareces en la puerta de tu base**, frente al arco con tu nombre ("Base de *tu nombre*").
-- Al morir o reaparecer, también vuelves a la puerta de tu base.
-- La energía empieza **llena**.
-- Si tu progreso no se pudo cargar, se avisa: *"No se pudo cargar tu progreso. Esta sesión no se guardará."*
-- Doña Chatarra da la bienvenida: *"Bienvenido a Recíclatas. Habla con Doña Chatarra para empezar."*
+- Una **pantalla de carga** (los cinco contenedores saltando y consejos) tapa el juego hasta que llega tu progreso; si tarda más de 8 s dice "Cargando tu progreso…".
+- Apareces en la **plaza**, mirando al patio (también al morir). Bienvenida: *"¡Bienvenido a Recíclatas! Excava un montón del patio y lanza la bolsa a un contenedor. Si separas por colores, pagan el doble."*
+- Si el progreso no se pudo cargar, se avisa: *"No se pudo cargar tu progreso. Esta sesión no se guardará."* Si la partida se abre en otro servidor, este te echa: *"Tu partida se abrió en otro servidor. Vuelve a entrar para seguir jugando."*
+- El **tutorial** es una píldora arriba a la izquierda ("Paso 3/8 · …") con una flecha en el mundo. Los 8 pasos: ir al patio · excavar un montón · llenar la bolsa · lanzarla al contenedor azul · comprar una mejora · separar (recoger un solo color y lanzarlo a su contenedor) · cumplir un pedido · la meta del Rebirth 1. Avanza solo con lo que haces.
+- Desde la primera mejora (paso 5), si hay algo que cobrar, el panel **Recompensas** se abre solo al entrar; tras 3 días o más sin jugar, antes sale la ventana de regreso (§10).
 
 ---
 
 ## 3. Controles
 
-### PC (teclado y ratón)
-| Acción | Control |
-|---|---|
-| Moverse / saltar | WASD / Espacio |
-| Recoger basura | **Mantener clic** sobre la pieza (recoge una cada ~0,16 s mientras mantienes) |
-| Lanzar la bolsa | **Mantener F** para cargar la fuerza, soltar para lanzar hacia donde apuntas |
-| Interactuar (excavar, reciclar, comprar refresco, hablar…) | **E** (algunas acciones hay que mantenerlas) |
-| Tienda | **Q** o **T** |
-| Álbum | **J** |
-| Logros | **L** |
-| Mi base | **B** |
-| Cerrar panel | **Esc** |
+| | PC | Móvil y tableta | Mando |
+|---|---|---|---|
+| Recoger | **mantener el clic** con la mira sobre la basura | apuntar con la mira (arrastrar gira la cámara) y mantener **RECOGER** | mantener **X** |
+| Lanzar (con la bolsa llena) | **mantener F** y soltar | mantener **LANZAR** y soltar | mantener **Y** y soltar |
+| Excavar, reciclar a mano, tienda | **E** en el aviso del mundo (excavar se mantiene 1,5 s) | tocar el aviso | el botón que enseña el aviso |
+| Cerrar un panel | **Esc** | la X | **B** |
 
-### Móvil (táctil)
-- Palanca y botón de salto de Roblox.
-- **Toca la basura** para recogerla ("TOCA LA BASURA PARA RECOGER").
-- Botón **MANTÉN** para cargar y soltar el lanzamiento.
-- Las interacciones aparecen como pegatinas en pantalla que se tocan (o se mantienen).
-- La rejilla de botones del menú se coloca arriba a la izquierda, bajo el retrato.
-
-### Mando
-- Botón X: recoger. Botón Y: cargar y lanzar. B: cerrar panel. Select: Álbum.
-
-### Cámara
-- **Dentro del patio** la cámara pasa sola a **primera persona**: ves tus manos sujetando la bolsa abierta y un **punto de mira** en el centro. Un anillo alrededor del punto crece cuando hay una pieza a tu alcance.
-- **Al salir del patio** vuelves a la cámara normal, con la misma distancia que tenías al entrar.
-- Con un panel abierto el ratón queda libre para usar la interfaz.
+- **Cámara**: primera persona en todo el mapa, con un punto de mira en el centro (un anillo crece cuando hay algo al alcance). **V** o el botón Cámara pasan a **tercera persona** sobre el hombro; se recuerda para la próxima vez.
+- **Botonera** (a la izquierda; en táctil, arriba a la izquierda), con su tecla: **Q** (o T) Tienda · **R** Rebirth · **P** Pedidos · **V** Cámara · **M** Sonido · **G** Recompensas (con un punto rojo si hay algo por cobrar). En PC el ratón está bloqueado al centro mientras no hay un panel abierto, así que los paneles se abren con la tecla.
+- En el patio ves tus manos con la bolsa abierta; llena, se cierra con un nudo. Los demás te ven con los brazos extendidos y la bolsa.
 
 ---
 
 ## 4. El mundo
 
-Todo el mapa está rodeado por una **valla de madera** de vertedero. De norte a sur y de oeste a este:
+Una valla de madera rodea todo el mapa. De norte a sur:
 
-- **Calle de las bases** (oeste): las 6 bases en columna, cada una con su camino de tierra hasta la calle.
-- **El patio de basura** (centro): una explanada de césped claro de 97,5 × 150 studs, con un **borde rojo**, dividida en 2 × 3 cuadrantes por caminos. Tiene **18 montones** (3 por cuadrante). Alrededor hay decorado de vertedero (tubos, contenedores, lavadora vieja, neumáticos…) donde se esconden figuritas.
-- **La plaza** (al sur del patio): el cruce de caminos con los postes indicadores "Parcelas ↑" y "Patio de basura ↑".
-- **La recicladora** (sur): sobre una solera de hormigón en un lote de tierra están:
-  - la **tienda SHOP**: dos contenedores apilados, menta y coral, con el letrero amarillo y **Doña Chatarra** tras el mostrador;
-  - la **máquina de refrescos** ("RESTAURAR ENERGÍA");
-  - el **contenedor verde** de reciclaje ("VENDER BASURA") con la **trituradora** y su cinta;
-  - alrededor, camiones abandonados, pilas de neumáticos, barriles, cajas y postes de luz con cables.
-- Fuera de las zonas, césped verde.
+- **El patio de basura**: un rectángulo de 97,5 × 150 m dividido por caminos en 6 cuadrantes (2 columnas × 3 filas), todos abiertos. Cada cuadrante tiene **2 montones chicos y 1 grande** (18 en total).
+- **La plaza**, donde se aparece. En el césped del este, los **3 tablones de ranking** (§12).
+- **La recicladora**: la caseta-tienda **SHOP** (dos contenedores apilados, menta y coral) con el tendero tras el mostrador (aviso "Tienda · Reciclador"); el **contenedor general azul**, el volquete de la recicladora grande con su trituradora y su cinta; y, en fila al este, los **4 contenedores de color**, cada uno con su trituradora pequeña. Cada depósito pone en marcha la cinta y la trituradora de su contenedor, y lo ven todos.
 
 ---
 
 ## 5. El patio y los montones
 
-### Montones
-| Tamaño | Cantidad en el patio | Piezas al excavar | Tiradas de premio |
+| Montón | Cuántos | Piezas al excavar |
+|---|---|---|
+| Chico | 12 | 20 |
+| Grande | 6 | 60, con un **tesoro seguro** |
+
+- Junto a una colina, mantén E en **"Excavar"** 1,5 s: la colina se convierte en una montaña de basura que cae con física; las piezas quietas son sólidas y la montaña se puede escalar.
+- Cada pieza es **basura** (94 %), un **billete** (5 %, verde con destellos) o un **tesoro** (1 %, violeta brillante, "¡TESORO!").
+- La basura es del **color de su tipo**: papel celeste, plástico amarillo, metal gris plomo, orgánico verde. Con 0 rebirths solo salen papel y plástico; el **Rebirth 1** abre el metal y el **2** el orgánico. Nadie recoge una pieza de un tipo que aún no tiene, aunque la saque otro (burbuja "Metal: Rebirth 1").
+- **Prioridad del excavador**: durante 10 s solo recoge quien excavó ("Espera 6 s: es de Ana").
+- **Un montón a medias por jugador**: para abrir otro hay que recoger el 75 % del tuyo ("Termina tu montón primero"). Con demasiada basura suelta en el patio no se excava ("Patio lleno: espera un poco").
+- Las piezas no caducan. Un montón que baja del 25 % vuelve a ser colina a los 45 s.
+- Recoger: solo con la mira y dentro de tu **alcance** (6 m de base). La pieza vuela a tu bolsa y sale un **"+1"** ("+1 $" un billete). Pasar por encima no recoge nada.
+
+---
+
+## 6. La bolsa, el lanzamiento y los contenedores
+
+- Capacidad: **10 piezas**, +3 por nivel de la mejora Bolsa (40 al máximo; +10 con el pase Bolsa XL). Todo ocupa un hueco, billetes y tesoros incluidos. En el HUD, la barra **Bolsa** se llena sin números y dice **"¡LLENA!"** en rojo.
+- **Lanzar**: solo con la bolsa **llena**. Mantén F para cargar la fuerza (1,2 s llega al alcance de tu **Brazo**: 25 m de base, 70 al máximo) y suelta; la bolsa entera vuela hacia la mira. Hay que estar a más de 6 m del contenedor ("Aléjate un poco para lanzar"). Los 5 primeros lanzamientos llevan una **línea de ayuda**, y el **primero siempre entra**.
+- **Si entra**: celebración **"¡DENTRO!"** con el dinero contando, la distancia, el bonus y la racha.
+
+  | Distancia al contenedor | Bonus |
+  |---|---|
+  | menos de 10 m | — |
+  | 10–19 m | +20 % |
+  | 20–29 m | +40 % |
+  | 30–44 m | +70 % |
+  | 45–59 m | +100 % |
+  | 60 m o más | +150 % |
+
+  Más la **racha**: +10 % por cada acierto seguido, hasta +50 %. Batir tu récord de distancia (o el del servidor) saca la tarjeta **"¡NUEVO RÉCORD!"**; el del servidor sale también en el feed de los demás.
+- **Si falla**: la racha vuelve a 0 y la bolsa queda en el suelo con todo dentro, con "Bolsa de Ana" y una cuenta atrás encima: **30 s solo para su dueño**, después **"¡LIBRE!"** y se la queda quien la recoja (al dueño le llega "Luis se llevó tu bolsa"). Si queda en alto, baja junto al contenedor. Como mucho **3 bolsas caídas** por jugador: con la cuarta, la más vieja se recicla sola, sin bonus y a mitad de precio.
+- **Entregar a mano**: E en "Reciclar bolsa" junto a un contenedor. Celebración **"¡RECICLADO!"**; sin bonus de distancia ni de racha (el de separar sí).
+- **Los cinco contenedores** ("PAPEL · x2", "GENERAL · TODO"): en el de su color, cada pieza de basura paga **x2**; en el de otro color, **x0,5**; en el **general**, x1. Billetes y tesoros pagan lo suyo en cualquiera. La bolsa entera va al contenedor donde cae. Los de **metal** y **orgánico** están cerrados con un candado ("REBIRTH 1", "REBIRTH 2") hasta tener su rebirth: la bolsa rebota en la tapa.
+- **Al salir del juego**, lo que llevas en la bolsa, tus bolsas caídas y las que estén en el aire se cobran para ti, sin bonus.
+
+---
+
+## 7. El dinero
+
+| Pieza | Paga |
+|---|---|
+| Papel | $5 |
+| Plástico | $7 |
+| Metal | $15 |
+| Orgánico | $25 |
+| Billete | 6 piezas de su tipo |
+| Tesoro | 40 piezas de su tipo |
+
+Pago de una bolsa = el valor de sus piezas (con el x2 / x0,5 de separar) × (1 + bonus de distancia + racha) × el multiplicador del rebirth, × 2 con el pase **Dinero x2** y × 2 con **Turbo**. La primera bolsa (10 piezas al general, sin bonus) ronda los **$97**.
+
+- **Turbo**: dinero x2 durante unos minutos, que se suman si llega otro; el HUD enseña "x2 7:30". Se gana con los pedidos y las recompensas (y se venderá, §11). Hoy corre en tiempo real y no se guarda al salir; **(llega con K1)** que solo corra mientras juegas.
+- Los premios en dinero (pedidos, calendario, regalos, regreso) **no** los multiplican ni los pases ni el Turbo.
+
+---
+
+## 8. Mejoras (la Tienda, pestaña Mejoras)
+
+Cuatro mejoras de 10 niveles; en la tienda el nivel es una barra de 10 cuadros, sin números de alcance ni de velocidad.
+
+| Mejora | Qué hace | Nivel 0 → 10 | Nivel 1 | Nivel 10 | Las 10 |
+|---|---|---|---|---|---|
+| Bolsa | cabe más basura | 10 → 40 piezas | $150 | $2.234 | $8.189 |
+| Alcance | recoge desde más lejos | 6 → 16 m | $120 | $1.787 | $6.551 |
+| Velocidad | corre más rápido | 16 → 28 | $200 | $2.979 | $10.918 |
+| Brazo | lanza más lejos | 25 → 70 m | $180 | $2.681 | $9.827 |
+
+Las 4 al máximo: **$35.485**. Cada nivel cuesta 1,35 veces el anterior.
+
+---
+
+## 9. Rebirth
+
+Con las **4 mejoras al máximo** y el **dinero del requisito en mano**, el botón **Renacer** reinicia el dinero y las mejoras y sube para siempre tu multiplicador de dinero. Te quedas los tipos de basura abiertos, los récords, las insignias, los cosméticos y los pases.
+
+| Rebirth | En mano | Tu dinero vale | Además |
 |---|---|---|---|
-| Chico | 11 | 18–24 | 10–12 |
-| Mediano | 4 | 45–60 | 16–20 |
-| Grande | 3 | 90–115 | 24–30 |
+| 1 | $15.000 | x1,5 | abre la basura de metal (y su contenedor) |
+| 2 | $100.000 | x2 | abre la basura orgánica (y su contenedor) |
+| 3 | $250.000 | x3 | regala la Bolsa plateada |
+| 4 | $500.000 | x4 | regala la Bolsa de hielo |
+| 5 | $800.000 | x5 | regala la Estela de fuego y la insignia Reciclador de élite |
+| 6–9 | $1,2M · 1,8M · 2,5M · 3,5M | x6 … x9 | solo sube el multiplicador |
+| 10 | $5M | x10 | la insignia Leyenda del reciclaje |
+| 11 y más | ×1,4 cada uno | +1 cada uno | solo multiplicador |
 
-- Cada montón es una **colina**. Al **excavar** (mantener E 1,5 s; no gasta energía) se transforma en una **montaña de basura del mismo tamaño**: las piezas brotan de abajo arriba y caen con física, amontonándose.
-- La montaña **se puede escalar**: las piezas quietas son sólidas. Al recoger las de abajo, las de encima caen y se vuelven a asentar.
-- Las piezas **no caducan**: se quedan hasta que alguien las recoja.
-- Un montón vacío queda **agotado** (una marca plana). Cuando quedan **6 o menos montones disponibles**, a los 20 s Doña Chatarra **repone** los agotados (aviso: *"¡Doña Chatarra trajo más basura!"*). Un montón al que le queda menos del 25 % ya no cuenta como disponible.
+Un jugador medio llega al Rebirth 1 hacia la **hora de juego** (calculado, falta medirlo con jugadores). El panel enseña el requisito, una barra y lo que abre el siguiente; bajo el botón Rebirth del HUD hay una barrita de progreso.
 
-### Límites al excavar
-- **Un montón a medias por jugador.** Si quieres abrir otro sin terminar el tuyo, aparece la oferta **"Montón extra"** (Robux) con las opciones "Abrir ya" o "Sigo recogiendo".
-- Si el patio ya tiene demasiada basura suelta (360 piezas), no se puede excavar: *"Hay demasiada basura en el patio: espera a que se recoja un poco"*.
+---
 
-### Qué sale de un montón
-Cada tirada de premio decide qué es la pieza. El resto de piezas es basura de relleno.
+## 10. Pedidos y recompensas
 
-| Tipo | Probabilidad |
+### Pedidos del día (panel Pedidos, P)
+
+Se abren al comprar la primera mejora. Cada día hay **3 pedidos**, el primero de puntería, elegidos entre:
+
+| Pedido | Dificultad |
 |---|---|
-| Basura | 58 % |
-| Billete | 15 % |
-| Fragmento de mascota | 14 % |
-| Mascota completa | 6 % |
-| Tesoro | 4 % |
-| Coleccionable (figurita, cinta o traje) | 3 % |
+| Encesta 10 bolsas | media |
+| Consigue una racha de 5 | difícil |
+| Encesta 3 desde N m o más (según tu Brazo) | media |
+| Recicla 150 piezas | media |
+| Recicla 40 piezas en su contenedor de color | fácil |
+| Recicla 40 de (un tipo que ya tienes) | media |
+| Encuentra 3 tesoros | media |
+| Recicla 5 bolsas llenas | fácil |
 
-- **Basura**: Metal 25 %, Plástico 30 %, Papel 30 %, Orgánico 15 %. Hay muchas formas distintas (latas, botellas, cajas, periódicos, barriles, neumáticos, cáscaras…).
-- **Mascota completa**: sale **sucia** el 70 % de las veces. Estado: Dañada 30 %, Regular 35 %, Buena 25 %, Excelente 8 %, Perfecta 2 %. La rareza la decide el **pity** (ver §10).
-- **Fragmento**: Común 70 %, Rara 22 %, Épica 8 %. La mitad de las veces es de una mascota que ya tienes a medias, para que completarla no se eternice.
-- **Coleccionable**: figurita 50 %, cinta 35 %, traje 15 %, siempre entre los que **te faltan**.
+Se cobran solos al cumplirse ("¡Pedido cumplido! +$1.000"). Pagan el **1,5 % (fácil), 2 % (medio) o 3 % (difícil)** de lo que cuesta tu siguiente rebirth: con 0 rebirths, $760 / $1.000 / $1.500; con 1, $2.000 / $2.700 / $4.100. Los tres del día dan además **10 min de Turbo**. Con el pase **VIP** sale un **Pedido VIP** más (dorado, con corona), que paga como difícil. Los pedidos cambian cada día a las **06:00 UTC** (madrugada en América, mañana en España). El HUD enseña bajo el dinero el pedido más avanzado ("Separa 12/40").
 
-### Recoger
-- **Solo con clic** (o tocando en móvil) dentro de tu **alcance** (6 studs de base), o arrastrado por el **imán**. Pasar por encima no recoge nada.
-- La pieza apuntada se resalta. Al recogerla, vuela hacia ti y entra en la bolsa.
-- Cada pieza cuesta **2 de energía** y ocupa **un hueco de la bolsa**, sea basura, billete, tesoro o mascota.
-- **Imán** (mejora): atrae las piezas de su radio y las mete en la bolsa sin clic. Se detiene si la bolsa está llena o no te queda energía.
-- Todo es **compartido**: lo que sale de un montón es de quien lo recoja primero, lo haya excavado quien sea.
+### Recompensas (panel Recompensas, G)
 
----
+Se abren con la primera mejora. Todo premio en dinero es un porcentaje de lo que cuesta tu siguiente rebirth (con 0 rebirths, 1 % = $500).
 
-## 6. La bolsa
-
-- Capacidad inicial: **8 objetos**, +3 por nivel de la mejora Bolsa (hasta 38).
-- En el HUD, la barra **Bolsa** se llena sin números. Llena, muestra **"¡LLENA!"** en rojo y aparece el aviso *"¡Bolsa llena! Vuelve a la caseta"*.
-- En primera persona ves la bolsa en tus manos. Los demás jugadores te ven con los brazos extendidos y la bolsa abierta mientras estás en el patio.
-
-### Reciclar en el contenedor
-Junto al contenedor verde, mantén E en **"Reciclar bolsa"**. Se vacía todo:
-
-| Lo que llevas | Qué pasa |
-|---|---|
-| Basura | Se paga según su material (§7) |
-| Billetes y tesoros | Se pagan |
-| Fragmentos | Pasan a tu colección |
-| Mascotas | Van a tu almacén si hay sitio; si no, **se quedan en la bolsa** y se avisa |
-| Figuritas, cintas, trajes | Pasan a tu colección |
-
-- **Bonus bolsa llena: +25 %** del dinero si la bolsa iba llena ("… (+25% bolsa llena)").
-- Al reciclar, la **cinta de la recicladora** se pone en marcha: la basura sube por la cinta en L, cae en la trituradora (los rodillos giran más rápido) y sale un bloque prensado por la rampa. Lo ven todos los jugadores.
-
-### Lanzar la bolsa (puntería)
-- Mantén **F** para cargar la **barra de fuerza** (se llena en 1,2 s) y suelta: la bolsa **entera** vuela en parábola hacia donde apuntas. Cuanta más fuerza, más lejos (hasta 70 studs).
-- Cuesta **10 de energía**. Hace falta estar a **más de 6 studs** del destino.
-- Si **entra en el contenedor**: se recicla todo con un **+50 %** extra (se suma al +25 % de bolsa llena) y aparece *"¡Dentro! +$… desde N studs"*. Cuenta para los logros de Puntería.
-- Si **falla**: la bolsa rebota contra lo que golpee y **queda en el suelo con todo dentro**. *Cualquier jugador* puede recogerla ("Recogiste la bolsa de X (N objetos)").
-- La bolsa rebota en paredes y máquinas y puede quedarse encima de ellas (por ejemplo, en el techo de la trituradora).
-
-### Si te desconectas
-Lo que vale dinero y no reciclaste **se pierde**. Las mascotas y los coleccionables que lleves pasan a tu colección si caben.
+- **Calendario** de 7 casillas, una por **día jugado**, con botón **Reclamar**: 2 % · 2 % · Turbo 10 min · 3 % · 3 % · Turbo 15 min · 4 %. Si un día no juegas, **no pierdes nada**: la casilla te espera. La 7.ª da la insignia **Constante**, que regala la Bolsa de cartón (ponérsela **llega con K1**); desde la segunda semana, la 7.ª suma Turbo 15 min.
+- **Regalos por jugar**, que se dan solos según los minutos que llevas jugando **hoy** (cuentan los minutos en los que recoges, lanzas o excavas, también entre varias sesiones del mismo día): a los 5, 10, 20, 30, 45 y 60 min, 0,5 % · 0,5 % · 1 % · Turbo 5 min · 1 % · 2 %.
+- **Bono de regreso**, al volver tras 3 días o más sin jugar: Turbo 15 min + 4 % (tras 14 días, Turbo 30 min + 8 %), con la ventana *"¡Qué bien verte otra vez!"*.
 
 ---
 
-## 7. Dinero y Gemas
+## 11. La Tienda ("Caseta de reciclaje", Q)
 
-### Dinero ($)
-Moneda gratuita. **Solo se gana al reciclar en el contenedor**, al vender mascotas y con los logros.
+Se abre con Q (o T), con el botón Tienda o en el aviso del tendero. Tres pestañas:
 
-| Fuente | Valor |
-|---|---|
-| Basura de metal | $12 |
-| Basura de plástico | $8 |
-| Basura de papel | $6 |
-| Basura orgánica | $5 |
-| Billete | $20–80 |
-| Tesoro | $150–600 |
-| Logro desbloqueado | $100 |
-| Venta de mascota | Ver §10 |
+- **Mejoras** (§8).
+- **Pases** (Robux), creados en Roblox el 23 oct: cada tarjeta lleva su botón de compra con el precio de la tabla.
 
-- La basura vale más con **mascotas exhibidas** en tu base (su pasiva; ver §10).
-- Se gasta en mejoras, refrescos ($50) y el Contenedor Dorado ($25.000).
+  | Pase o producto | Robux | Da |
+  |---|---|---|
+  | Pack de inicio (compra única) | 99 | 30 min de Turbo una vez **(llega con K1)** y la Bolsa del reciclador |
+  | Dinero x2 | 199 | todo lo que reciclas paga el doble, para siempre |
+  | Bolsa XL | 149 | 10 huecos más en la bolsa, para siempre |
+  | VIP | 249 | la Estela VIP, un pedido más cada día y una corona sobre la cabeza **(llega con K1)** |
+  | Estela arcoíris | 99 | tu bolsa deja un arcoíris al lanzarla |
+  | Bolsa dorada | 99 | una bolsa de oro |
+  | Turbo 15 min / 60 min | 49 / 149 | dinero x2 ese tiempo, sumado al que te quede |
 
-### Gemas
-Moneda premium: solo se consiguen con Robux. Se gastan en el Sobre de Mascotas Premium (149) y en el Contenedor Dorado (150, alternativa al dinero).
+- **Estilo**: diseños de la bolsa (en las manos, lanzada y caída) y estelas al lanzarla. Bolsas plateada (Rebirth 3), de hielo (Rebirth 4), de cartón (insignia Constante), del reciclador (Pack de inicio) y dorada (pase); estelas arcoíris (pase), de fuego (Rebirth 5) y VIP (pase VIP). Solo se ven: no dan ventaja.
 
----
-
-## 8. Energía y refrescos
-
-- Máximo inicial **100**, +15 por nivel de la mejora Energía (hasta 250). Barra naranja arriba a la derecha.
-- **Gasta**: recoger una pieza (2) y lanzar la bolsa (10). Excavar es gratis. Con la bolsa inicial, un viaje completo gasta unos 26: da para unas 4 bolsas por barra.
-- **Regenera sola** 1 punto cada 6 s (10 por minuto), para que nadie se quede atascado.
-- Sin energía: *"Sin energía: compra un refresco en la máquina"*.
-- **Máquina de refrescos** (junto a la tienda): mantén E 1,5 s → **$50** → recupera **30** de energía, +8 por nivel de la mejora Chispa (hasta 110). Mensaje: *"¡Glup! +N energía"*.
+Nada de lo que se vende es aleatorio ni hace el trabajo por ti, y no se vende dinero ni rebirths. **(Llega con K1)**: el precio real de Roblox en la tienda y, de vez en cuando, una oferta en una ventana con "Comprar" y "Ahora no" igual de visibles, nunca en la primera sesión.
 
 ---
 
-## 9. La tienda SHOP y Doña Chatarra
+## 12. Insignias, récords y rankings
 
-- **Doña Chatarra** está tras el mostrador de la tienda. Acercarse y pulsar **"Tienda"** abre el panel de la tienda (sin diálogos: se quitaron el 29 sep).
-- El **panel de la tienda** se abre con **Q/T**, con el botón Tienda del HUD o desde el **teléfono** de tu base ("Llamar a Doña Chatarra"). Tiene 4 pestañas:
+- **20 insignias** (panel Pedidos, pestaña Insignias, "N/20 conseguidas"), con una tarjeta grande al conseguirlas ("¡Insignia conseguida!"); las que ya están creadas en Roblox se dan también como Badge.
 
-**Mejoras**: las 7 mejoras (§12), con su nivel, el valor actual → el siguiente y el coste.
+  | Insignia | Cómo | Insignia | Cómo |
+  |---|---|---|---|
+  | Primer reciclaje | recicla tu primera bolsa | ¡Dentro! | encesta tu primera bolsa |
+  | Brazo fuerte | encesta desde 30 m | Francotirador | encesta desde 60 m |
+  | En racha | encesta 5 seguidas | Imparable | encesta 10 seguidas |
+  | Reciclador | recicla 1.000 piezas | Gran reciclador | recicla 10.000 piezas |
+  | Separa bien | 500 piezas en su contenedor de color | Buscatesoros | encuentra un tesoro |
+  | Ahorrador | gana $10.000 en total | Millonario | gana $1.000.000 en total |
+  | A tope | una mejora al máximo | Equipo completo | las 4 mejoras al máximo |
+  | Renacido | tu primer Rebirth | Veterano | llega al Rebirth 3 |
+  | Reciclador de élite | llega al Rebirth 5 | Leyenda del reciclaje | llega al Rebirth 10 |
+  | Constante | cobra las 7 casillas del calendario | Cumplidor | cumple 30 pedidos |
 
-**Mascotas**
-- **Sobre de Mascotas Premium** (149 Gemas): 1 mascota **limpia**. Rareza: Común 55 %, Rara 35 %, Épica 10 %. Estado: Regular 40 %, Buena 35 %, Excelente 20 %, Perfecta 5 %.
-- **Contenedor Dorado** ($25.000 o 150 Gemas): **3 mascotas** Raras (60 %) o Épicas (40 %), en estado Buena 50 %, Excelente 40 % o Perfecta 10 %. **Bloqueado** hasta tener las 7 mejoras al máximo ("Se desbloquea con las 7 mejoras al máximo (N/7)").
-- Los dos tienen el botón **"Ver probabilidades"**, que muestra las cifras exactas antes de comprar. En la tabla de montones aparece tu probabilidad actual de Rara o mejor.
-- **Vender duplicados**: vende de una vez todas las copias repetidas y se queda con la mejor de cada mascota.
-- No se cobra nada si no hay sitio en el almacén para lo que pueda salir.
-
-**Trajes**: los 3 trajes gratuitos (hay que encontrarlos; se equipan), los 2 de pago y las 2 skins de base.
-
-**Gemas y Pases**: packs de Gemas y pases (§16).
-
-Al abrir un sobre o un contenedor, una ventana revela lo que salió.
-
----
-
-## 10. Mascotas
-
-### La colección
-**41 mascotas**: 4 sets de 10 (4 Comunes, 3 Raras y 3 Épicas) más el **Rey Reciclón** (Mítica).
-
-| Set | Material | Estilo |
-|---|---|---|
-| Chatarrín | Metal | Latas, tornillos, tuberías: robóticas y brillantes |
-| Plastín | Plástico | Botellas, tapas, bolsas: elásticas y coloridas |
-| Cartonín | Papel | Cajas, periódicos, rollos: suaves y torpes |
-| Mostrenco | Orgánico | Cáscaras y restos: espeluznantes-tiernas |
-
-<details>
-<summary>Las 41 mascotas</summary>
-
-| Set | Comunes | Raras | Épicas |
-|---|---|---|---|
-| Chatarrín | Latita, Tornillín, Clavito, Tuberco | Engranín, Robolata, Chispazo | Ferrotón, Cromadón, Magnetrón |
-| Plastín | Botellín, Tapita, Bolsuki, Pajito | Elastiko, Burbujín, Tupperín | Polímero, Neoplast, Vinilón |
-| Cartonín | Cajita, Periodín, Rollito, Papelón | Origamo, Libretín, Cartonazo | Papiro, Enciclopedio, Cartonio |
-| Mostrenco | Cascarón, Semillín, Hojarasca, Pepita | Mohosín, Fantasmita, Raicilla | Compostor, Espectrón, Musgrón |
-| — | | | **Rey Reciclón** (Mítica) |
-
-</details>
-
-- Cada una tiene **Resistencia** y **Poder** (valores de colección; no hay combate), una descripción y una **pasiva**.
-- Colores de rareza: Común gris, Rara azul, Épica morado, Mítica dorado.
-
-### Estado de conservación
-**Dañada → Regular → Buena → Excelente → Perfecta.** Se ve en la etiqueta de la mascota (p. ej. "Latita · Regular").
-
-### Sucias
-Las mascotas sacadas de los montones suelen venir **sucias**. Una mascota sucia vale la mitad, no se puede fusionar ni exhibir: hay que **limpiarla** en la mesa de reparación.
-
-### Cómo se consiguen
-1. **Completas en un montón** (6 % de las tiradas).
-2. **Fragmentos**: 5 fragmentos de la misma mascota se ensamblan en la mesa → 1 copia **Regular y limpia**. Aviso: *"¡Tienes los 5 fragmentos de X! Ve a la mesa de reparación"*.
-3. **Sobre Premium** y **Contenedor Dorado** (tienda).
-4. **Rey Reciclón**: se consigue automáticamente al tener las 40 mascotas de los 4 sets. No se puede vender.
-
-### Pity (suerte que sube)
-La probabilidad de que una mascota completa de un montón sea **Rara o mejor** empieza en **8 %** y sube **2 puntos** por cada montón que excavas sin conseguir una Rara (3 con el Pase de la Suerte), hasta un **60 %**. Al salir una Rara vuelve al 8 %. De las Raras o mejores, 1 de cada 4 es Épica.
-
-### Fusión
-**3 copias limpias** de la misma mascota **en el mismo estado** → 1 copia en el estado siguiente. Las Perfectas no se fusionan. Se hace desde el Álbum ("Fusionar ×3").
-
-### Vender
-Valor = base por rareza × multiplicador de estado (×0,5 si está sucia):
-
-| Rareza | Base | Dañada ×0,5 | Regular ×1 | Buena ×1,6 | Excelente ×2,5 | Perfecta ×4 |
-|---|---|---|---|---|---|---|
-| Común | $40 | $20 | $40 | $64 | $100 | $160 |
-| Rara | $200 | $100 | $200 | $320 | $500 | $800 |
-| Épica | $900 | $450 | $900 | $1.440 | $2.250 | $3.600 |
-
-### Almacén
-Cuántas mascotas puedes guardar: **30** de base, +10 por nivel de la mejora Almacén (hasta 130). Si está lleno: *"Almacén lleno: vende o fusiona mascotas"*. Lo que no cabe se queda en la bolsa.
-
-### Exhibir y pasivas
-- Hasta **6 mascotas limpias** en los **6 podios** de tu base. Se ponen desde el Álbum.
-- **Solo las exhibidas activan su pasiva**: Común +2 %, Rara +4 % y Épica +6 % al dinero de **la basura de su material**. El Rey Reciclón da **+10 % a toda la basura**.
+- **Récords**: tu mejor distancia de acierto y la mejor del servidor (§6). El primer lanzamiento, que entra siempre, no cuenta para récords.
+- **Tablones de ranking** en la plaza: **Dinero ganado**, **Racha máxima** y **Bolsas encestadas**, cada uno con el **histórico** y **esta semana** (empieza el lunes a las 00:00 UTC): el top 10 con la cara del avatar y, al pie, tu fila.
 
 ---
 
-## 11. Mesa de reparación
+## 13. Pantalla y avisos
 
-Es el banco del taller de tu base; también se abre desde el Álbum. Tiene dos minijuegos:
-
-- **Limpieza**: arrastras el puntero (o el dedo) sobre las **8–12 manchas** de la mascota; cada una se va tras un momento de frotar. Sin manchas, la mascota queda limpia.
-- **Ensamblaje**: 5 piezas giradas al azar; tocar una la gira 90°. Cuando todas encajan, sale la mascota en estado Regular.
-- Con el pase **Auto-Ensamblaje**, los 5 fragmentos se ensamblan al instante, sin minijuego.
-- Si no tienes nada que reparar: *"No tienes mascotas sucias ni fragmentos completos"*.
-
----
-
-## 12. Mejoras
-
-Se compran en la tienda. Cada una tiene **10 niveles**. El coste del siguiente nivel es el coste base × 1,6 elevado al nivel actual.
-
-| Mejora | Qué hace | Nivel 0 → 10 | Coste nivel 1 | Coste nivel 10 |
-|---|---|---|---|---|
-| Bolsa | Cuánto cabe en la bolsa | 8 → 38 objetos | $150 | $10.310 |
-| Energía | Energía máxima | 100 → 250 | $200 | $13.740 |
-| Chispa | Energía que da cada refresco | 30 → 110 | $120 | $8.250 |
-| Almacén | Mascotas que caben en tu base | 30 → 130 | $180 | $12.370 |
-| Velocidad | Velocidad al andar | 16 → 28 studs/s | $250 | $17.180 |
-| Alcance | Distancia para recoger con clic | 6 → 16 studs | $160 | $11.000 |
-| Imán | Radio de atracción automática | 0 → 15 studs | $220 | $15.120 |
-
-Los pases de Velocidad (+25 %) e Imán (+50 %) se suman encima. Tener las 7 al máximo desbloquea el **Contenedor Dorado**.
+- **Arriba a la derecha**: la píldora verde del **dinero**, el **Turbo** si queda y el pedido más avanzado.
+- **A la derecha**: la barra de **Fuerza** (con el bonus que daría acertar desde donde estás) y la de **Bolsa**.
+- **Abajo**: "MANTÉN [F] PARA LANZAR" con la bolsa llena y la pista de recoger (se va sola tras 20 recogidas).
+- **Burbujas en el mundo**, a media pantalla, para lo que se rechaza ("Es de Ana: libre en 12 s", "Se abre con el Rebirth 2", "Llena la bolsa para poder lanzarla", "No llevas nada que reciclar"…).
+- **Avisos** arriba en el centro para lo tuyo (pedidos, rebirth, compras, regalos) y un **feed** del servidor ("Ana activó un montón grande", "¡Llegó más basura al patio!", "¡Luis hizo el Rebirth 2!", "¡Récord del servidor!…").
+- **Celebraciones** al cobrar ("¡DENTRO!", "¡RECICLADO!") y tarjetas grandes de récord y de insignia.
 
 ---
 
-## 13. Coleccionables
+## 14. Sonido e idiomas
 
-### Figuritas (12)
-Se colocan solas en la **vitrina** de tu base.
-- **6 escondidas en el mundo**: se recogen al acercarte a ellas. Cada jugador puede recoger cada una una vez, y en su pantalla desaparece. Las pistas, en la pestaña Estantería de "Mi base":
-  - Gnomo Oxidado: detrás de la caseta de Doña Chatarra
-  - Pato de Goma: dentro del tubo tumbado
-  - Robot de Hojalata: encima del contenedor azul
-  - Gatito de Cartón: bajo la rampa
-  - Dinosaurio Sin Cola: dentro de la lavadora vieja
-  - Astronauta Pequeñito: sobre la pila de neumáticos
-- **6 salen de los montones**: Sirena de Botella, Caballero de Latas, Búho de Periódico, Rana de Tapitas, Payaso Descolorido y Doña Chatarra en Miniatura.
-
-### Cintas (7)
-Salen de los montones y se ponen en la **radio** de tu base: Ritmo Chatarra, Balada del Vertedero, Plástico Elástico, Noticias de Ayer, Compost Nocturno, Refresco Burbujeante y Marcha del Rey Reciclón. Al reproducir una, los carretes de la radio giran y se muestra el título. **Todavía no tienen audio** (el panel lo indica: "sin audio todavía").
-
-### Trajes (3 gratis + 2 de pago)
-Cambian los colores de tu avatar y le ponen un accesorio. Se equipan en la pestaña Trajes.
-- Gratis (se encuentran en los montones): **Mono Naranja** (gorra), **Chaleco Reflectante** (casco), **Escafandra de Chatarra**.
-- De pago: **Traje Dorado** (corona), **Fantasma del Vertedero**.
-
-### Skins de base (de pago)
-Recolorean el suelo, la cerca y los muebles de tu base: **Base Neón** y **Base Jardín**.
+- Efectos al recoger, cargar y lanzar, al encestar o fallar, al cobrar, en las mejoras, los rebirths y las insignias, en la interfaz y en las trituradoras; música alegre en el patio (otra más animada al empezar un Turbo), que baja en las celebraciones. El botón **Sonido (M)** enciende o apaga **Música** y **Efectos** por separado, y se recuerda.
+- El juego sale en **español, inglés o portugués** según el idioma de tu cuenta de Roblox; cualquier otro idioma lo ve en español.
 
 ---
 
-## 14. Tu base
+## 15. Varios jugadores
 
-Una parcela de 36 × 36 studs con esta distribución:
-
-- **Arco de entrada** coral, con el nombre del dueño encima ("Base de *nombre*" o "Parcela libre").
-- **Alfombra roja** desde la entrada hasta el fondo.
-- **6 podios**, tres a cada lado de la alfombra. La mascota exhibida **gira despacio** sobre el suyo, con su nombre y estado encima. El **aro del podio brilla** con el color de su rareza (neón y luz). Vacíos, los aros son neutros.
-- **Escenario** al fondo con la **vitrina de figuritas**: 2 baldas de cristal con 6 huecos cada una.
-- **Radio** en una esquina del fondo y **banco del taller** (mesa de reparación) en la otra.
-- **Teléfono** (abre la tienda) y **almacén** (cofre, abre el Álbum).
-- Cerca menta alrededor, abierta al frente.
-
-**Interacciones** (solo en tu base):
-
-| Mueble | Qué abre |
-|---|---|
-| Vitrina | Mi base → Estantería |
-| Radio | Mi base → Radio |
-| Podios | Mi base → Exhibidor |
-| Banco del taller | Mesa de reparación |
-| Teléfono | Tienda |
-| Almacén | Álbum |
-
-**Visitar**: puedes entrar en las bases de otros jugadores y mirar, pero no tocar. Bajo su arco puedes darles **"Me gusta"**, una vez por base y sesión. El dueño recibe el aviso *"¡A X le gusta tu base!"* y lo ve en su contador de "Me gusta recibidos".
-
-**Viajar**: los botones **Ir a casa** e **Ir al patio** del HUD te teletransportan a tu base o a la plaza.
+- Hasta **6 por servidor**.
+- **Compartido**: el patio, sus montones y lo que sale de ellos (quien recoge primero se lo lleva, salvo los 10 s del que excava), las bolsas falladas pasados sus 30 s, el feed, los tablones y las recicladoras en marcha.
+- **De cada uno**: la bolsa, el dinero, las mejoras, los rebirths, los pedidos, las recompensas, los récords personales, las insignias y los cosméticos. Las celebraciones solo las ve quien cobra.
+- El servidor vigila que nadie se mueva más deprisa de lo que permite su Velocidad: a quien se pasa no le deja recoger ni lanzar durante 2 s (nunca le echa).
 
 ---
 
-## 15. Logros (40)
+## 16. Lo que todavía no hay
 
-En 11 categorías. Cada uno da **$100** y se anuncia con una tarjeta grande con trofeo. El panel de Logros muestra una barra de progreso por logro y el total "N/40 logros".
-
-| Categoría | Logros |
-|---|---|
-| Reciclaje | Reciclar 1 / 100 / 1.000 / 10.000 / 100.000 objetos |
-| Ahorro | Tener $1.000 / $10.000 / $100.000 / $1.000.000 a la vez |
-| Mejoras | Primera mejora; una mejora a nivel 5; una a nivel 10; las 7 a nivel 10 |
-| Sets | Completar cada uno de los 4 sets; conseguir al Rey Reciclón |
-| Estado Perfecto | 1 / 10 / 40 mascotas distintas en estado Perfecto |
-| Contenedor Dorado | Abrir 1 / 10 / 50 |
-| Figuritas | Encontrar 1 / 6 / 12 |
-| Cintas | Encontrar 1 / 4 / 7 |
-| Trajes | Encontrar 1 / 2 / 3 trajes gratuitos |
-| Refrescos | Beber 1 / 25 / 100 |
-| Puntería | Acertar en el contenedor desde 15 / 25 / 40 studs; acertar 50 lanzamientos |
-
----
-
-## 16. Pases y compras con Robux
-
-Ningún pase bloquea contenido: la colección entera se completa gratis.
-
-| Pase | Precio | Efecto |
-|---|---|---|
-| Pase de la Suerte | 249 R$ | El pity de Raras sube 3 % por montón en vez de 2 % |
-| Pase de Velocidad | 149 R$ | +25 % de velocidad |
-| Pase de Imán | 149 R$ | +50 % de radio de imán |
-| Auto-Ensamblaje | 199 R$ | Los 5 fragmentos se ensamblan al instante |
-| Traje Dorado | 199 R$ | Traje premium |
-| Fantasma del Vertedero | 79 R$ | Traje premium |
-| Base Neón | 249 R$ | Skin de base |
-| Base Jardín | 99 R$ | Skin de base |
-
-| Producto | Precio | Da |
-|---|---|---|
-| Puñado de Gemas | 99 R$ | 100 Gemas |
-| Bolsa de Gemas | 249 R$ | 300 Gemas |
-| Cubo de Gemas | 499 R$ | 700 Gemas |
-| Montón extra | 49 R$ | Abrir otro montón sin terminar el tuyo (se ofrece al intentar excavar) |
-
-> Los productos todavía no están publicados en Roblox: fuera de Studio, al intentar comprarlos aparece "Producto no disponible todavía". En Studio los pases cuentan como comprados para probarlos.
-
----
-
-## 17. Pantalla (HUD) y paneles
-
-**HUD**
-- **Izquierda**: botones grandes con icono: Tienda (Q), Álbum (J), Logros (L), Mi base (B), Ir a casa e Ir al patio.
-- **Arriba a la derecha**: mascotas conseguidas (N/41), Gemas, el **dinero** en una píldora verde grande y la **barra de energía**.
-- **Derecha**: la barra de **Fuerza** (al cargar el lanzamiento) y la barra de **Bolsa**.
-- **Abajo a la izquierda**: el retrato de tu avatar.
-- **Abajo a la derecha**: las pistas "MANTÉN [F] PARA LANZAR" y "MANTÉN PARA RECOGER". La de recoger desaparece sola tras 20 recogidas.
-- **Avisos**:
-  - arriba en el centro, lo que te pasa a ti ("Reciclaste 8 objetos por $64", "Fragmento de Latita (3/5)"…);
-  - arriba a la derecha, un **feed** de lo que pasa en el servidor ("X activó un montón grande", "¡X encontró una Robolata (Rara)!", "¡Doña Chatarra trajo más basura!", "X obtuvo al Rey Reciclón").
-- En el mundo hay **carteles flotantes**: "VENDER BASURA", "RESTAURAR ENERGÍA", "DOÑA CHATARRA" y el nombre de cada base. Las interacciones aparecen como pegatinas bajo la mira, con la tecla y una barra que se llena si hay que mantener.
-
-**Paneles** (solo uno abierto a la vez)
-- **Álbum**: una pestaña por set y otra del Rey. A la izquierda, las 10 tarjetas del set (silueta gris si no la tienes); a la derecha, el detalle con todas tus copias y las acciones Limpiar, Vender, Exhibir / Quitar del pedestal, Fusionar ×3 y Ensamblar. Muestra los fragmentos (N/5), "Exhibidas N/6" y "Almacén N/máx".
-- **Tienda**: §9.
-- **Logros**: §15.
-- **Mi base**: pestañas Estantería (las 12 figuritas, con pista para las escondidas), Radio (reproducir o parar cintas) y Exhibidor (qué hay en cada podio, y quitarlo). Arriba, los "Me gusta" recibidos.
-- **Mesa de reparación**: §11.
-
----
-
-## 18. Multijugador
-
-- Hasta **6 jugadores** por servidor, cada uno con su base.
-- **Compartido**: el patio, sus montones y todo lo que sale de ellos (quien recoge primero, se lo lleva), las bolsas lanzadas que fallan (cualquiera las recoge) y la animación de la recicladora.
-- **De cada uno**: su bolsa, su energía, su dinero, su colección y su base. Las figuritas escondidas las puede recoger cada jugador una vez.
-- **Social**: el feed del servidor, visitar bases y los "Me gusta".
+- **(Llega con K1)**: el Turbo que solo corre mientras juegas (y en pausa si no haces nada), el Turbo del Pack de inicio, la corona VIP, la Bolsa de cartón puesta, el precio real en la tienda y las ofertas.
+- Pases y productos **a la venta**: faltan crearlos en Roblox; también 10 de los 20 Badges.
+- **Pospuestas**: figuritas escondidas y cintas de música en los montones.
+- **Después del lanzamiento**: amigos, grupo e invitaciones, códigos, contenido nuevo pasado el Rebirth 3, premios semanales de ranking.
+- **Quitadas** (no vuelven sin una decisión nueva): mascotas, energía y refrescos, bases, gemas, sobres y Contenedor Dorado, trajes, venta, reparación y fusión.
