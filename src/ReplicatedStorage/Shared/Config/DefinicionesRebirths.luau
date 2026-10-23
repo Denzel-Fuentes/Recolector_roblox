@@ -29,6 +29,9 @@
 	segundo argumento (niveles de las mejoras) se acepta y se ignora, para
 	que la firma no cambie si algun dia se decide medir lo que falta. Lee las
 	tablas al llamarlo: sigue valiendo cuando cambien los numeros.
+	redondear(n) deja un premio en dos cifras significativas, como los
+	redondea el documento ($757,3 -> $760, $1.009,7 -> $1.000; por debajo de
+	100, a la unidad): asi pedidos y recompensas dan cifras redondas iguales.
 ]]
 
 local DefinicionesMejoras = require(script.Parent.DefinicionesMejoras)
@@ -81,6 +84,25 @@ end
 -- tambien por que se ignoran los niveles)
 function DefinicionesRebirths.costeSiguiente(rebirths: number, _nivelesMejoras: { [string]: number }?): number
 	return DefinicionesRebirths.rebirth(rebirths + 1).requisito + DefinicionesMejoras.costeTotal()
+end
+
+-- Dos cifras significativas (1.009,7 -> 1.000; 757,3 -> 760); por debajo de
+-- 100, a la unidad (docs/Economia-v4.md §2.4). Para los premios en dinero y
+-- los requisitos que no estan en la tabla
+function DefinicionesRebirths.redondear(n: number): number
+	if n < 100 then
+		return math.floor(n + 0.5)
+	end
+	-- La potencia de 10 de n. log10 de una potencia exacta (1.000) puede
+	-- quedarse un pelo corto o largo: se corrige con la potencia misma
+	local exponente = math.floor(math.log10(n))
+	if 10 ^ (exponente + 1) <= n then
+		exponente += 1
+	elseif 10 ^ exponente > n then
+		exponente -= 1
+	end
+	local paso = 10 ^ (exponente - 1)
+	return math.floor(n / paso + 0.5) * paso
 end
 
 return DefinicionesRebirths
