@@ -185,7 +185,7 @@ un módulo de solo tipos.
   Dorado, Pase de la Suerte, Montón extra, reparación, fusión, venta, base,
   logros con dinero; el 3 oct las mascotas, sus fragmentos y el imán; el
   5 oct los trajes del avatar, gratis y de pago; el 22 oct 7 textos sin uso,
-  los iconos gema, sobre, contenedorDorado y pocion y el glifo gema): no se
+  los iconos y glifos gema, sobre, contenedorDorado y pocion): no se
   reintroduce sin decisión del usuario (`sinRestos` lo vigila). Tampoco se
   vende dinero, ni saltos de rebirth, ni automatización. Lo que solo POSPONE
   (figuritas, cintas) sigue tras
@@ -277,7 +277,7 @@ un módulo de solo tipos.
    - Progreso: `estado`, `perfilV5` (antes `perfilV3`), `mejorasV2` ($35.485
      las 4 al máximo), `brazoLimita`, `aparicion`, `tutorial` (8 pasos),
      `sinRestos` (nada de lo quitado: mascotas, trajes y el copy, los iconos
-     y el glifo del 22 oct).
+     y los glifos del 22–23 oct).
    - Rankings: `rankings` (semana desde el lunes, valores semanales de suma
      y de máximo, stores `_Studio`, un tablón por ranking) y
      `rankingsDatastore` (ida y vuelta real por los OrderedDataStores de

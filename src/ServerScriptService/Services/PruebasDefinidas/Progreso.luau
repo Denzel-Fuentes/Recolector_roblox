@@ -353,7 +353,8 @@ function Pruebas.sinRestos()
 			table.insert(restos, "FUNCIONES." .. nombre)
 		end
 	end
-	-- El copy, los iconos y el glifo sin uso que se borraron el 22 oct: ni en
+	-- El copy, los iconos y los glifos sin uso que se borraron el 22 oct (los
+	-- glifos sobre y contenedorDorado, que se habian quedado, el 23): ni en
 	-- Textos ni en ninguna traduccion, ni en Config/Iconos ni en
 	-- Utilidades/Glifos. Si alguno vuelve a hacer falta de verdad, se quita
 	-- de estas listas.
@@ -382,9 +383,9 @@ function Pruebas.sinRestos()
 		if Iconos.existe(clave) then
 			table.insert(restos, "Iconos." .. clave)
 		end
-	end
-	if Glifos.existe("gema") then
-		table.insert(restos, "Glifos.gema")
+		if Glifos.existe(clave) then
+			table.insert(restos, "Glifos." .. clave)
+		end
 	end
 	return string.format("restos: [%s] => %s", table.concat(restos, ", "), ok(#restos == 0))
 end

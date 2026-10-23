@@ -269,7 +269,9 @@ Lo no obvio de cada paquete:
 - **C1, copy y limpieza**: fuera 7 textos sin uso (`HUD.lanzar`, `HUD.cerrar`,
   `PATIO.figurinaYaTienes`, `TIENDA.comprar`, `TIENDA.equipado`,
   `NOTIFICACIONES.guardado`, `NOTIFICACIONES.tesoro`), los iconos gema, sobre,
-  contenedorDorado y pocion y el glifo gema; `sinRestos` falla si vuelven.
+  contenedorDorado y pocion y el glifo gema (los glifos sobre y
+  contenedorDorado se habían quedado y se borraron el 23 oct); `sinRestos`
+  falla si vuelven.
 - **P1, guardado v4** (y los arreglos de su revisión, el mismo día):
   `Services/Guardado` hereda el guardado de `DataService` (que queda como
   cableado), sigue sin ProfileStore y pone el bloqueo de sesión dentro de

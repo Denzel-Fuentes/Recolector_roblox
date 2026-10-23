@@ -196,20 +196,6 @@ DIBUJOS.flecha = function(l, color)
 	forma(l, 0.3, 0.1, 0.4, 0.4, c, 0.1, 45)
 end
 
-DIBUJOS.sobre = function(l, color)
-	local c = color or Paleta.UI_GEMAS
-	forma(l, 0.08, 0.26, 0.84, 0.58, c, 0.08)
-	forma(l, 0.3, 0.06, 0.4, 0.4, claro(c), 0.08, 45)
-	forma(l, 0.08, 0.5, 0.84, 0.34, c, 0.08)
-end
-
-DIBUJOS.contenedorDorado = function(l, color)
-	local c = color or Paleta.DORADO
-	forma(l, 0.16, 0.36, 0.68, 0.54, c, 0.1)
-	forma(l, 0.08, 0.24, 0.84, 0.18, oscuro(c), 0.3)
-	forma(l, 0.4, 0.12, 0.2, 0.14, oscuro(c), 0.3)
-end
-
 DIBUJOS.estrella = function(l, color)
 	letra(l, "★", color or Paleta.UI_PRIMARIO, 1.1)
 end
