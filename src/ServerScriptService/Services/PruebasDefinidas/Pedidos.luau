@@ -47,6 +47,10 @@ local function restaurar(j, p, copia)
 	for k, v in copia do
 		p[k] = v
 	end
+	-- Lo que no habia no sale en el bucle: en un perfil v5 turboHasta es nil
+	-- y el Turbo que pusiera la prueba seguiria corriendo (y doblaria el
+	-- dinero de las pruebas siguientes, p. ej. salirRecicla)
+	p.turboHasta = copia.turboHasta
 	Perfiles.marcarSucio(j)
 end
 
