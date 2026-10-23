@@ -77,7 +77,8 @@
 	                    primera), minutosActivos y diasCalendario (casillas
 	                    cobradas: la insignia semanaCompleta) las suma R1
 	Y la senal alMinuto: el tic de 60 s de tiempoJugado, por jugador, para
-	que R1 cuente ahi los minutos activos.
+	que R1 cuente ahi los minutos activos. Lo que hace activo un minuto (y
+	lo que pausa el Turbo) lo dice Services/Actividad.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
