@@ -161,7 +161,7 @@ return {
 			leyenda = "Dá o emblema Lenda da reciclagem",
 		},
 		reinicia = "O dinheiro e as melhorias são zerados",
-		conserva = "Você mantém as zonas abertas, os recordes, os emblemas e os passes",
+		conserva = "Você mantém os tipos de lixo que liberou, os recordes, os emblemas e os passes",
 		renacer = "Renascer",
 		hecho = "Rebirth {n}! Seu dinheiro agora vale {mult}",
 		faltanMejoras = "Antes de renascer, leve as 4 melhorias ao máximo",

@@ -1572,9 +1572,12 @@ a origin/master). Lo que falta, en orden:
    `RECOMPENSAS` no necesitan entrada en `SONIDO_AVISO`: cada cobro ya suena
    ("regalo") por `RecompensaEvent` "premio" en `UI/Recompensas`, y los
    informativos ("abiertas", "listo") callan como los demás.
-   También del 23 oct: los colores de las pestañas del Kit cambian con el
-   idioma (salen del nombre del botón) y, con mando, las insignias de tecla
-   (Q, R…) no sirven. Y lo menor de la revisión Q4b: con el perfil
+   También del 23 oct: con mando, las insignias de tecla (Q, R…) no sirven;
+   y el poste del cartel "Patio de basura ↑" de la plaza tapa una letra
+   desde el este ("Patio de|asura", "Junk|ard"): moverlo pide re-hornear.
+   (Hecho ese día: las pestañas con el mismo color en los tres idiomas,
+   `Kit/Pestanas` con `Claves`, y `REBIRTH.conserva` sin las "zonas
+   abiertas".) Y lo menor de la revisión Q4b: con el perfil
    provisional (DataStore caído) la tienda deja comprar Turbo, que no llega
    hasta que Roblox reintenta el recibo (apagar los botones de productos con
    `cargado == false`); una bolsa caída que no cabe no se recoge ni avisa, y

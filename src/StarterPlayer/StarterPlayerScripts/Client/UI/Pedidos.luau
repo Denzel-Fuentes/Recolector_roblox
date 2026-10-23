@@ -389,6 +389,7 @@ scope:Ventana({
 	Hijos = {
 		scope:Pestanas({
 			Nombres = { Textos.PEDIDOS.pestanaPedidos, Textos.PEDIDOS.pestanaInsignias },
+			Claves = { "Pedidos del día", "Insignias" }, -- el color, igual en todo idioma (Kit/Pestanas)
 			Seleccion = pestana,
 		}),
 		paginas,

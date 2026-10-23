@@ -318,13 +318,13 @@ Capturas con `screen_capture` (MCP) o desde Studio a 1920×1080. Las posiciones 
   - en: "The bag lands in the paper bin: SCORED! appears with the money earned."
   - pt: "O saco cai na lixeira de papel: aparece ACERTOU! com o dinheiro ganho."
 
-**3. Los cinco contenedores**
-- **Qué se ve**: desde la plaza (8, 12, 100) mirando a (8, 3, 128): los cuatro de color, cada uno con su trituradora, y el general azul de la recicladora.
-- **Idiomas**: una por idioma, por los carteles ("PAPEL · x2"). Antes hay que re-hornear el mundo para que las placas se traduzcan (CONTEXTO §5.6).
+**3. Los contenedores de color**
+- **Qué se ve**: desde la plaza (8, 12, 100) mirando a (8, 3, 128): los cuatro de color, cada uno con su trituradora. El general azul queda fuera: está al otro lado de la caseta (x −57,5), y con los cinco en 16:9 las placas no se leen o los tapan la caseta y los tablones (comprobado al capturarlas, 23 oct).
+- **Idiomas**: una por idioma, por los carteles ("PAPEL · x2"). Las placas se traducen desde el re-horneado del 22 oct.
 - **Texto alternativo**:
-  - es: "Los cinco contenedores: papel celeste, plástico amarillo, metal gris, orgánico verde y el general azul."
-  - en: "The five bins: light blue paper, yellow plastic, gray metal, green organic and the blue general bin."
-  - pt: "As cinco lixeiras: papel azul-claro, plástico amarelo, metal cinza, orgânico verde e a geral azul."
+  - es: "Los contenedores de color, cada uno con su trituradora: orgánico verde, metal gris, plástico amarillo y papel celeste."
+  - en: "The colored bins, each with its shredder: green organic, gray metal, yellow plastic and light blue paper."
+  - pt: "As lixeiras coloridas, cada uma com seu triturador: orgânico verde, metal cinza, plástico amarelo e papel azul-claro."
 
 **4. Varios jugadores**
 - **Qué se ve**: de 4 a 6 avatares reales (cuentas propias o amigos, con su permiso; en el place publicado o con Team Test) en el patio. Uno excava una montaña grande donde brilla un tesoro, otro recoge y otro carga un lanzamiento.

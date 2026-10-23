@@ -6,8 +6,14 @@
 	Album), contorno marino y texto blanco; la elegida sube y se ve entera,
 	las demas quedan hundidas y oscurecidas.
 
-	  scope:Pestanas { Nombres, Seleccion (Value<number>), Colores?,
+	  scope:Pestanas { Nombres, Seleccion (Value<number>), Claves?, Colores?,
 	                   Alto? (40), Orden?, Size?, Position?, alCambiar?(indice) }
+
+	El color fijo sale de Claves[i] si se da, y si no, del nombre. Los
+	Nombres van traducidos y el color cambiaba con el idioma (Mejoras azul en
+	espanol, naranja en ingles, rosa en portugues: visto en las miniaturas del
+	23 oct): los paneles pasan como Claves sus etiquetas en espanol, el idioma
+	fuente, y asi cada pestana tiene en los tres idiomas el color de siempre.
 
 	La seleccion es un Value que posee quien crea las pestanas: el panel
 	decide que se ve con Computed(use(seleccion)). Devuelve la barra.
@@ -34,6 +40,7 @@ type U<T> = Fusion.UsedAs<T>
 export type Props = {
 	Nombres: { string },
 	Seleccion: Fusion.Value<number>,
+	Claves: { string }?, -- de donde sale el color (ver cabecera)
 	Colores: { Color3 }?,
 	Alto: number?,
 	Orden: U<number>?,
@@ -47,7 +54,7 @@ return function(scope: any, p: Props): Frame
 	local hueco = 6
 	local pestanas = {}
 	for i, nombre in p.Nombres do
-		local propio = (p.Colores and p.Colores[i]) or Tema.colorBoton(nombre)
+		local propio = (p.Colores and p.Colores[i]) or Tema.colorBoton((p.Claves and p.Claves[i]) or nombre)
 		local elegida = scope:Computed(function(use)
 			return use(p.Seleccion) == i
 		end)

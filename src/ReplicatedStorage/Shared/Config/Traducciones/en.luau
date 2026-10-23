@@ -157,7 +157,7 @@ return {
 			leyenda = "Gives you the Recycling legend badge",
 		},
 		reinicia = "Your money and upgrades reset",
-		conserva = "You keep unlocked zones, records, badges and passes",
+		conserva = "You keep the trash types you unlocked, records, badges and passes",
 		renacer = "Rebirth",
 		hecho = "Rebirth {n}! Your money is now worth {mult}",
 		faltanMejoras = "Max out all 4 upgrades before you rebirth",

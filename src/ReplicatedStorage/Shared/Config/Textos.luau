@@ -194,7 +194,7 @@ Textos.REBIRTH = {
 		leyenda = "Regala la insignia Leyenda del reciclaje",
 	},
 	reinicia = "Se reinician el dinero y las mejoras",
-	conserva = "Te quedas las zonas abiertas, los récords, las insignias y los pases",
+	conserva = "Te quedas los tipos de basura que abriste, los récords, las insignias y los pases",
 	renacer = "Renacer",
 	hecho = "¡Rebirth {n}! Tu dinero ahora vale {mult}",
 	faltanMejoras = "Antes de renacer, lleva las 4 mejoras al máximo",

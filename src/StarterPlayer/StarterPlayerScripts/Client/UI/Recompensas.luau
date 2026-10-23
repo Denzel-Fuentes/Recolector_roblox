@@ -628,6 +628,7 @@ scope:Ventana({
 	Hijos = {
 		scope:Pestanas({
 			Nombres = { Textos.RECOMPENSAS.calendario, Textos.RECOMPENSAS.regalos },
+			Claves = { "Calendario", "Regalos por jugar" }, -- el color, igual en todo idioma (Kit/Pestanas)
 			Seleccion = pestana,
 		}),
 		paginas,

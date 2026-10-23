@@ -543,6 +543,7 @@ scope:Ventana({
 	Hijos = {
 		scope:Pestanas({
 			Nombres = { Textos.TIENDA.mejoras, Textos.TIENDA.pases, Textos.TIENDA.estilo },
+			Claves = { "Mejoras", "Pases", "Estilo" }, -- el color, igual en todo idioma (Kit/Pestanas)
 			Seleccion = pestana,
 		}),
 		paginas,
