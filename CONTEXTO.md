@@ -29,8 +29,9 @@ productos de Turbo creados en el Creator Hub con sus ids en `Config/Productos`
 tres idiomas (I1b, 23 oct). El usuario pausó el plan el 23 oct y lo retomó ese mismo día;
 **K1** (catálogo: Turbo solo jugando, VIP, Pack de inicio, ofertas y precio
 real) se unió a master el 23 oct y, con E1 y N1b, quedó **verificado en
-Studio** ese mismo día (la batería entera en verde). La ficha del Creator Hub está hecha y el juego sigue
-**privado**.
+Studio** ese mismo día (la batería entera en verde). La ficha del Creator Hub está hecha, el place se
+**publicó** el 23 oct (la versión 286, con master hasta `ad51258`) y el juego
+sigue **privado**.
 
 **3 oct 2026: v3 para lanzar** (decisiones del usuario, ver §3 "Lanzamiento:
 v3"): **cinco contenedores** (uno por tipo de basura, del color de su tipo,
@@ -491,6 +492,21 @@ Lo no obvio de cada paquete:
   primero los textos y al final ordenar y Save Changes. Máximo 4 MB por
   imagen (las de hoy pesan 1,7–2,9 MB; una captura nativa a 1920 puede
   pasarse).
+- **Publicar el place** (23 oct, la versión 286): en Studio, Archivo →
+  Publicar en Roblox (Alt+P). No hay API ni herramienta del MCP para
+  hacerlo, y el modo automático de Claude lo para como despliegue a
+  producción: va con el permiso expreso del usuario. Antes, en Edit: el
+  instalador HTTP da 0 cambios (Studio tiene el código de master); no queda
+  ningún atributo de prueba (`Prueba`, `IdiomaStudio`, `OfertasEnStudio`,
+  `SimularCargaLenta`) ni scripts fuera de las carpetas de Rojo;
+  `HttpService.HttpEnabled` está apagado (el juego no lo usa; hasta el
+  23 oct lo dejaba encendido el instalador y Team Create lo guardaba); y
+  una pasada corta en Play (`estado`, `idioma`, `sinRestos` y la consola).
+  Studio lo confirma con "Publicado. Los editores ya pueden jugar." y
+  Creator Hub → el place → Version History marca la versión publicada
+  (con "Show published only", las anteriores). Para volver atrás: Restore
+  de la anterior allí, que solo la guarda, y publicarla desde Studio.
+  Mientras la experiencia sea privada, solo la juegan sus editores.
 - **Imágenes de lanzamiento** (I1a, 22 oct): renders de Blender a 512×512 sin
   texto en `thumbnails/` (3 propuestas de icono, la 1 copiada a
   `icon_512.png`; las 20 insignias en bronce, plata y oro; los 6 pases y los 2
@@ -1628,8 +1644,10 @@ a origin/master). Lo que falta, en orden:
 8. **Verificación de lanzamiento**: Q0, la regresión completa (la batería de
    CLAUDE.md "Verificar", `("hud")` en PC, táctil y mando, el juego en inglés
    y en portugués, la consola limpia y capturas de cada panel) y Q4b (revisión
-   de todo el diff desde `base-lanzamiento`); **el usuario publica el place**;
-   Q1, multijugador con 2–3 clientes (`README-pruebas.md`); Q2, un móvil real,
+   de todo el diff desde `base-lanzamiento`); la publicación del place
+   (**hecha** el 23 oct a las 17:01: la versión 286, con master hasta
+   `ad51258`; la anterior publicada era la 158, del 29 sep, de antes de la
+   v3; cómo, en §3 "Publicar el place"); Q1, multijugador con 2–3 clientes (`README-pruebas.md`); Q2, un móvil real,
    y Q3, una compra real de cada tipo (estas dos, del usuario). **Ojo con Q3**:
    Roblox da a su creador los pases que crea (`UserOwnsGamePassAsync` da
    `true` en los seis para fuentes_arial12, comprobado el 23 oct), así que
