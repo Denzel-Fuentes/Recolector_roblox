@@ -52,7 +52,12 @@ GameConfig.REINTENTO_CARGA_FONDO = 30
 
 -- === Mejoras (valores y costes en DefinicionesMejoras) ===
 GameConfig.NIVEL_MAX_MEJORA = 10
-GameConfig.FACTOR_COSTE_MEJORA = 1.6
+-- Economia v4 (22 oct, docs/Economia-v4.md §2.1): 1,35 (era 1,6) con los
+-- mismos costes base. Las 4 al maximo pasan de $118.030 a $35.485: con 1,6
+-- el 76 % del gasto estaba en los tres ultimos niveles y el final de cada
+-- tramo se hacia eterno. Los requisitos de los rebirths, en
+-- DefinicionesRebirths
+GameConfig.FACTOR_COSTE_MEJORA = 1.35
 
 -- === Montones ===
 GameConfig.DURACION_EXCAVAR = 1.5

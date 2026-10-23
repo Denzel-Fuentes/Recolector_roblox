@@ -248,6 +248,11 @@ function Pruebas.analiticaEconomia()
 	Economia.ganar(j, 500)
 	Pedidos.alCumplir:Fire(j, { id = "separadas", objetivo = 40, progreso = 40, cobrado = true, recompensa = 500 })
 	comprobar("Pedido_facil", "fuente", 500, p.dinero, "Gameplay")
+	-- El Pedido VIP va con la dificultad con la que paga (dificil), no con
+	-- la de su plantilla (separadas es facil)
+	Economia.ganar(j, 1500)
+	Pedidos.alCumplir:Fire(j, { id = "separadas", objetivo = 40, progreso = 40, cobrado = true, recompensa = 1500, vip = true })
+	comprobar("Pedido_dificil", "fuente", 1500, p.dinero, "Gameplay")
 	-- Mejora de verdad: Alcance de 0 a 1
 	p.mejoras.Alcance = 0
 	local coste = DefinicionesMejoras.coste("Alcance", 0)
@@ -286,7 +291,7 @@ function Pruebas.analiticaEconomia()
 	Tutorial.fijar(j, copia.tutorial)
 	Analitica.fijarPlataforma(j, copia.plataforma)
 	Perfiles.marcarSucio(j)
-	return string.format("depositos $%d (papel) y $%d (general), pedido $500, mejora $%d (compro=%s), salida $77 | mal [%s] | campos %s | deposito sin dinero sin evento=%s | %s => %s",
+	return string.format("depositos $%d (papel) y $%d (general), pedido $500 y VIP $1500 (Pedido_dificil), mejora $%d (compro=%s), salida $77 | mal [%s] | campos %s | deposito sin dinero sin evento=%s | %s => %s",
 		r1.dinero, r2.dinero, coste, tostring(compro), table.concat(mal, "; "), describir(mejora), tostring(sinDinero), describir(sesion[1]),
 		ok(#mal == 0 and compro and camposOk and sinDinero and sesionOk))
 end

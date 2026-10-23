@@ -7,12 +7,24 @@
 	                    el premio por completar los tres (Turbo: dinero x2
 	                    unos minutos). Se cobran solos al cumplirse
 	                    (Services/Pedidos): aqui solo se ve como vas.
-	  Insignias         las 16 (Config/DefinicionesInsignias), conseguidas o
+	  Insignias         las de Config/DefinicionesInsignias, conseguidas o
 	                    con su progreso.
 
 	Solo presentacion. El perfil llega varias veces por segundo como tablas
 	nuevas: cada fila deriva un primitivo (un texto "progreso|objetivo|...")
-	y se monta una vez sobre los tres huecos fijos y las 16 definiciones.
+	y se monta una vez sobre los huecos fijos y las definiciones.
+
+	Economia v4 (22 oct):
+	  - Lo que paga un pedido pendiente sale de DefinicionesPedidos.premio con
+	    los rebirths del perfil: la misma cuenta con la que cobra el servidor,
+	    asi que cambia en cuanto se renace. Uno ya cobrado ensena lo que se
+	    pago (el servidor lo anota en pedido.recompensa al cobrar): si se
+	    renace despues, no aparece una cifra que no se cobro.
+	  - Pedido VIP (pedido.vip, con el pase): hay POR_DIA_VIP huecos y el que
+	    lleva un pedido VIP se pinta con la etiqueta Textos.PEDIDOS.vip, la
+	    corona y fondo dorado, y DEBAJO de la tarjeta del Turbo: no es uno de
+	    "los 3", y los cuadros del Turbo solo cuentan los normales, como el
+	    servidor.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -53,7 +65,17 @@ end)
 -- Pestana 1: pedidos del dia
 -- ===========================================================================
 
--- El pedido del hueco i como texto plano "texto|progreso|objetivo|cobrado|$"
+-- Orden de la tarjeta del Turbo de los tres: las filas normales van antes
+-- (1..) y las VIP despues (ORDEN_TURBO + i), luego el pie
+local ORDEN_TURBO = 10
+local ORDEN_PIE = ORDEN_TURBO + DefinicionesPedidos.POR_DIA_VIP + 1
+-- Lo que ocupa la etiqueta "Pedido VIP" encima del titulo
+local ALTO_ETIQUETA_VIP = 22
+
+-- El pedido del hueco i como texto plano
+-- "texto|progreso|objetivo|cobrado|$|vip". El $ de uno pendiente es lo que
+-- pagaria ahora (DefinicionesPedidos.premio con los rebirths del perfil);
+-- el de uno cobrado, lo que se pago (ver cabecera)
 local function pedidoEn(i: number)
 	return scope:Computed(function(use)
 		local p = use(reactivo.perfil)
@@ -61,13 +83,17 @@ local function pedidoEn(i: number)
 		if not pedido then
 			return ""
 		end
-		return string.format("%s|%d|%d|%s|%d", DefinicionesPedidos.texto(pedido, Textos), pedido.progreso, pedido.objetivo, tostring(pedido.cobrado), pedido.recompensa or 0)
+		local premio = if pedido.cobrado and pedido.recompensa
+			then pedido.recompensa
+			else DefinicionesPedidos.premio(pedido, p.rebirths or 0)
+		return string.format("%s|%d|%d|%s|%d|%s", DefinicionesPedidos.texto(pedido, Textos), pedido.progreso, pedido.objetivo,
+			tostring(pedido.cobrado), premio, tostring(pedido.vip == true))
 	end)
 end
 
-local function partes(texto: string): (string, number, number, boolean, number)
+local function partes(texto: string): (string, number, number, boolean, number, boolean)
 	local t = string.split(texto, "|")
-	return t[1] or "", tonumber(t[2]) or 0, tonumber(t[3]) or 1, t[4] == "true", tonumber(t[5]) or 0
+	return t[1] or "", tonumber(t[2]) or 0, tonumber(t[3]) or 1, t[4] == "true", tonumber(t[5]) or 0, t[6] == "true"
 end
 
 local function filaPedido(i: number)
@@ -76,31 +102,62 @@ local function filaPedido(i: number)
 		local _, _, _, cobrado = partes(use(dato))
 		return cobrado
 	end)
+	local esVip = scope:Computed(function(use)
+		local _, _, _, _, _, vip = partes(use(dato))
+		return vip
+	end)
+	-- La etiqueta VIP empuja el titulo y la barra hacia abajo
+	local bajada = scope:Computed(function(use)
+		return if use(esVip) then ALTO_ETIQUETA_VIP else 0
+	end)
 	return scope:Tarjeta({
 		Nombre = "Pedido" .. i,
-		Orden = i,
-		Size = UDim2.new(1, 0, 0, 84),
+		Orden = scope:Computed(function(use)
+			return if use(esVip) then ORDEN_TURBO + i else i
+		end),
+		Size = scope:Computed(function(use)
+			return UDim2.new(1, 0, 0, 84 + use(bajada))
+		end),
 		Visible = scope:Computed(function(use)
 			return use(abiertos) and use(dato) ~= ""
 		end),
 		Color = scope:Computed(function(use)
-			return if use(hecho) then Color3.fromRGB(215, 245, 215) else Paleta.UI_PAPEL_OSCURO
+			if use(hecho) then
+				return Color3.fromRGB(215, 245, 215)
+			end
+			return if use(esVip) then Color3.fromRGB(255, 241, 196) else Paleta.UI_PAPEL_OSCURO
 		end),
 		Hijos = {
 			scope:Icono({
 				Clave = scope:Computed(function(use)
-					return if use(hecho) then "trofeo" else "libreta"
+					if use(hecho) then
+						return "trofeo"
+					end
+					return if use(esVip) then "corona" else "libreta"
 				end),
 				Tamano = 48,
 				Position = UDim2.new(0, 0, 0.5, 0),
 				AnchorPoint = Vector2.new(0, 0.5),
 			}),
 			scope:Texto({
+				Nombre = "EtiquetaVip",
+				Texto = Textos.PEDIDOS.vip,
+				Visible = esVip,
+				Size = UDim2.new(1, -190, 0, ALTO_ETIQUETA_VIP - 2),
+				Position = UDim2.fromOffset(58, 0),
+				Tamano = 15,
+				Fuente = "titulo",
+				Color = Paleta.UI_ORO,
+				Contorno = Paleta.UI_TINTA,
+			}),
+			scope:Texto({
 				Texto = scope:Computed(function(use)
 					return (partes(use(dato)))
 				end),
 				Size = UDim2.new(1, -190, 0, 26),
-				Position = UDim2.fromOffset(58, 2),
+				Position = scope:Computed(function(use)
+					return UDim2.fromOffset(58, 2 + use(bajada))
+				end),
 				Tamano = 17,
 				Fuente = "titulo",
 			}),
@@ -117,7 +174,9 @@ local function filaPedido(i: number)
 					return if use(hecho) then Paleta.UI_EXITO else Paleta.UI_CARTAS
 				end),
 				Size = UDim2.new(1, -190, 0, 24),
-				Position = UDim2.fromOffset(58, 36),
+				Position = scope:Computed(function(use)
+					return UDim2.fromOffset(58, 36 + use(bajada))
+				end),
 				Radio = 12,
 			}),
 			scope:Pildora({
@@ -154,19 +213,22 @@ local function paginaPedidos()
 			Orden = 0,
 		}),
 	}
-	for i = 1, DefinicionesPedidos.POR_DIA do
+	-- Un hueco por pedido posible (con el pase VIP, uno mas); los que no
+	-- tienen pedido no se ven
+	for i = 1, DefinicionesPedidos.POR_DIA_VIP do
 		table.insert(hijos, filaPedido(i))
 	end
-	-- El premio del dia: 3 cuadros, uno por pedido cobrado
+	-- El premio del dia: 3 cuadros, uno por pedido normal cobrado (el VIP no
+	-- cuenta para el Turbo, Services/Pedidos)
 	local cobrados = scope:Computed(function(use)
 		local p = use(reactivo.perfil)
 		local n = 0
 		for _, pedido in (p and p.pedidos and p.pedidos.lista) or {} do
-			if pedido.cobrado then
+			if pedido.cobrado and not pedido.vip then
 				n += 1
 			end
 		end
-		return n
+		return math.min(n, DefinicionesPedidos.POR_DIA)
 	end)
 	local premioCobrado = scope:Computed(function(use)
 		local p = use(reactivo.perfil)
@@ -174,7 +236,7 @@ local function paginaPedidos()
 	end)
 	table.insert(hijos, scope:Tarjeta({
 		Nombre = "PremioDia",
-		Orden = 10,
+		Orden = ORDEN_TURBO,
 		Size = UDim2.new(1, 0, 0, 74),
 		Color = Paleta.UI_PRIMARIO,
 		Visible = abiertos,
@@ -208,7 +270,7 @@ local function paginaPedidos()
 		Tamano = 13,
 		Color = Paleta.UI_TINTA_SUAVE,
 		Alinear = Enum.TextXAlignment.Center,
-		Orden = 11,
+		Orden = ORDEN_PIE,
 	}))
 	return hijos
 end
