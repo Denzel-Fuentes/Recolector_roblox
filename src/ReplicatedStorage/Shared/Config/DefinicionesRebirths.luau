@@ -16,7 +16,22 @@
 	El Rebirth 3 daba la segunda mascota equipada; al quitar las mascotas
 	(3 oct) regala un diseno de bolsa (DefinicionesCosmeticos). Lo que abre
 	cada rebirth no se repite aqui: las zonas las dice GameConfig.CUADRANTES.
+
+	=== Coste del siguiente rebirth (economia v4, C3 22 oct) ===
+	costeSiguiente(rebirths) es la base de todos los premios en dinero: los
+	pedidos (E1) y el calendario, los regalos y el bono de regreso (R1) pagan
+	un porcentaje de el (docs/Economia-v4.md §2.4 y §4.1). Es el tramo
+	entero: el requisito en mano del rebirth rebirths + 1 mas las 4 mejoras
+	de 0 a 10 (DefinicionesMejoras.costeTotal), como lo define el documento,
+	y NO lo que le falta al jugador: asi un premio solo cambia al renacer
+	(los pedidos pendientes pasan a valer lo del rebirth nuevo), no baja al
+	comprar mejoras y vale lo mismo para todos los del mismo rebirth. El
+	segundo argumento (niveles de las mejoras) se acepta y se ignora, para
+	que la firma no cambie si algun dia se decide medir lo que falta. Lee las
+	tablas al llamarlo: sigue valiendo cuando cambien los numeros.
 ]]
+
+local DefinicionesMejoras = require(script.Parent.DefinicionesMejoras)
 
 export type Rebirth = {
 	requisito: number, -- $ en mano para hacerlo
@@ -59,6 +74,13 @@ function DefinicionesRebirths.multiplicador(rebirths: number): number
 		return 1
 	end
 	return DefinicionesRebirths.rebirth(rebirths).multiplicador
+end
+
+-- Lo que cuesta el siguiente rebirth con `rebirths` hechos: su requisito mas
+-- las 4 mejoras de 0 a 10. La base de los premios en dinero (ver cabecera,
+-- tambien por que se ignoran los niveles)
+function DefinicionesRebirths.costeSiguiente(rebirths: number, _nivelesMejoras: { [string]: number }?): number
+	return DefinicionesRebirths.rebirth(rebirths + 1).requisito + DefinicionesMejoras.costeTotal()
 end
 
 return DefinicionesRebirths
